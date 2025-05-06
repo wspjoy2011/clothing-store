@@ -12,7 +12,7 @@ from pathlib import Path
 from settings.config import config
 
 
-def get_logger(name: str = __name__) -> logging.Logger:
+def get_logger(name: str, log_filename: str) -> logging.Logger:
     """Creates and configures a logger with both console and file handlers.
 
     The logger will:
@@ -21,7 +21,8 @@ def get_logger(name: str = __name__) -> logging.Logger:
     - Suppress verbose logs from `httpx` library.
 
     Args:
-        name (str): The logger name, typically `__name__`.
+        name (str): name of the logger (usually __name__).
+        log_filename (str): base name (without .log) for the file in config.LOG_DIR.
 
     Returns:
         logging.Logger: A configured logger instance.
@@ -37,8 +38,9 @@ def get_logger(name: str = __name__) -> logging.Logger:
         logger.addHandler(console_handler)
 
         # File handler for WARNING+ logs
-        log_file: Path = config.LOG_DIR / "app.log"
+        log_file: Path = config.LOG_DIR / f"{log_filename}.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
+
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.WARNING)
         file_formatter = logging.Formatter(

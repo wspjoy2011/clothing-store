@@ -1,45 +1,45 @@
-"""Application configuration module.
-
-This module defines the AppConfig class, which loads application settings from
-environment variables using Pydantic. It supports configurable paths for image
-storage, logging, allowed file formats, and file size limits.
-
-Side effects:
-    - Reads and parses environment variables from the `.env` file during import.
-"""
-
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Base directory for resolving relative paths
+# Base directory for resolving the path to .env
 BASE_DIR = Path(__file__).parent.parent.parent
 
 
 class AppConfig(BaseSettings):
-    """Application settings loaded from environment variables.
-
-    Attributes:
-        IMAGES_DIR (str): Directory path where uploaded images are stored.
-        WEB_SERVER_WORKERS (int): Number of worker processes to run for the HTTP server.
-        WEB_SERVER_START_PORT (int): Starting port number for worker processes.
-        LOG_DIR (Path): Directory path where log files are saved.
-        MAX_FILE_SIZE (int): Maximum allowed size of uploaded files (in bytes).
-        SUPPORTED_FORMATS (set[str]): Set of allowed file extensions.
+    """
+    Application settings loaded from environment variables.
     """
 
-    IMAGES_DIR: str
-    LOG_DIR: Path
-    WEB_SERVER_WORKERS: int
-    WEB_SERVER_START_PORT: int
+    # PostgreSQL settings
+    POSTGRES_DB: str
+    POSTGRES_DB_PORT: int
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_HOST: str
 
-    MAX_FILE_SIZE: int = 1 * 1024 * 1024
-    SUPPORTED_FORMATS: set[str] = {'.jpg', '.png', '.gif'}
+    # pgAdmin settings
+    PGADMIN_DEFAULT_EMAIL: str
+    PGADMIN_DEFAULT_PASSWORD: str
+
+    # Paths
+    DATASET_DIR: Path
+    LOG_DIR: Path
 
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8"
     )
 
+    @property
+    def STYLES_CSV(self) -> Path:
+        """Full path to styles_clean.csv"""
+        return self.DATASET_DIR / "styles_clean.csv"
 
-# Global application config instance
+    @property
+    def IMAGES_CSV(self) -> Path:
+        """Full path to images.csv"""
+        return self.DATASET_DIR / "images.csv"
+
+
+# Global config instance
 config = AppConfig()
