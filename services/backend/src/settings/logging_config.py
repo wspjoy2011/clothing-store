@@ -32,7 +32,7 @@ def get_logger(name: str, log_filename: str) -> logging.Logger:
         # Console handler for INFO+ logs
         console_handler = logging.StreamHandler()
         console_formatter = logging.Formatter(
-            "%(asctime)s - %(processName)s - %(levelname)s - %(message)s"
+            "%(asctime)s - %(name)s -  %(levelname)s - %(message)s"
         )
         console_handler.setFormatter(console_formatter)
         logger.addHandler(console_handler)
@@ -44,7 +44,7 @@ def get_logger(name: str, log_filename: str) -> logging.Logger:
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.WARNING)
         file_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            "%(asctime)s - %(name)s - %(filename)s - %(levelname)s - %(message)s"
         )
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)

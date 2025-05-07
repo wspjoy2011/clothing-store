@@ -20,6 +20,12 @@ up:  ## Start all services
 up-detached:  ## Start all services in detached mode
 	docker compose --env-file $(ENV_FILE) up -d
 
+seed-db: ## Start services, run seed.py, then stop services
+	docker compose --env-file $(ENV_FILE) up -d db web
+	@echo "Waiting for the database to be ready..."
+	docker compose --env-file $(ENV_FILE) run --rm web python /usr/src/clothing-store/backend/etl/seed.py
+	docker compose --env-file $(ENV_FILE) down
+
 down:  ## Stop all services
 	docker compose --env-file $(ENV_FILE) down
 

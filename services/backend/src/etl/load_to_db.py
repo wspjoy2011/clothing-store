@@ -26,6 +26,24 @@ class DatabaseSeeder:
             await self._seed_products(conn)
         logger.info("Database seeding completed successfully.")
 
+    async def is_database_empty(self):
+        """Check if the database has no data in its key root or final tables."""
+        critical_tables = ["master_category", "products"]
+        async with self._pool.connection() as conn:
+            for table in critical_tables:
+                query = f"SELECT EXISTS (SELECT 1 FROM {table} LIMIT 1);"
+                logger.debug(f"Executing query to check table '{table}' emptiness: {query}")
+                result = await conn.execute(query)
+                row = await result.fetchone()
+                if row and row[0]:
+                    logger.info(f"Table '{table}' is not empty.")
+                    return False
+                else:
+                    logger.info(f"Table '{table}' is empty.")
+        logger.info("All critical tables are empty.")
+        return True
+
+
     async def _seed_master_categories(self, conn):
         query = "INSERT INTO master_category (name) VALUES (%s) ON CONFLICT DO NOTHING;"
         for category in tqdm_asyncio(self._dto.master_categories, desc="Master Categories"):
