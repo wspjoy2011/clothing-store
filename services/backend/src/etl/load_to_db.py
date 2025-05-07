@@ -9,6 +9,8 @@ logger = get_logger(__name__, "elt")
 
 
 class DatabaseSeeder:
+    BATCH_SIZE = 5000
+
     def __init__(self, pool: AsyncConnectionPool, dto: ETLResultDTO):
         self._pool = pool
         self._dto = dto
@@ -85,24 +87,34 @@ class DatabaseSeeder:
             await conn.execute(query, (usage.name,))
 
     async def _seed_products(self, conn):
-        query = """
-                INSERT INTO products (product_id, gender, year, product_display_name, article_type_id,
-                                      base_colour_id, season_id, usage_type_id, image_url)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (product_id) DO NOTHING; \
-                """
-        for product in tqdm_asyncio(self._dto.products, desc="Products"):
+        params = []
+
+        for product in tqdm_asyncio(self._dto.products, desc="Build params"):
             article_type_id = await self._get_article_type_id(conn, product.article_type)
             base_colour_id = await self._get_base_colour_id(conn, product.base_colour)
             season_id = await self._get_season_id(conn, product.season)
             usage_type_id = await self._get_usage_type_id(conn, product.usage)
-
-            await conn.execute(query, (
+            params.append((
                 product.product_id, product.gender, product.year,
                 product.product_display_name, article_type_id,
                 base_colour_id, season_id, usage_type_id,
                 self._get_image_url_by_product_id(product.product_id)
             ))
+
+        batch_indices = range(0, len(params), self.BATCH_SIZE)
+        for i in tqdm_asyncio(batch_indices, desc="Bulk insert"):
+            batch = params[i: i + self.BATCH_SIZE]
+            sql = """
+                  INSERT INTO products (product_id, gender, year, product_display_name, article_type_id,
+                                        base_colour_id, season_id, usage_type_id, image_url)
+                  VALUES """
+            values_part = ', '.join(['(%s,%s,%s,%s,%s,%s,%s,%s,%s)'] * len(batch))
+            sql += values_part
+            sql += " ON CONFLICT (product_id) DO NOTHING"
+            args = []
+            for row in batch:
+                args.extend(row)
+            await conn.execute(sql, args)
 
     @alru_cache(maxsize=128)
     async def _get_master_category_id(self, conn, name: str) -> int:
