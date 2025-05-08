@@ -5,12 +5,13 @@ services:
       context: services/backend
       dockerfile: Dockerfile
     container_name: clothing-store-backend
-    command: [ "python", "app.py" ]
+    command: [ "/bin/bash", "/commands/run_fastapi_dev.sh" ]
     env_file:
       - services/backend/.env
     environment:
       - LOG_LEVEL=debug
       - PYTHONPATH=/usr/src/clothing-store/backend
+      - WATCHFILES_FORCE_POLLING=true
     volumes:
       - ./services/backend/src:/usr/src/clothing-store/backend
       - ./dataset:/usr/src/dataset

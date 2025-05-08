@@ -59,7 +59,7 @@ CREATE TABLE products (
   gender                   TEXT         NOT NULL,
   year                     SMALLINT,
   product_display_name     TEXT,
-  image_url TEXT,
+  image_url                TEXT,
   article_type_id          INT REFERENCES article_type(article_type_id),
   base_colour_id           INT REFERENCES base_colour(base_colour_id),
   season_id                INT REFERENCES season(season_id),
