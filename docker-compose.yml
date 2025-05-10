@@ -24,6 +24,24 @@ services:
     networks:
       - clothing_store_network
 
+  frontend:
+    restart: always
+    build:
+      context: services/frontend
+      dockerfile: Dockerfile
+    container_name: clothing-store-frontend
+    command: ["npm", "run", "dev", "--", "--config", "/usr/src/clothing-store/frontend/vite.config.js"]
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./services/frontend:/usr/src/clothing-store/frontend
+      - /usr/src/clothing-store/frontend/node_modules
+    ports:
+      - "5000:5000"
+    networks:
+      - clothing_store_network
+
   db:
     image: 'postgres:17.4'
     restart: unless-stopped
