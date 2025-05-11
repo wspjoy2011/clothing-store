@@ -6,16 +6,27 @@
       </v-col>
     </v-row>
 
+    <!-- Per page -->
+    <v-row>
+      <v-col cols="12" class="d-flex justify-end">
+        <items-per-page-select
+            :options="itemsPerPageOptions"
+            @update:perPage="handleItemsPerPageChange"
+        />
+      </v-col>
+    </v-row>
+
+
     <!-- Loader -->
-    <content-loader v-if="loading" />
+    <content-loader v-if="catalogStore.loading"/>
 
     <!-- Error message -->
-    <error-alert v-if="error" :message="error.message" />
+    <error-alert v-if="catalogStore.error" :message="catalogStore.error.message"/>
 
     <!-- Products grid -->
-    <v-row v-if="!loading && !error && products.length > 0">
+    <v-row v-if="!catalogStore.loading && !catalogStore.error && catalogStore.products.length > 0">
       <v-col
-          v-for="product in products"
+          v-for="product in catalogStore.products"
           :key="product.product_id"
           cols="12"
           sm="6"
@@ -28,84 +39,96 @@
 
     <!-- Pagination -->
     <app-pagination
-      v-if="!loading && !error && totalPages > 0"
-      :current-page="currentPage"
-      :total-pages="totalPages"
-      @update:page="handlePageChange"
+        v-if="!catalogStore.loading && !catalogStore.error && catalogStore.totalPages > 0"
+        :current-page="catalogStore.currentPage"
+        :total-pages="catalogStore.totalPages"
+        @update:page="handlePageChange"
     />
 
     <!-- No products found -->
     <no-items-found
-      v-if="!loading && !error && products.length === 0"
-      title="No products found"
-      message="Sorry, there are no products in this category."
+        v-if="!catalogStore.loading && !catalogStore.error && catalogStore.products.length === 0"
+        title="No products found"
+        message="Sorry, there are no products in this category."
     />
   </v-container>
 </template>
 
 <script setup>
-import {ref, onMounted, watch} from 'vue';
+import {onMounted, onUnmounted, watch} from 'vue';
 import {useRouter, useRoute} from 'vue-router';
+
+import {useUserPreferencesStore} from '@/stores/userPreferences';
+import {useCatalogStore} from '@/stores/catalog';
 import ClothesCard from '@/components/catalog/ClothesCard.vue';
 import ContentLoader from '@/components/ui/loaders/ContentLoader.vue';
 import ErrorAlert from '@/components/ui/alerts/ErrorAlert.vue';
 import AppPagination from '@/components/ui/pagination/AppPagination.vue';
+import ItemsPerPageSelect from '@/components/ui/pagination/ItemsPerPageSelect.vue';
 import NoItemsFound from '@/components/ui/empty-states/NoItemsFound.vue';
-import catalogService from '@/services/catalogService';
 
 const router = useRouter();
 const route = useRoute();
+const preferencesStore = useUserPreferencesStore();
+const catalogStore = useCatalogStore();
 
 const props = defineProps({
   page: {
     type: Number,
     default: 1
+  },
+  perPage: {
+    type: Number,
+    default: 12
   }
 });
 
-const products = ref([]);
-const loading = ref(true);
-const error = ref(null);
-const currentPage = ref(props.page);
-const totalPages = ref(0);
-const totalItems = ref(0);
-const perPage = ref(12);
+const itemsPerPageOptions = [8, 12, 16, 20];
 
-const fetchProducts = async (page = currentPage.value) => {
-  loading.value = true;
-  error.value = null;
+const handleItemsPerPageChange = (count) => {
+  router.push({
+    name: 'catalog',
+    query: {
+      ...route.query,
+      page: 1,
+      per_page: count
+    }
+  });
 
-  try {
-    const response = await catalogService.getProducts(page, perPage.value);
-    products.value = response.products;
-    totalPages.value = response.total_pages;
-    totalItems.value = response.total_items;
-    currentPage.value = page;
-  } catch (err) {
-    error.value = err;
-    products.value = [];
-  } finally {
-    loading.value = false;
-  }
+  catalogStore.fetchProducts(1);
 };
 
 const handlePageChange = (page) => {
   router.push({
     name: 'catalog',
-    query: { page: page > 1 ? page : undefined }
+    query: {
+      ...route.query,
+      page: page > 1 ? page : undefined
+    }
   });
 
-  fetchProducts(page);
+  catalogStore.fetchProducts(page);
 };
 
-watch(() => route.query.page, (newPage) => {
-  const page = parseInt(newPage) || 1;
-  if (page !== currentPage.value) {
-    fetchProducts(page);
+watch(() => route.query, (newQuery) => {
+  const page = parseInt(newQuery.page) || 1;
+
+  if (page !== catalogStore.currentPage) {
+    catalogStore.fetchProducts(page);
+  }
+}, { deep: true });
+
+watch(() => preferencesStore.itemsPerPage, (_newPerPage) => {
+  if (catalogStore.totalItems > 0) {
+    catalogStore.fetchProducts(catalogStore.currentPage);
   }
 });
 
 onMounted(() => {
-  fetchProducts(props.page);
+  catalogStore.fetchProducts(props.page);
+});
+
+onUnmounted(() => {
+  catalogStore.resetState();
 });
 </script>
