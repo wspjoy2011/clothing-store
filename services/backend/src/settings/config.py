@@ -25,6 +25,9 @@ class AppConfig(BaseSettings):
     DATASET_DIR: Path
     LOG_DIR: Path
 
+    # CORS settings
+    FRONTEND_CORS_ORIGINS: str
+
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8"
@@ -39,6 +42,11 @@ class AppConfig(BaseSettings):
     def IMAGES_CSV(self) -> Path:
         """Full path to images.csv"""
         return self.DATASET_DIR / "images.csv"
+
+    @property
+    def CORS_ORIGINS(self) -> list[str]:
+        """Parse the comma-separated list of allowed origins for CORS"""
+        return [origin.strip() for origin in self.FRONTEND_CORS_ORIGINS.split(",")]
 
 
 # Global config instance

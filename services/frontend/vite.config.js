@@ -13,7 +13,6 @@ export default defineConfig({
         },
         hmr: {
             protocol: 'ws',
-            host: '0.0.0.0',
             port: 5000,
             clientPort: 5000
         }

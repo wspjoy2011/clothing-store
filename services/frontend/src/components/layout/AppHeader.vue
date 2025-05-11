@@ -17,7 +17,7 @@
         class="ml-6 hidden-sm-and-down"
       >
         <v-tab :to="{ name: 'home' }" value="home">Home</v-tab>
-        <v-tab value="catalog">Catalog</v-tab>
+        <v-tab :to="{ name: 'catalog' }" value="catalog">Catalog</v-tab>
         <v-tab value="new">New Arrivals</v-tab>
         <v-tab value="sale">Sale</v-tab>
       </v-tabs>

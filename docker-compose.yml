@@ -31,6 +31,8 @@ services:
       dockerfile: Dockerfile
     container_name: clothing-store-frontend
     command: ["npm", "run", "dev", "--", "--config", "/usr/src/clothing-store/frontend/vite.config.js"]
+    env_file:
+      - services/frontend/.env
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
