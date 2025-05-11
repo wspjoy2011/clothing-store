@@ -7,7 +7,7 @@
         cover
         class="align-end"
       >
-        <v-card-title class="text-white text-h4 font-weight-bold bg-black bg-opacity-30 pa-4">
+        <v-card-title class="text-white text-h4 font-weight-bold bg-black bg-opacity-30 pa-4 text-center">
           Browse Catalog
         </v-card-title>
       </v-img>
@@ -23,7 +23,7 @@
       </v-card-text>
 
       <v-card-actions class="justify-center pb-6">
-        <v-btn color="primary" size="large" variant="flat">
+        <v-btn color="primary" size="large" variant="flat" :to="{ name: 'catalog' }">
           Explore Collection
         </v-btn>
       </v-card-actions>

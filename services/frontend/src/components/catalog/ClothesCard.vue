@@ -1,20 +1,31 @@
 <template>
   <v-card class="mx-auto my-3 product-card" max-width="300" :elevation="hover ? 8 : 2" @mouseenter="hover = true"
           @mouseleave="hover = false">
-    <v-img
-        :src="product.image_url"
-        height="250"
-        cover
-        class="product-image"
-    />
+    <div class="position-relative">
+      <div v-if="imageLoading" class="image-loader">
+        <v-progress-circular
+            color="primary"
+            indeterminate
+            size="30"
+        ></v-progress-circular>
+      </div>
+      <v-img
+          :src="props.product.image_url"
+          height="250"
+          cover
+          class="product-image"
+          @load="imageLoaded"
+          @error="imageLoaded"
+      />
+    </div>
 
     <v-card-title class="text-subtitle-1 font-weight-bold d-block text-truncate">
-      {{ product.product_display_name }}
+      {{ props.product.product_display_name }}
     </v-card-title>
 
     <v-card-subtitle>
-      <span class="font-weight-medium">{{ product.gender }}</span>
-      <span class="ms-2 text-medium-emphasis text-caption">{{ product.year }}</span>
+      <span class="font-weight-medium">{{ props.product.gender }}</span>
+      <span class="ms-2 text-medium-emphasis text-caption">{{ props.product.year }}</span>
     </v-card-subtitle>
 
     <v-card-actions>
@@ -50,6 +61,11 @@ const props = defineProps({
 });
 
 const hover = ref(false);
+const imageLoading = ref(true);
+
+const imageLoaded = () => {
+  imageLoading.value = false;
+};
 </script>
 
 <style scoped>
@@ -67,5 +83,23 @@ const hover = ref(false);
 
 .product-image:hover {
   opacity: 0.85;
+}
+
+.position-relative {
+  position: relative;
+  height: 250px;
+}
+
+.image-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(245, 245, 245, 0.7);
+  z-index: 1;
 }
 </style>

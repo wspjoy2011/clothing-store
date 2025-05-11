@@ -12,7 +12,10 @@ const routes = [
     {
         path: '/catalog',
         name: 'catalog',
-        component: CatalogPage
+        component: CatalogPage,
+        props: route => ({
+            page: parseInt(route.query.page) || 1
+        })
     }
 
 ]
