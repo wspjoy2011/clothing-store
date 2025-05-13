@@ -1,4 +1,6 @@
 from dataclasses import asdict
+from typing import Optional
+from urllib.parse import urlencode
 
 from fastapi import HTTPException
 
@@ -9,9 +11,10 @@ from apps.catalog.schemas.responses import ProductListResponseSchema, ProductSch
 async def get_product_list_controller(
         page: int,
         per_page: int,
+        ordering: Optional[str],
         catalog_service: CatalogServiceInterface,
 ) -> ProductListResponseSchema:
-    products = await catalog_service.get_paginated_products(page, per_page)
+    products = await catalog_service.get_paginated_products(page, per_page, ordering)
 
     if products is None:
         raise HTTPException(status_code=404, detail="No products found.")
@@ -22,8 +25,15 @@ async def get_product_list_controller(
     total_pages = (total_items + per_page - 1) // per_page
 
     base_url = "/api/v1.0/catalog/products"
-    prev_page = f"{base_url}?page={page - 1}&per_page={per_page}" if page > 1 else None
-    next_page = f"{base_url}?page={page + 1}&per_page={per_page}" if page < total_pages else None
+
+    def build_url_with_params(page_num: int) -> str:
+        params = {'page': page_num, 'per_page': per_page}
+        if ordering:
+            params['ordering'] = ordering
+        return f"{base_url}?{urlencode(params)}"
+
+    prev_page = build_url_with_params(page - 1) if page > 1 else None
+    next_page = build_url_with_params(page + 1) if page < total_pages else None
 
     return ProductListResponseSchema(
         products=products,

@@ -36,6 +36,8 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
+    depends_on:
+      - web
     volumes:
       - ./services/frontend:/usr/src/clothing-store/frontend
       - /usr/src/clothing-store/frontend/node_modules

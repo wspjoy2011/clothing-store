@@ -7,7 +7,12 @@ from apps.catalog.dto.products import ProductDTO
 class CatalogServiceInterface(ABC):
 
     @abstractmethod
-    async def get_paginated_products(self, page: int, per_page: int) -> Optional[list[ProductDTO]]:
+    async def get_paginated_products(
+            self,
+            page: int,
+            per_page: int,
+            ordering: Optional[str] = None
+    ) -> Optional[list[ProductDTO]]:
         pass
 
     @abstractmethod

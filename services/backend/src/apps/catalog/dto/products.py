@@ -8,4 +8,3 @@ class ProductDTO:
     year: int
     product_display_name: str
     image_url: str
-
