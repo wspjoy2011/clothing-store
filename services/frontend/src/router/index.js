@@ -25,7 +25,8 @@ const routes = [
             
             return {
                 page: parseInt(route.query.page) || 1,
-                perPage
+                perPage,
+                ordering: route.query.ordering || '-id'
             }
         }
     }
