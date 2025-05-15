@@ -1,22 +1,42 @@
 from typing import Optional
 
-from db.connection import AsyncConnectionPool
-
 from apps.catalog.dto.products import ProductDTO
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
-from apps.catalog.interfaces.specifications import PaginationSpecificationInterface, SpecificationInterface, \
+from apps.catalog.interfaces.specifications import (
+    PaginationSpecificationInterface,
+    SpecificationInterface,
     OrderingSpecificationInterface
+)
+from db.interfaces import DAOInterface
 
 
 class ProductRepository(ProductRepositoryInterface):
-    def __init__(self, connection_pool: AsyncConnectionPool):
-        self._connection_pool = connection_pool
+    """Repository for product data access"""
+
+    def __init__(self, dao: DAOInterface):
+        """
+        Initialize product repository
+
+        Args:
+            dao: Data Access Object for database operations
+        """
+        self._dao = dao
 
     async def get_products_with_specifications(
             self,
             pagination_spec: PaginationSpecificationInterface,
             ordering_spec: Optional[OrderingSpecificationInterface] = None
     ) -> list[ProductDTO]:
+        """
+        Get products using pagination and optional ordering specifications
+
+        Args:
+            pagination_spec: Specification for pagination
+            ordering_spec: Optional specification for ordering results
+
+        Returns:
+            List of product DTOs
+        """
         base_query = """
                      SELECT product_id, \
                             gender, \
@@ -41,29 +61,26 @@ class ProductRepository(ProductRepositoryInterface):
             base_query += " OFFSET %s LIMIT %s"
             params.extend([pagination_spec.get_offset(), pagination_spec.get_limit()])
 
-        async with self._connection_pool.connection() as conn:
-            async with conn.cursor() as cursor:
-                await cursor.execute(base_query, tuple(params))
-                result = await cursor.fetchall()
+        result = await self._dao.execute(base_query, params)
 
-            return [
-                ProductDTO(
-                    product_id=row[0],
-                    gender=row[1],
-                    year=row[2],
-                    product_display_name=row[3],
-                    image_url=row[4],
-                )
-                for row in result
-            ]
+        return [
+            ProductDTO(
+                product_id=int(row[0]),
+                gender=row[1],
+                year=int(row[2]),
+                product_display_name=row[3],
+                image_url=row[4],
+            )
+            for row in (result or [])
+        ]
 
     async def get_products_count(self) -> int:
-        query = "SELECT COUNT(*) FROM products;"
-        async with self._connection_pool.connection() as conn:
-            async with conn.cursor() as cursor:
-                await cursor.execute(query)
+        """
+        Get total count of products
 
-                result = await cursor.fetchone()
-                if result:
-                    return result[0]
-                return 0
+        Returns:
+            Number of products in the database
+        """
+        query = "SELECT COUNT(*) FROM products;"
+        result = await self._dao.execute(query, fetch_one=True)
+        return result[0] if result else 0

@@ -5,24 +5,42 @@ from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.repositories.product import ProductRepository
 from apps.catalog.services.catalog import CatalogService
-from db.connection import get_connection_pool, AsyncConnectionPool
-
-
-async def get_connection_pool_dependency() -> AsyncConnectionPool:
-    return await get_connection_pool()
+from db.dependencies import get_database_dao
+from db.interfaces import DAOInterface
 
 
 async def get_product_repository(
-        connection_pool: AsyncConnectionPool = Depends(get_connection_pool_dependency),
+        dao: DAOInterface = Depends(get_database_dao),
 ) -> ProductRepositoryInterface:
-    return ProductRepository(connection_pool)
+    """
+    Dependency for getting product repository.
+
+    Args:
+        dao: Data Access Object for database operations
+
+    Returns:
+        Initialized product repository
+    """
+    return ProductRepository(dao)
 
 
 def get_pagination_specification_factory() -> callable:
+    """
+    Dependency for getting pagination specification factory.
+
+    Returns:
+        Function to create pagination specifications
+    """
     return create_pagination_specification
 
 
 def get_ordering_specification_factory() -> callable:
+    """
+    Dependency for getting ordering specification factory.
+
+    Returns:
+        Function to create ordering specifications
+    """
     return create_ordering_specification
 
 
@@ -31,6 +49,17 @@ async def get_catalog_service(
         pagination_specification_factory: callable = Depends(get_pagination_specification_factory),
         ordering_specification_factory: callable = Depends(get_ordering_specification_factory),
 ) -> CatalogServiceInterface:
+    """
+    Dependency for getting catalog service.
+
+    Args:
+        product_repository: Repository for accessing product data
+        pagination_specification_factory: Factory for creating pagination specifications
+        ordering_specification_factory: Factory for creating ordering specifications
+
+    Returns:
+        Initialized catalog service
+    """
     return CatalogService(
         product_repository=product_repository,
         pagination_specification_factory=pagination_specification_factory,
