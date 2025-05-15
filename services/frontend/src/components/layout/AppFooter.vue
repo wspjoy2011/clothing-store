@@ -3,6 +3,7 @@
     class="footer"
     elevation="2"
     app
+    :class="{ 'footer-dark': isDarkTheme }"
   >
     <v-container>
       <v-row>
@@ -65,13 +66,22 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useTheme } from 'vuetify';
+import { useUserPreferencesStore } from '@/stores/userPreferences';
 
 const currentYear = computed(() => new Date().getFullYear());
+const preferencesStore = useUserPreferencesStore();
+const isDarkTheme = computed(() => preferencesStore.theme === 'dark');
 </script>
 
 <style scoped>
 .footer {
   background: linear-gradient(145deg, #fdfbfb 0%, #ebedee 100%);
+}
+
+/* Dark theme styles */
+.footer-dark {
+  background: linear-gradient(145deg, #1a1a1a 0%, #2c2c2c 100%) !important;
 }
 
 :deep(.v-container) {
@@ -123,5 +133,4 @@ const currentYear = computed(() => new Date().getFullYear());
     margin-right: 4px;
   }
 }
-
 </style>
