@@ -37,3 +37,28 @@ class OrderingSpecificationInterface(ABC):
     def get_ordering_fields(self) -> list[str]:
         """Get list of ordering fields"""
         pass
+
+
+class FilterSpecificationInterface(SpecificationInterface, ABC):
+    """Interface for filtering specifications"""
+
+    @abstractmethod
+    def add_filter(self, field: str, value: Any) -> None:
+        """
+        Add a filter criterion
+
+        Args:
+            field: Field name to filter on
+            value: Value to filter by
+        """
+        pass
+
+    @abstractmethod
+    def is_empty(self) -> bool:
+        """
+        Check if filter specification has any filters
+
+        Returns:
+            True if no filters are defined, False otherwise
+        """
+        pass

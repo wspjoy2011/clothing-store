@@ -5,7 +5,7 @@ from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
     SpecificationInterface,
-    OrderingSpecificationInterface
+    OrderingSpecificationInterface, FilterSpecificationInterface
 )
 from db.interfaces import DAOInterface
 
@@ -25,28 +25,35 @@ class ProductRepository(ProductRepositoryInterface):
     async def get_products_with_specifications(
             self,
             pagination_spec: PaginationSpecificationInterface,
-            ordering_spec: Optional[OrderingSpecificationInterface] = None
+            ordering_spec: Optional[OrderingSpecificationInterface] = None,
+            filter_spec: Optional[FilterSpecificationInterface] = None
     ) -> list[ProductDTO]:
         """
-        Get products using pagination and optional ordering specifications
+        Get products using pagination, ordering, and filtering specifications
 
         Args:
             pagination_spec: Specification for pagination
             ordering_spec: Optional specification for ordering results
+            filter_spec: Optional specification for filtering results
 
         Returns:
             List of product DTOs
         """
         base_query = """
-                     SELECT product_id, \
-                            gender, \
-                            year, \
-                            product_display_name, \
+                     SELECT product_id,
+                            gender,
+                            year,
+                            product_display_name,
                             image_url
-                     FROM products \
+                     FROM products 
                      """
 
         params = []
+
+        if filter_spec and isinstance(filter_spec, SpecificationInterface) and not filter_spec.is_empty():
+            filter_clause, filter_params = filter_spec.to_sql()
+            base_query += f" {filter_clause}"
+            params.extend(filter_params)
 
         if ordering_spec and isinstance(ordering_spec, SpecificationInterface):
             order_clause, order_params = ordering_spec.to_sql()
@@ -74,13 +81,26 @@ class ProductRepository(ProductRepositoryInterface):
             for row in (result or [])
         ]
 
-    async def get_products_count(self) -> int:
+    async def get_products_count(
+            self,
+            filter_spec: Optional[FilterSpecificationInterface] = None
+    ) -> int:
         """
-        Get total count of products
+        Get total count of products, optionally filtered
+
+        Args:
+            filter_spec: Optional specification for filtering results
 
         Returns:
             Number of products in the database
         """
-        query = "SELECT COUNT(*) FROM products;"
-        result = await self._dao.execute(query, fetch_one=True)
+        query = "SELECT COUNT(*) FROM products"
+        params = []
+
+        if filter_spec and isinstance(filter_spec, SpecificationInterface) and not filter_spec.is_empty():
+            filter_clause, filter_params = filter_spec.to_sql()
+            query += f" {filter_clause}"
+            params.extend(filter_params)
+
+        result = await self._dao.execute(query, params, fetch_one=True)
         return result[0] if result else 0

@@ -1,6 +1,10 @@
 from fastapi import Depends
 
-from apps.catalog.factories import create_pagination_specification, create_ordering_specification
+from apps.catalog.factories import (
+    create_pagination_specification,
+    create_ordering_specification,
+    create_product_filter_specification
+)
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.repositories.product import ProductRepository
@@ -44,10 +48,21 @@ def get_ordering_specification_factory() -> callable:
     return create_ordering_specification
 
 
+def get_filter_specification_factory() -> callable:
+    """
+    Dependency for getting filter specification factory.
+
+    Returns:
+        Function to create filter specifications
+    """
+    return create_product_filter_specification
+
+
 async def get_catalog_service(
         product_repository: ProductRepositoryInterface = Depends(get_product_repository),
         pagination_specification_factory: callable = Depends(get_pagination_specification_factory),
         ordering_specification_factory: callable = Depends(get_ordering_specification_factory),
+        filter_specification_factory: callable = Depends(get_filter_specification_factory),
 ) -> CatalogServiceInterface:
     """
     Dependency for getting catalog service.
@@ -56,6 +71,7 @@ async def get_catalog_service(
         product_repository: Repository for accessing product data
         pagination_specification_factory: Factory for creating pagination specifications
         ordering_specification_factory: Factory for creating ordering specifications
+        filter_specification_factory: Factory for creating filter specifications
 
     Returns:
         Initialized catalog service
@@ -64,4 +80,5 @@ async def get_catalog_service(
         product_repository=product_repository,
         pagination_specification_factory=pagination_specification_factory,
         ordering_specification_factory=ordering_specification_factory,
+        filter_specification_factory=filter_specification_factory,
     )
