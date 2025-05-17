@@ -2,7 +2,7 @@
   <div class="catalog-layout">
     <!-- Filter Drawer -->
     <v-navigation-drawer
-        v-model="isFilterDrawerOpen"
+        v-model="catalogStore.isFilterDrawerOpen"
         location="left"
         temporary
         width="320"
@@ -10,18 +10,24 @@
     >
       <div class="drawer-header">
         <h3 class="text-h6">Filters</h3>
-        <v-btn icon="mdi-close" variant="text" size="small" @click="isFilterDrawerOpen = false"/>
+        <v-btn icon="mdi-close" variant="text" size="small" @click="catalogStore.toggleFilterDrawer(false)"/>
       </div>
       <filter-sidebar/>
     </v-navigation-drawer>
 
     <!-- Filter Toggle Button -->
     <div class="filter-toggle-container">
-      <v-btn icon="mdi-filter" variant="outlined" size="small" class="filter-btn" @click="isFilterDrawerOpen = true">
+      <v-btn
+        icon="mdi-filter"
+        variant="outlined"
+        size="small"
+        class="filter-btn"
+        @click="catalogStore.toggleFilterDrawer(true)"
+      >
         <v-badge
-            :content="activeFiltersCount"
-            :value="activeFiltersCount > 0"
-            color="primary"
+            :content="catalogStore.activeFiltersCount"
+            :value="catalogStore.activeFiltersCount > 0"
+            :color="catalogStore.activeFiltersCount > 0 ? 'error' : 'primary'"
             location="top end"
         />
       </v-btn>
@@ -96,7 +102,7 @@
 </template>
 
 <script setup>
-import {onMounted, onUnmounted, watch, ref, computed} from 'vue';
+import {onMounted, onUnmounted, watch, provide} from 'vue';
 import {useRouter, useRoute} from 'vue-router';
 
 import {useUserPreferencesStore} from '@/stores/userPreferences';
@@ -115,12 +121,6 @@ const route = useRoute();
 const preferencesStore = useUserPreferencesStore();
 const catalogStore = useCatalogStore();
 
-const isFilterDrawerOpen = ref(false);
-
-const activeFiltersCount = computed(() => {
-  return 0;
-});
-
 const props = defineProps({
   page: {
     type: Number,
@@ -134,37 +134,106 @@ const props = defineProps({
 
 const itemsPerPageOptions = [8, 12, 16, 20];
 
+const createQueryFromFilters = () => {
+  const query = { ...route.query };
+  const activeFilters = catalogStore.activeFilters;
+  const availableFilters = catalogStore.availableFilters;
+
+  if (activeFilters.gender !== null) {
+    query.gender = activeFilters.gender;
+  } else {
+    delete query.gender;
+  }
+
+  if (
+    availableFilters?.year &&
+    activeFilters.min_year !== null &&
+    activeFilters.min_year !== availableFilters.year.min
+  ) {
+    query.min_year = activeFilters.min_year;
+  } else {
+    delete query.min_year;
+  }
+
+  if (
+    availableFilters?.year &&
+    activeFilters.max_year !== null &&
+    activeFilters.max_year !== availableFilters.year.max
+  ) {
+    query.max_year = activeFilters.max_year;
+  } else {
+    delete query.max_year;
+  }
+
+  return query;
+};
+
+const clearAllFilters = () => {
+  const drawerWasOpen = catalogStore.isFilterDrawerOpen;
+
+  catalogStore.clearFilters();
+
+  const newQuery = {};
+  if (route.query.ordering && route.query.ordering !== '-id') {
+    newQuery.ordering = route.query.ordering;
+  }
+  if (route.query.per_page) {
+    newQuery.per_page = route.query.per_page;
+  }
+
+  router.push({
+    name: 'catalog',
+    query: newQuery
+  }).then(() => {
+    catalogStore.fetchProducts(1);
+
+    if (drawerWasOpen) {
+      catalogStore.toggleFilterDrawer(true);
+    }
+  });
+};
+
+provide('clearAllFilters', clearAllFilters);
+
 const handleOrderingChange = (ordering) => {
+  const query = createQueryFromFilters();
+
   router.push({
     name: 'catalog',
     query: {
-      ...route.query,
-      page: 1,
-      ordering
+      ...query,
+      page: undefined,
+      ordering: ordering !== '-id' ? ordering : undefined
     }
   });
 
+  catalogStore.setOrdering(ordering);
   catalogStore.fetchProducts(1, ordering);
 };
 
 const handleItemsPerPageChange = (count) => {
+  const query = createQueryFromFilters();
+
   router.push({
     name: 'catalog',
     query: {
-      ...route.query,
-      page: 1,
+      ...query,
+      page: undefined,
       per_page: count
     }
   });
 
+  preferencesStore.setItemsPerPage(count);
   catalogStore.fetchProducts(1);
 };
 
 const handlePageChange = (page) => {
+  const query = createQueryFromFilters();
+
   router.push({
     name: 'catalog',
     query: {
-      ...route.query,
+      ...query,
       page: page > 1 ? page : undefined
     }
   });
@@ -172,24 +241,65 @@ const handlePageChange = (page) => {
   catalogStore.fetchProducts(page);
 };
 
-watch(() => route.query, (newQuery) => {
-  const page = parseInt(newQuery.page) || 1;
-  const ordering = newQuery.ordering || '-id';
+watch(() => catalogStore.activeFilters, () => {
+  if (catalogStore.isUpdatingFilters) return;
 
-  if (page !== catalogStore.currentPage || ordering !== catalogStore.currentOrdering) {
+  const drawerWasOpen = catalogStore.isFilterDrawerOpen;
+
+  router.push({
+    name: 'catalog',
+    query: {
+      ...createQueryFromFilters(),
+      page: undefined,
+      ordering: catalogStore.currentOrdering !== '-id' ? catalogStore.currentOrdering : undefined,
+      per_page: route.query.per_page
+    }
+  }).then(() => {
+    catalogStore.fetchProducts(1);
+
+    if (drawerWasOpen) {
+      catalogStore.toggleFilterDrawer(true);
+    }
+  });
+}, { deep: true });
+
+watch(() => route.query, (newQuery, oldQuery) => {
+  const filterParamsChanged =
+    newQuery.gender !== oldQuery.gender ||
+    newQuery.min_year !== oldQuery.min_year ||
+    newQuery.max_year !== oldQuery.max_year;
+
+  if (filterParamsChanged) {
+    catalogStore.loadFiltersFromQuery(newQuery);
+  }
+
+  const pageChanged = newQuery.page !== oldQuery.page;
+  const orderingChanged = newQuery.ordering !== oldQuery.ordering;
+  const perPageChanged = newQuery.per_page !== oldQuery.per_page;
+
+  if (filterParamsChanged || pageChanged || orderingChanged || perPageChanged) {
+    const page = parseInt(newQuery.page) || 1;
+    const ordering = newQuery.ordering || '-id';
+
     catalogStore.fetchProducts(page, ordering);
   }
-}, {deep: true});
+}, { deep: true });
 
-watch(() => preferencesStore.itemsPerPage, (_newPerPage) => {
+watch(() => preferencesStore.itemsPerPage, (newPerPage) => {
   if (catalogStore.totalItems > 0) {
     catalogStore.fetchProducts(catalogStore.currentPage);
   }
 });
 
 onMounted(() => {
+  const page = parseInt(route.query.page) || 1;
   const ordering = route.query.ordering || '-id';
-  catalogStore.fetchProducts(props.page, ordering);
+
+  catalogStore.fetchFilters().then(() => {
+    catalogStore.loadFiltersFromQuery(route.query);
+
+    catalogStore.fetchProducts(page, ordering);
+  });
 });
 
 onUnmounted(() => {
