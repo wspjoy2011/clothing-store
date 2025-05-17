@@ -1,21 +1,21 @@
 <template>
-  <v-card class="mx-auto my-3 product-card" max-width="300" :elevation="hover ? 8 : 2" @mouseenter="hover = true"
-          @mouseleave="hover = false">
+  <v-card
+      class="mx-auto my-3 product-card"
+      :elevation="hover ? 8 : 2"
+      @mouseenter="hover = true"
+      @mouseleave="hover = false"
+  >
     <div class="position-relative">
       <div v-if="imageLoading" class="image-loader">
-        <v-progress-circular
-            color="primary"
-            indeterminate
-            size="30"
-        ></v-progress-circular>
+        <v-progress-circular color="primary" indeterminate size="30"/>
       </div>
       <v-img
-          :src="props.product.image_url"
-          height="250"
-          cover
-          class="product-image"
-          @load="imageLoaded"
-          @error="imageLoaded"
+        :src="props.product.image_url"
+        height="250"
+        cover
+        class="product-image"
+        @load="imageLoaded"
+        @error="imageLoaded"
       />
     </div>
 
@@ -29,12 +29,7 @@
     </v-card-subtitle>
 
     <v-card-actions>
-      <v-btn
-          color="primary"
-          variant="flat"
-          class="text-none"
-          block
-      >
+      <v-btn color="primary" variant="flat" class="text-none" block>
         View Details
       </v-btn>
     </v-card-actions>
@@ -42,7 +37,7 @@
 </template>
 
 <script setup>
-import {ref} from 'vue';
+import { ref } from 'vue';
 
 const props = defineProps({
   product: {
@@ -71,6 +66,7 @@ const imageLoaded = () => {
 <style scoped>
 .product-card {
   transition: transform 0.2s ease-in-out;
+  width: 100%;
 }
 
 .product-card:hover {
