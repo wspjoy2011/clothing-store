@@ -37,7 +37,7 @@
           </v-col>
         </v-row>
 
-        <!-- Control panel correctly aligned with products -->
+        <!-- Control panel -->
         <v-row justify="center" align="center" class="mb-3">
           <v-col cols="12" sm="6" md="4" lg="3">
             <product-sorting @update:ordering="handleOrderingChange"/>
@@ -80,7 +80,7 @@
             message="Sorry, there are no products in this category."
         />
 
-        <!-- Pagination correctly aligned with products -->
+        <!-- Pagination  -->
         <v-row justify="center" v-if="!catalogStore.loading && !catalogStore.error && catalogStore.totalPages > 0">
           <v-col cols="12" class="px-0">
             <app-pagination

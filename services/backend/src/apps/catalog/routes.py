@@ -2,9 +2,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Query, Depends
 
-from apps.catalog.controllers import get_product_list_controller
+from apps.catalog.controllers import (
+    get_product_list_controller,
+    get_filters_controller
+)
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.interfaces.services import CatalogServiceInterface
+from apps.catalog.schemas.examples.filters import FILTERS_FULL_EXAMPLE
 from apps.catalog.schemas.examples.responses import (
     STANDARD_RESPONSE_VALUE,
     YEAR_FILTERED_VALUE,
@@ -12,6 +16,7 @@ from apps.catalog.schemas.examples.responses import (
     YEAR_DESCENDING_VALUE,
     COMBINED_FILTERS_VALUE
 )
+from apps.catalog.schemas.filters import FiltersResponseSchema
 from apps.catalog.schemas.responses import ProductListResponseSchema
 
 router = APIRouter(
@@ -21,7 +26,7 @@ router = APIRouter(
 
 
 @router.get(
-    f"/products",
+    "/products",
     response_model=ProductListResponseSchema,
     status_code=200,
     summary="Get a paginated list of products",
@@ -110,3 +115,64 @@ async def get_products_route(
         gender=gender,
         catalog_service=catalog_service,
     )
+
+
+@router.get(
+    "/products/filters",
+    response_model=FiltersResponseSchema,
+    status_code=200,
+    summary="Get available product filters",
+    description=(
+            "<h3>This endpoint retrieves available filters for the product catalog based on the actual data. "
+            "It provides information about available filter options such as gender values and year ranges. "
+            "Clients can use this information to build dynamic filter UIs that adapt to the current catalog state. "
+            "The endpoint returns filter metadata including possible values for checkbox filters and min/max ranges for "
+            "numeric filters.</h3>"
+    ),
+    responses={
+        404: {
+            "description": "Catalog is empty, no filters available.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Catalog is empty. No filters available."}
+                }
+            },
+        }
+    },
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "full_filters": {
+                                "summary": "Complete filters",
+                                "description": "Example response with all filter types",
+                                "value": FILTERS_FULL_EXAMPLE
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def filters_route(
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
+) -> FiltersResponseSchema:
+    """
+    Get available filters for products
+
+    This endpoint allows clients to fetch metadata about available filters that can be
+    applied to the product catalog. The response contains filter structures with their
+    respective type and possible values.
+
+    If the catalog is empty, a 404 error is returned.
+
+    Returns:
+        FiltersResponseSchema: Object containing available filters
+
+    Raises:
+        404: If the catalog is empty, no filters are available
+    """
+    return await get_filters_controller(catalog_service)

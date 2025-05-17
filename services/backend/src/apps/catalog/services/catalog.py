@@ -1,7 +1,7 @@
 from typing import Optional, Callable
 
 from apps.catalog.dto.catalog import CatalogDTO, PaginationDTO
-from apps.catalog.dto.products import ProductDTO
+from apps.catalog.dto.filters import FiltersDTO
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.interfaces.specifications import (
@@ -11,7 +11,7 @@ from apps.catalog.interfaces.specifications import (
 )
 
 PaginationSpecificationFactory = Callable[[int, int], PaginationSpecificationInterface]
-OrderingSpecificationFactory = Callable[[Optional[str], Optional[str]], OrderingSpecificationInterface]
+OrderingSpecificationFactory = Callable[[Optional[str]], OrderingSpecificationInterface]
 FilterSpecificationFactory = Callable[[Optional[int], Optional[int], Optional[str]], FilterSpecificationInterface]
 
 
@@ -68,11 +68,7 @@ class CatalogService(CatalogServiceInterface):
 
         filter_spec = None
         if min_year is not None or max_year is not None or gender:
-            filter_spec = self._filter_specification_factory(
-                min_year=min_year,
-                max_year=max_year,
-                gender=gender
-            )
+            filter_spec = self._filter_specification_factory(min_year, max_year, gender)
 
         products = await self._product_repository.get_products_with_specifications(
             pagination_spec,
@@ -93,3 +89,12 @@ class CatalogService(CatalogServiceInterface):
                 total_pages=total_pages
             )
         )
+
+    async def get_available_filters(self) -> Optional[FiltersDTO]:
+        """
+        Get available filters and their possible values based on the actual data
+
+        Returns:
+            FiltersDTO object containing all available filters or None if catalog is empty
+        """
+        return await self._product_repository.get_available_filters()

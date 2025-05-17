@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from apps.catalog.dto.catalog import CatalogDTO
+from apps.catalog.dto.filters import FiltersDTO
 
 
 class CatalogServiceInterface(ABC):
@@ -30,5 +31,15 @@ class CatalogServiceInterface(ABC):
 
         Returns:
             CatalogDTO with products and pagination info
+        """
+        pass
+
+    @abstractmethod
+    async def get_available_filters(self) -> Optional[FiltersDTO]:
+        """
+        Get available filters and their possible values based on the actual data
+
+        Returns:
+            FiltersDTO object containing all available filters or None if catalog is empty
         """
         pass

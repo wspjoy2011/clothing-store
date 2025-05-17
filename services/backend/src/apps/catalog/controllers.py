@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 from fastapi import HTTPException
 
 from apps.catalog.interfaces.services import CatalogServiceInterface
+from apps.catalog.schemas.filters import FiltersResponseSchema, CheckboxFilterSchema, RangeFilterSchema
 from apps.catalog.schemas.responses import ProductListResponseSchema, ProductSchema
 
 
@@ -57,4 +58,38 @@ async def get_product_list_controller(
         next_page=next_page,
         total_pages=total_pages,
         total_items=total_items,
+    )
+
+
+async def get_filters_controller(
+        catalog_service: CatalogServiceInterface,
+) -> FiltersResponseSchema:
+    """
+    Get available filters for products
+
+    Args:
+        catalog_service: Catalog service for data access
+
+    Returns:
+        Filters response schema
+
+    Raises:
+        HTTPException: If the catalog is empty
+    """
+    filters_dto = await catalog_service.get_available_filters()
+
+    if filters_dto is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Catalog is empty. No filters available."
+        )
+
+    return FiltersResponseSchema(
+        gender=CheckboxFilterSchema(
+            values=filters_dto.gender.values
+        ) if filters_dto.gender else None,
+        year=RangeFilterSchema(
+            min=filters_dto.year.min,
+            max=filters_dto.year.max
+        ) if filters_dto.year else None
     )
