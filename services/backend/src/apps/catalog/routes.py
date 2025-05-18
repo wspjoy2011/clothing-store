@@ -39,14 +39,6 @@ router = APIRouter(
         "along with links to the previous and next pages if applicable.</h3>"
     ),
     responses={
-        404: {
-            "description": "No products found.",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "No products found."}
-                }
-            },
-        },
         422: {
             "description": "Validation error occurred for query parameters.",
             "content": {

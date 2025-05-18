@@ -27,12 +27,8 @@ async def get_product_list_controller(
         gender=gender
     )
 
-    if not catalog_dto.products:
-        raise HTTPException(status_code=404, detail="No products found.")
-
     products = [ProductSchema(**asdict(product)) for product in catalog_dto.products]
 
-    total_items = catalog_dto.pagination.total_items
     total_pages = catalog_dto.pagination.total_pages
 
     base_url = "/api/v1.0/catalog/products"
@@ -54,10 +50,10 @@ async def get_product_list_controller(
 
     return ProductListResponseSchema(
         products=products,
-        prev_page=prev_page,
-        next_page=next_page,
-        total_pages=total_pages,
-        total_items=total_items,
+        prev_page=None if not products else prev_page,
+        next_page=None if not products else next_page,
+        total_pages=catalog_dto.pagination.total_pages,
+        total_items=catalog_dto.pagination.total_items,
     )
 
 

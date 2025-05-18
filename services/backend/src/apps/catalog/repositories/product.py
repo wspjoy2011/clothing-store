@@ -15,6 +15,8 @@ from db.interfaces import DAOInterface
 class ProductRepository(ProductRepositoryInterface):
     """Repository for product data access"""
 
+    APP_NAME = "catalog"
+
     def __init__(self, dao: DAOInterface):
         """
         Initialize product repository
@@ -41,13 +43,13 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             List of product DTOs
         """
-        base_query = """
+        base_query = f"""
                      SELECT product_id,
                             gender,
                             year,
                             product_display_name,
                             image_url
-                     FROM products 
+                     FROM {self.APP_NAME}_products 
                      """
 
         params = []
@@ -96,7 +98,7 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             Number of products in the database
         """
-        query = "SELECT COUNT(*) FROM products"
+        query = f"SELECT COUNT(*) FROM {self.APP_NAME}_products"
         params = []
 
         if filter_spec and isinstance(filter_spec, SpecificationInterface) and not filter_spec.is_empty():
@@ -115,17 +117,17 @@ class ProductRepository(ProductRepositoryInterface):
             FiltersDTO object containing all available filters or None if catalog is empty
         """
 
-        count_query = "SELECT COUNT(*) FROM products"
+        count_query = f"SELECT COUNT(*) FROM {self.APP_NAME}_products"
         count_result = await self._dao.execute(count_query, [], fetch_one=True)
 
         if not count_result or count_result[0] == 0:
             return None
 
-        gender_query = "SELECT DISTINCT gender FROM products"
+        gender_query = f"SELECT DISTINCT gender FROM {self.APP_NAME}_products"
         gender_result = await self._dao.execute(gender_query, [])
         gender_values = [row[0] for row in gender_result] if gender_result else []
 
-        year_query = "SELECT MIN(year), MAX(year) FROM products WHERE year IS NOT NULL"
+        year_query = f"SELECT MIN(year), MAX(year) FROM {self.APP_NAME}_products WHERE year IS NOT NULL"
         year_result = await self._dao.execute(year_query, [], fetch_one=True)
         min_year, max_year = year_result if year_result else (None, None)
 

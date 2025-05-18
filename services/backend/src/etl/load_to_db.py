@@ -9,6 +9,7 @@ logger = get_logger(__name__, "elt")
 
 
 class DatabaseSeeder:
+    APP_NAME = "catalog"
     BATCH_SIZE = 5000
 
     def __init__(self, pool: AsyncConnectionPool, dto: ETLResultDTO):
@@ -33,27 +34,27 @@ class DatabaseSeeder:
         critical_tables = ["master_category", "products"]
         async with self._pool.connection() as conn:
             for table in critical_tables:
-                query = f"SELECT EXISTS (SELECT 1 FROM {table} LIMIT 1);"
-                logger.debug(f"Executing query to check table '{table}' emptiness: {query}")
+                query = f"SELECT EXISTS (SELECT 1 FROM {self.APP_NAME}_{table} LIMIT 1);"
+                logger.debug(f"Executing query to check table '{self.APP_NAME}_{table}' emptiness: {query}")
                 result = await conn.execute(query)
                 row = await result.fetchone()
                 if row and row[0]:
-                    logger.info(f"Table '{table}' is not empty.")
+                    logger.info(f"Table '{self.APP_NAME}_{table}' is not empty.")
                     return False
                 else:
-                    logger.info(f"Table '{table}' is empty.")
+                    logger.info(f"Table '{self.APP_NAME}_{table}' is empty.")
         logger.info("All critical tables are empty.")
         return True
 
 
     async def _seed_master_categories(self, conn):
-        query = "INSERT INTO master_category (name) VALUES (%s) ON CONFLICT DO NOTHING;"
+        query = f"INSERT INTO {self.APP_NAME}_master_category (name) VALUES (%s) ON CONFLICT DO NOTHING;"
         for category in tqdm_asyncio(self._dto.master_categories, desc="Master Categories"):
             await conn.execute(query, (category.name,))
 
     async def _seed_sub_categories(self, conn):
-        query = """
-                INSERT INTO sub_category (master_category_id, name)
+        query = f"""
+                INSERT INTO {self.APP_NAME}_sub_category (master_category_id, name)
                 VALUES (%s, %s)
                 ON CONFLICT DO NOTHING; \
                 """
@@ -62,8 +63,8 @@ class DatabaseSeeder:
             await conn.execute(query, (master_id, sub_category.name))
 
     async def _seed_article_types(self, conn):
-        query = """
-                INSERT INTO article_type (sub_category_id, name)
+        query = f"""
+                INSERT INTO {self.APP_NAME}_article_type (sub_category_id, name)
                 VALUES (%s, %s)
                 ON CONFLICT DO NOTHING; \
                 """
@@ -72,17 +73,17 @@ class DatabaseSeeder:
             await conn.execute(query, (sub_cat_id, article_type.name))
 
     async def _seed_base_colours(self, conn):
-        query = "INSERT INTO base_colour (name) VALUES (%s) ON CONFLICT DO NOTHING;"
+        query = f"INSERT INTO {self.APP_NAME}_base_colour (name) VALUES (%s) ON CONFLICT DO NOTHING;"
         for colour in tqdm_asyncio(self._dto.base_colours, desc="Base Colours"):
             await conn.execute(query, (colour.name,))
 
     async def _seed_seasons(self, conn):
-        query = "INSERT INTO season (name) VALUES (%s) ON CONFLICT DO NOTHING;"
+        query = f"INSERT INTO {self.APP_NAME}_season (name) VALUES (%s) ON CONFLICT DO NOTHING;"
         for season in tqdm_asyncio(self._dto.seasons, desc="Seasons"):
             await conn.execute(query, (season.name,))
 
     async def _seed_usage_types(self, conn):
-        query = "INSERT INTO usage_type (name) VALUES (%s) ON CONFLICT DO NOTHING;"
+        query = f"INSERT INTO {self.APP_NAME}_usage_type (name) VALUES (%s) ON CONFLICT DO NOTHING;"
         for usage in tqdm_asyncio(self._dto.usage_types, desc="Usage Types"):
             await conn.execute(query, (usage.name,))
 
@@ -104,8 +105,8 @@ class DatabaseSeeder:
         batch_indices = range(0, len(params), self.BATCH_SIZE)
         for i in tqdm_asyncio(batch_indices, desc="Bulk insert"):
             batch = params[i: i + self.BATCH_SIZE]
-            sql = """
-                  INSERT INTO products (product_id, gender, year, product_display_name, article_type_id,
+            sql = f"""
+                  INSERT INTO {self.APP_NAME}_products (product_id, gender, year, product_display_name, article_type_id,
                                         base_colour_id, season_id, usage_type_id, image_url)
                   VALUES """
             values_part = ', '.join(['(%s,%s,%s,%s,%s,%s,%s,%s,%s)'] * len(batch))
@@ -118,42 +119,42 @@ class DatabaseSeeder:
 
     @alru_cache(maxsize=128)
     async def _get_master_category_id(self, conn, name: str) -> int:
-        query = "SELECT master_category_id FROM master_category WHERE name=%s;"
+        query = f"SELECT master_category_id FROM {self.APP_NAME}_master_category WHERE name=%s;"
         row = await conn.execute(query, (name,))
         result = await row.fetchone()
         return result[0]
 
     @alru_cache(maxsize=128)
     async def _get_sub_category_id(self, conn, name: str) -> int:
-        query = "SELECT sub_category_id FROM sub_category WHERE name=%s;"
+        query = f"SELECT sub_category_id FROM {self.APP_NAME}_sub_category WHERE name=%s;"
         row = await conn.execute(query, (name,))
         result = await row.fetchone()
         return result[0]
 
     @alru_cache(maxsize=128)
     async def _get_article_type_id(self, conn, name: str) -> int:
-        query = "SELECT article_type_id FROM article_type WHERE name=%s;"
+        query = f"SELECT article_type_id FROM {self.APP_NAME}_article_type WHERE name=%s;"
         row = await conn.execute(query, (name,))
         result = await row.fetchone()
         return result[0]
 
     @alru_cache(maxsize=128)
     async def _get_base_colour_id(self, conn, name: str) -> int:
-        query = "SELECT base_colour_id FROM base_colour WHERE name=%s;"
+        query = f"SELECT base_colour_id FROM {self.APP_NAME}_base_colour WHERE name=%s;"
         row = await conn.execute(query, (name,))
         result = await row.fetchone()
         return result[0]
 
     @alru_cache(maxsize=128)
     async def _get_season_id(self, conn, name: str) -> int:
-        query = "SELECT season_id FROM season WHERE name=%s;"
+        query = f"SELECT season_id FROM {self.APP_NAME}_season WHERE name=%s;"
         row = await conn.execute(query, (name,))
         result = await row.fetchone()
         return result[0]
 
     @alru_cache(maxsize=128)
     async def _get_usage_type_id(self, conn, name: str) -> int:
-        query = "SELECT usage_type_id FROM usage_type WHERE name=%s;"
+        query = f"SELECT usage_type_id FROM {self.APP_NAME}_usage_type WHERE name=%s;"
         row = await conn.execute(query, (name,))
         result = await row.fetchone()
         return result[0]

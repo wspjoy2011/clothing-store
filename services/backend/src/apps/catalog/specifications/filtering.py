@@ -77,7 +77,6 @@ class ProductFilterSpecification(FilterSpecificationInterface):
         conditions = []
         params = []
 
-        # Add year range conditions
         if self._min_year is not None:
             conditions.append("year >= %s")
             params.append(self._min_year)
@@ -86,7 +85,6 @@ class ProductFilterSpecification(FilterSpecificationInterface):
             conditions.append("year <= %s")
             params.append(self._max_year)
 
-        # Add gender conditions
         if self._genders and len(self._genders) > 0:
             placeholders = ', '.join(['%s'] * len(self._genders))
             conditions.append(f"gender IN ({placeholders})")

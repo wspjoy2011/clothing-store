@@ -16,7 +16,7 @@
     </v-navigation-drawer>
 
     <!-- Filter Toggle Button -->
-    <div class="filter-toggle-container">
+    <div v-if="hasProducts" class="filter-toggle-container">
       <v-btn
         icon="mdi-filter"
         variant="outlined"
@@ -44,7 +44,7 @@
         </v-row>
 
         <!-- Control panel -->
-        <v-row justify="center" align="center" class="mb-3">
+        <v-row v-if="hasProducts" justify="center" align="center" class="mb-3">
           <v-col cols="12" sm="6" md="4" lg="3">
             <product-sorting @update:ordering="handleOrderingChange"/>
           </v-col>
@@ -81,7 +81,7 @@
 
         <!-- No products found -->
         <no-items-found
-            v-if="!catalogStore.loading && !catalogStore.error && catalogStore.products.length === 0"
+            v-if="isEmpty"
             title="No products found"
             message="Sorry, there are no products in this category."
         />
@@ -102,7 +102,7 @@
 </template>
 
 <script setup>
-import {onMounted, onUnmounted, watch, provide} from 'vue';
+import {onMounted, onUnmounted, watch, provide, computed} from 'vue';
 import {useRouter, useRoute} from 'vue-router';
 
 import {useUserPreferencesStore} from '@/stores/userPreferences';
@@ -121,16 +121,18 @@ const route = useRoute();
 const preferencesStore = useUserPreferencesStore();
 const catalogStore = useCatalogStore();
 
-const props = defineProps({
-  page: {
-    type: Number,
-    default: 1
-  },
-  perPage: {
-    type: Number,
-    default: 12
-  }
-});
+
+const hasProducts = computed(() =>
+  !catalogStore.loading &&
+  !catalogStore.error &&
+  catalogStore.products.length > 0
+);
+
+const isEmpty = computed(() =>
+  !catalogStore.loading &&
+  !catalogStore.error &&
+  catalogStore.products.length === 0
+);
 
 const itemsPerPageOptions = [8, 12, 16, 20];
 
@@ -285,7 +287,7 @@ watch(() => route.query, (newQuery, oldQuery) => {
   }
 }, { deep: true });
 
-watch(() => preferencesStore.itemsPerPage, (newPerPage) => {
+watch(() => preferencesStore.itemsPerPage, () => {
   if (catalogStore.totalItems > 0) {
     catalogStore.fetchProducts(catalogStore.currentPage);
   }
