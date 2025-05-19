@@ -3,11 +3,13 @@ from typing import Optional
 from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
     OrderingSpecificationInterface,
-    FilterSpecificationInterface
+    FilterSpecificationInterface,
+    SearchSpecificationInterface
 )
 from apps.catalog.specifications.filtering import ProductFilterSpecification
 from apps.catalog.specifications.pagination import PaginationSpecification
 from apps.catalog.specifications.ordering import OrderingSpecification
+from apps.catalog.specifications.search import ProductSearchSpecification
 
 
 def create_pagination_specification(page: int, per_page: int) -> PaginationSpecificationInterface:
@@ -45,3 +47,16 @@ def create_product_filter_specification(
         spec.set_genders(gender)
 
     return spec
+
+
+def create_search_specification(query: Optional[str] = None) -> SearchSpecificationInterface:
+    """
+    Create a search specification
+
+    Args:
+        query: Search query string
+
+    Returns:
+        SearchSpecificationInterface implementation
+    """
+    return ProductSearchSpecification(query)

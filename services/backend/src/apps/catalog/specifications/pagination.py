@@ -1,9 +1,9 @@
 from typing import Any
 
-from apps.catalog.interfaces.specifications import SpecificationInterface, PaginationSpecificationInterface
+from apps.catalog.interfaces.specifications import PaginationSpecificationInterface
 
 
-class PaginationSpecification(SpecificationInterface, PaginationSpecificationInterface):
+class PaginationSpecification(PaginationSpecificationInterface):
     """Specification for pagination"""
 
     def __init__(self, page: int, per_page: int):

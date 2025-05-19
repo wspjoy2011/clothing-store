@@ -16,7 +16,8 @@ class CatalogServiceInterface(ABC):
             ordering: Optional[str] = None,
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
-            gender: Optional[str] = None
+            gender: Optional[str] = None,
+            q: Optional[str] = None
     ) -> CatalogDTO:
         """
         Get paginated, sorted and filtered products
@@ -28,6 +29,7 @@ class CatalogServiceInterface(ABC):
             min_year: Minimum year filter
             max_year: Maximum year filter
             gender: Gender filter (comma-separated list)
+            q: Search query string
 
         Returns:
             CatalogDTO with products and pagination info

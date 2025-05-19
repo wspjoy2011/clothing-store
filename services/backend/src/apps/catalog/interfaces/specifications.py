@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 
 
 class SpecificationInterface(ABC):
@@ -16,7 +16,7 @@ class SpecificationInterface(ABC):
         pass
 
 
-class PaginationSpecificationInterface(ABC):
+class PaginationSpecificationInterface(SpecificationInterface):
     """Interface for pagination specifications"""
 
     @abstractmethod
@@ -30,7 +30,7 @@ class PaginationSpecificationInterface(ABC):
         pass
 
 
-class OrderingSpecificationInterface(ABC):
+class OrderingSpecificationInterface(SpecificationInterface):
     """Interface for ordering specifications"""
 
     @abstractmethod
@@ -39,7 +39,7 @@ class OrderingSpecificationInterface(ABC):
         pass
 
 
-class FilterSpecificationInterface(SpecificationInterface, ABC):
+class FilterSpecificationInterface(SpecificationInterface):
     """Interface for filtering specifications"""
 
     @abstractmethod
@@ -61,4 +61,19 @@ class FilterSpecificationInterface(SpecificationInterface, ABC):
         Returns:
             True if no filters are defined, False otherwise
         """
+        pass
+
+
+class SearchSpecificationInterface(SpecificationInterface):
+    """Interface for search specifications."""
+
+    @property
+    @abstractmethod
+    def query(self) -> Optional[str]:
+        """Get the search query."""
+        pass
+
+    @abstractmethod
+    def is_empty(self) -> bool:
+        """Check if the search specification is empty."""
         pass

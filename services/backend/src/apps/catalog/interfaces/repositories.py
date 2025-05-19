@@ -6,7 +6,8 @@ from apps.catalog.dto.products import ProductDTO
 from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
     OrderingSpecificationInterface,
-    FilterSpecificationInterface
+    FilterSpecificationInterface,
+    SearchSpecificationInterface
 )
 
 
@@ -16,7 +17,8 @@ class ProductRepositoryInterface(ABC):
             self,
             pagination_spec: PaginationSpecificationInterface,
             ordering_spec: Optional[OrderingSpecificationInterface] = None,
-            filter_spec: Optional[FilterSpecificationInterface] = None
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None
     ) -> list[ProductDTO]:
         """
         Get products using pagination, ordering, and filtering specifications
@@ -25,6 +27,7 @@ class ProductRepositoryInterface(ABC):
             pagination_spec: Specification for pagination
             ordering_spec: Optional specification for ordering results
             filter_spec: Optional specification for filtering results
+            search_spec: Optional specification for search
 
         Returns:
             List of product DTOs
@@ -34,13 +37,15 @@ class ProductRepositoryInterface(ABC):
     @abstractmethod
     async def get_products_count(
             self,
-            filter_spec: Optional[FilterSpecificationInterface] = None
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None  # Новый параметр
     ) -> int:
         """
-        Get total count of products, optionally filtered
+        Get total count of products, optionally filtered and searched
 
         Args:
             filter_spec: Optional specification for filtering results
+            search_spec: Optional specification for search
 
         Returns:
             Number of products in the database

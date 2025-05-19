@@ -16,6 +16,7 @@ async def get_product_list_controller(
         min_year: Optional[int],
         max_year: Optional[int],
         gender: Optional[str],
+        q: Optional[str],
         catalog_service: CatalogServiceInterface,
 ) -> ProductListResponseSchema:
     catalog_dto = await catalog_service.get_products(
@@ -24,7 +25,8 @@ async def get_product_list_controller(
         ordering=ordering,
         min_year=min_year,
         max_year=max_year,
-        gender=gender
+        gender=gender,
+        q=q
     )
 
     products = [ProductSchema(**asdict(product)) for product in catalog_dto.products]
@@ -43,6 +45,8 @@ async def get_product_list_controller(
             params['max_year'] = max_year
         if gender:
             params['gender'] = gender
+        if q:
+            params['q'] = q
         return f"{base_url}?{urlencode(params)}"
 
     prev_page = build_url_with_params(page - 1) if page > 1 else None

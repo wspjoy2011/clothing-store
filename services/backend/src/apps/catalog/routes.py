@@ -31,12 +31,13 @@ router = APIRouter(
     status_code=200,
     summary="Get a paginated list of products",
     description=(
-        "<h3>This endpoint retrieves a paginated and filtered list of products from the database. "
-        "Clients can specify the `page` number and the number of items per page using `per_page`. "
-        "Optional parameter `ordering` allows sorting results by fields with direction (e.g., 'year,-product_id'). "
-        "Filtering is available by year range (`min_year`, `max_year`) and by gender (`gender`, which can be a comma-separated list). "
-        "The response includes details about the products, total pages, and total items, "
-        "along with links to the previous and next pages if applicable.</h3>"
+            "<h3>This endpoint retrieves a paginated and filtered list of products from the database. "
+            "Clients can specify the `page` number and the number of items per page using `per_page`. "
+            "Optional parameter `ordering` allows sorting results by fields with direction (e.g., 'year,-product_id'). "
+            "Filtering is available by year range (`min_year`, `max_year`) and by gender (`gender`, which can be a comma-separated list). "
+            "The search parameter `q` allows for full-text search in product names with results sorted by relevance. "
+            "The response includes details about the products, total pages, and total items, "
+            "along with links to the previous and next pages if applicable.</h3>"
     ),
     responses={
         422: {
@@ -96,6 +97,7 @@ async def get_products_route(
     min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
     max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
     gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
+    q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
     catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
 ):
     return await get_product_list_controller(
@@ -105,9 +107,9 @@ async def get_products_route(
         min_year=min_year,
         max_year=max_year,
         gender=gender,
+        q=q,
         catalog_service=catalog_service,
     )
-
 
 @router.get(
     "/products/filters",

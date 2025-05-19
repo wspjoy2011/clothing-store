@@ -7,12 +7,14 @@ from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
     OrderingSpecificationInterface,
-    FilterSpecificationInterface
+    FilterSpecificationInterface,
+    SearchSpecificationInterface
 )
 
 PaginationSpecificationFactory = Callable[[int, int], PaginationSpecificationInterface]
 OrderingSpecificationFactory = Callable[[Optional[str]], OrderingSpecificationInterface]
 FilterSpecificationFactory = Callable[[Optional[int], Optional[int], Optional[str]], FilterSpecificationInterface]
+SearchSpecificationFactory = Callable[[Optional[str]], SearchSpecificationInterface]
 
 
 class CatalogService(CatalogServiceInterface):
@@ -24,6 +26,7 @@ class CatalogService(CatalogServiceInterface):
             pagination_specification_factory: PaginationSpecificationFactory,
             ordering_specification_factory: OrderingSpecificationFactory,
             filter_specification_factory: FilterSpecificationFactory,
+            search_specification_factory: SearchSpecificationFactory
     ):
         """
         Initialize catalog service
@@ -38,6 +41,7 @@ class CatalogService(CatalogServiceInterface):
         self._pagination_specification_factory = pagination_specification_factory
         self._ordering_specification_factory = ordering_specification_factory
         self._filter_specification_factory = filter_specification_factory
+        self._search_specification_factory = search_specification_factory
 
     async def get_products(
             self,
@@ -46,7 +50,8 @@ class CatalogService(CatalogServiceInterface):
             ordering: Optional[str] = None,
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
-            gender: Optional[str] = None
+            gender: Optional[str] = None,
+            q: Optional[str] = None
     ) -> CatalogDTO:
         """
         Get paginated, sorted and filtered products
@@ -58,6 +63,7 @@ class CatalogService(CatalogServiceInterface):
             min_year: Minimum year filter
             max_year: Maximum year filter
             gender: Gender filter (comma-separated list)
+            q: Search query string
 
         Returns:
             CatalogDTO with products and pagination info
@@ -70,13 +76,18 @@ class CatalogService(CatalogServiceInterface):
         if min_year is not None or max_year is not None or gender:
             filter_spec = self._filter_specification_factory(min_year, max_year, gender)
 
+        search_spec = None
+        if q:
+            search_spec = self._search_specification_factory(q)
+
         products = await self._product_repository.get_products_with_specifications(
             pagination_spec,
             ordering_spec,
-            filter_spec
+            filter_spec,
+            search_spec
         )
 
-        total = await self._product_repository.get_products_count(filter_spec)
+        total = await self._product_repository.get_products_count(filter_spec, search_spec)
 
         total_pages = (total + per_page - 1) // per_page if per_page > 0 else 0
 

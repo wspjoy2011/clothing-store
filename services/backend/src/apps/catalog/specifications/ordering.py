@@ -1,9 +1,9 @@
 from typing import Any, Optional
 
-from apps.catalog.interfaces.specifications import SpecificationInterface, OrderingSpecificationInterface
+from apps.catalog.interfaces.specifications import OrderingSpecificationInterface
 
 
-class OrderingSpecification(SpecificationInterface, OrderingSpecificationInterface):
+class OrderingSpecification(OrderingSpecificationInterface):
     """Specification for ordering results"""
 
     def __init__(self, ordering: Optional[str] = None):
