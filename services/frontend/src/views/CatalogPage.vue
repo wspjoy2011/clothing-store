@@ -18,11 +18,11 @@
     <!-- Filter Toggle Button -->
     <div v-if="hasProducts" class="filter-toggle-container">
       <v-btn
-        icon="mdi-filter"
-        variant="outlined"
-        size="small"
-        class="filter-btn"
-        @click="catalogStore.toggleFilterDrawer(true)"
+          icon="mdi-filter"
+          variant="outlined"
+          size="small"
+          class="filter-btn"
+          @click="catalogStore.toggleFilterDrawer(true)"
       >
         <v-badge
             :content="catalogStore.activeFiltersCount"
@@ -79,6 +79,21 @@
           </v-col>
         </v-row>
 
+        <!-- Products count indicator -->
+        <v-row v-if="hasProducts" justify="center" class="mt-4 mb-4">
+          <v-col cols="12" class="text-center">
+            <v-chip
+              color="primary"
+              variant="flat"
+              class="px-4 py-2"
+              size="large"
+            >
+              <v-icon start icon="mdi-tag-multiple" class="mr-1"/>
+              {{ catalogStore.totalItems }} products found
+            </v-chip>
+          </v-col>
+        </v-row>
+
         <!-- No products found -->
         <no-items-found
             v-if="isEmpty"
@@ -87,7 +102,7 @@
         />
 
         <!-- Pagination  -->
-        <v-row justify="center" v-if="!catalogStore.loading && !catalogStore.error && catalogStore.totalPages > 0">
+        <v-row justify="center" v-if="hasItems">
           <v-col cols="12" class="px-0">
             <app-pagination
                 :current-page="catalogStore.currentPage"
@@ -121,23 +136,35 @@ const route = useRoute();
 const preferencesStore = useUserPreferencesStore();
 const catalogStore = useCatalogStore();
 
-
 const hasProducts = computed(() =>
-  !catalogStore.loading &&
-  !catalogStore.error &&
-  catalogStore.products.length > 0
+    !catalogStore.loading &&
+    !catalogStore.error &&
+    catalogStore.products.length > 0
 );
 
 const isEmpty = computed(() =>
+    !catalogStore.loading &&
+    !catalogStore.error &&
+    catalogStore.products.length === 0
+);
+
+const hasItems = computed(() =>
   !catalogStore.loading &&
   !catalogStore.error &&
-  catalogStore.products.length === 0
+  catalogStore.totalPages > 0
 );
 
 const itemsPerPageOptions = [8, 12, 16, 20];
 
+const ensureValidPage = (page) => {
+  if (catalogStore.totalPages > 0 && page > catalogStore.totalPages) {
+    return catalogStore.totalPages;
+  }
+  return page;
+};
+
 const createQueryFromFilters = () => {
-  const query = { ...route.query };
+  const query = {...route.query};
   const activeFilters = catalogStore.activeFilters;
   const availableFilters = catalogStore.availableFilters;
 
@@ -148,9 +175,9 @@ const createQueryFromFilters = () => {
   }
 
   if (
-    availableFilters?.year &&
-    activeFilters.min_year !== null &&
-    activeFilters.min_year !== availableFilters.year.min
+      availableFilters?.year &&
+      activeFilters.min_year !== null &&
+      activeFilters.min_year !== availableFilters.year.min
   ) {
     query.min_year = activeFilters.min_year;
   } else {
@@ -158,9 +185,9 @@ const createQueryFromFilters = () => {
   }
 
   if (
-    availableFilters?.year &&
-    activeFilters.max_year !== null &&
-    activeFilters.max_year !== availableFilters.year.max
+      availableFilters?.year &&
+      activeFilters.max_year !== null &&
+      activeFilters.max_year !== availableFilters.year.max
   ) {
     query.max_year = activeFilters.max_year;
   } else {
@@ -216,31 +243,50 @@ const handleOrderingChange = (ordering) => {
 const handleItemsPerPageChange = (count) => {
   const query = createQueryFromFilters();
 
-  router.push({
-    name: 'catalog',
-    query: {
-      ...query,
-      page: undefined,
-      per_page: count
+  preferencesStore.setItemsPerPage(count);
+
+  catalogStore.fetchProducts(1).then(() => {
+    if (catalogStore.currentPage > catalogStore.totalPages) {
+      const correctedPage = catalogStore.totalPages > 0 ? catalogStore.totalPages : 1;
+
+      router.push({
+        name: 'catalog',
+        query: {
+          ...query,
+          page: correctedPage > 1 ? correctedPage : undefined,
+          per_page: count
+        }
+      });
+
+      if (correctedPage !== 1) {
+        catalogStore.fetchProducts(correctedPage);
+      }
+    } else {
+      router.push({
+        name: 'catalog',
+        query: {
+          ...query,
+          page: undefined,
+          per_page: count
+        }
+      });
     }
   });
-
-  preferencesStore.setItemsPerPage(count);
-  catalogStore.fetchProducts(1);
 };
 
 const handlePageChange = (page) => {
+  const validPage = ensureValidPage(page);
   const query = createQueryFromFilters();
 
   router.push({
     name: 'catalog',
     query: {
       ...query,
-      page: page > 1 ? page : undefined
+      page: validPage > 1 ? validPage : undefined
     }
   });
 
-  catalogStore.fetchProducts(page);
+  catalogStore.fetchProducts(validPage);
 };
 
 watch(() => catalogStore.activeFilters, () => {
@@ -263,13 +309,13 @@ watch(() => catalogStore.activeFilters, () => {
       catalogStore.toggleFilterDrawer(true);
     }
   });
-}, { deep: true });
+}, {deep: true});
 
 watch(() => route.query, (newQuery, oldQuery) => {
   const filterParamsChanged =
-    newQuery.gender !== oldQuery.gender ||
-    newQuery.min_year !== oldQuery.min_year ||
-    newQuery.max_year !== oldQuery.max_year;
+      newQuery.gender !== oldQuery.gender ||
+      newQuery.min_year !== oldQuery.min_year ||
+      newQuery.max_year !== oldQuery.max_year;
 
   if (filterParamsChanged) {
     catalogStore.loadFiltersFromQuery(newQuery);
@@ -283,13 +329,33 @@ watch(() => route.query, (newQuery, oldQuery) => {
     const page = parseInt(newQuery.page) || 1;
     const ordering = newQuery.ordering || '-id';
 
-    catalogStore.fetchProducts(page, ordering);
+    catalogStore.fetchProducts(page, ordering).then(() => {
+      const validPage = ensureValidPage(page);
+      if (validPage !== page) {
+        router.push({
+          name: 'catalog',
+          query: {
+            ...createQueryFromFilters(),
+            page: validPage > 1 ? validPage : undefined,
+            ordering: catalogStore.currentOrdering !== '-id' ? catalogStore.currentOrdering : undefined,
+            per_page: newQuery.per_page
+          }
+        });
+
+        catalogStore.fetchProducts(validPage, ordering);
+      }
+    });
   }
-}, { deep: true });
+}, {deep: true});
 
 watch(() => preferencesStore.itemsPerPage, () => {
   if (catalogStore.totalItems > 0) {
-    catalogStore.fetchProducts(catalogStore.currentPage);
+    const validPage = ensureValidPage(catalogStore.currentPage);
+    if (validPage !== catalogStore.currentPage) {
+      catalogStore.fetchProducts(validPage);
+    } else {
+      catalogStore.fetchProducts(catalogStore.currentPage);
+    }
   }
 });
 
@@ -300,7 +366,22 @@ onMounted(() => {
   catalogStore.fetchFilters().then(() => {
     catalogStore.loadFiltersFromQuery(route.query);
 
-    catalogStore.fetchProducts(page, ordering);
+    catalogStore.fetchProducts(page, ordering).then(() => {
+      const validPage = ensureValidPage(page);
+      if (validPage !== page) {
+        router.push({
+          name: 'catalog',
+          query: {
+            ...createQueryFromFilters(),
+            page: validPage > 1 ? validPage : undefined,
+            ordering: ordering !== '-id' ? ordering : undefined,
+            per_page: route.query.per_page
+          }
+        });
+
+        catalogStore.fetchProducts(validPage, ordering);
+      }
+    });
   });
 });
 
@@ -308,6 +389,7 @@ onUnmounted(() => {
   catalogStore.resetState();
 });
 </script>
+
 
 <style scoped>
 .catalog-layout {
