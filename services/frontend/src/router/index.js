@@ -37,6 +37,10 @@ const routes = [
                 catalogStore.activeFilters.max_year = parseInt(route.query.max_year);
             }
 
+            if (route.query.q) {
+                catalogStore.setSearchQuery(route.query.q);
+            }
+
             return {
                 page: parseInt(route.query.page) || 1,
                 perPage,

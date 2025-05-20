@@ -76,24 +76,123 @@ class ProductRepository(ProductRepositoryInterface):
         result = await self._dao.execute(query, params, fetch_one=True)
         return result[0] if result else 0
 
-    async def get_available_filters(self) -> Optional[FiltersDTO]:
-        count_result = await self._dao.execute(
-            f"SELECT COUNT(*) FROM {self.APP_NAME}_products", [], fetch_one=True
-        )
+    async def get_available_filters(
+            self,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> Optional[FiltersDTO]:
+        """
+        Get available filters and their possible values based on the actual data
+
+        Args:
+            search_spec: Optional search specification to limit filters to relevant options
+
+        Returns:
+            FiltersDTO object containing all available filters or None if catalog is empty
+        """
+        if not search_spec or search_spec.is_empty():
+            return await self._get_all_filters()
+
+        return await self._get_filtered_filters(search_spec)
+
+    async def get_available_filters(
+            self,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> Optional[FiltersDTO]:
+        """
+        Get available filters and their possible values based on the actual data
+
+        Args:
+            search_spec: Optional search specification to limit filters to relevant options
+
+        Returns:
+            FiltersDTO object containing all available filters or None if catalog is empty
+        """
+        if not search_spec or search_spec.is_empty():
+            return await self._get_all_filters()
+
+        return await self._get_filtered_filters(search_spec)
+
+    async def _get_all_filters(self) -> Optional[FiltersDTO]:
+        """
+        Get all available filters without additional filtering
+
+        Returns:
+            FiltersDTO object containing all available filters or None if catalog is empty
+        """
+        count_query = f"SELECT COUNT(*) FROM {self.APP_NAME}_products"
+        logger.info(f"Filters count query: {count_query}")
+
+        count_result = await self._dao.execute(count_query, [], fetch_one=True)
 
         if not count_result or count_result[0] == 0:
             return None
 
-        gender_result = await self._dao.execute(
-            f"SELECT DISTINCT gender FROM {self.APP_NAME}_products", []
-        )
+        gender_query = f"SELECT DISTINCT gender FROM {self.APP_NAME}_products"
+        logger.info(f"Filters gender query: {gender_query}")
+
+        gender_result = await self._dao.execute(gender_query, [])
         gender_values = [row[0] for row in gender_result] if gender_result else []
 
-        year_result = await self._dao.execute(
-            f"SELECT MIN(year), MAX(year) FROM {self.APP_NAME}_products WHERE year IS NOT NULL",
-            [],
-            fetch_one=True
+        year_query = f"SELECT MIN(year), MAX(year) FROM {self.APP_NAME}_products WHERE year IS NOT NULL"
+        logger.info(f"Filters year query: {year_query}")
+
+        year_result = await self._dao.execute(year_query, [], fetch_one=True)
+        min_year, max_year = year_result if year_result else (None, None)
+
+        return FiltersDTO(
+            gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
+            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None
         )
+
+    async def _get_filtered_filters(self, search_spec: SearchSpecificationInterface) -> Optional[FiltersDTO]:
+        """
+        Get available filters based on search query results
+
+        Args:
+            search_spec: Search specification for filtering
+
+        Returns:
+            FiltersDTO object containing filtered available filters or None if no results
+        """
+        self._query_builder.reset()
+
+        search_sql, search_params = search_spec.to_sql()
+        where_sql, _ = self._split_search_sql(search_sql)
+        self._parse_sql_conditions(where_sql, search_params[:1])
+
+        count_query, count_params = self._query_builder.build_count()
+        logger.info(f"Filtered filters count query: {count_query}")
+        logger.info(f"Filtered filters count params: {count_params}")
+
+        count_result = await self._dao.execute(count_query, count_params, fetch_one=True)
+
+        if not count_result or count_result[0] == 0:
+            return None
+
+        self._query_builder.reset().select("DISTINCT gender")
+
+        self._parse_sql_conditions(where_sql, search_params[:1])
+
+        self._query_builder.where("gender IS NOT NULL")
+
+        gender_query, gender_params = self._query_builder.build()
+        logger.info(f"Filtered filters gender query: {gender_query}")
+        logger.info(f"Filtered filters gender params: {gender_params}")
+
+        gender_result = await self._dao.execute(gender_query, gender_params)
+        gender_values = [row[0] for row in gender_result] if gender_result else []
+
+        self._query_builder.reset().select("MIN(year)", "MAX(year)")
+
+        self._parse_sql_conditions(where_sql, search_params[:1])
+
+        self._query_builder.where("year IS NOT NULL")
+
+        year_query, year_params = self._query_builder.build()
+        logger.info(f"Filtered filters year query: {year_query}")
+        logger.info(f"Filtered filters year params: {year_params}")
+
+        year_result = await self._dao.execute(year_query, year_params, fetch_one=True)
         min_year, max_year = year_result if year_result else (None, None)
 
         return FiltersDTO(

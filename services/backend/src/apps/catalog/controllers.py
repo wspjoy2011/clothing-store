@@ -63,12 +63,14 @@ async def get_product_list_controller(
 
 async def get_filters_controller(
         catalog_service: CatalogServiceInterface,
+        q: Optional[str] = None
 ) -> FiltersResponseSchema:
     """
     Get available filters for products
 
     Args:
         catalog_service: Catalog service for data access
+        q: Optional search query to limit filters to relevant options
 
     Returns:
         Filters response schema
@@ -76,7 +78,7 @@ async def get_filters_controller(
     Raises:
         HTTPException: If the catalog is empty
     """
-    filters_dto = await catalog_service.get_available_filters()
+    filters_dto = await catalog_service.get_available_filters(q)
 
     if filters_dto is None:
         raise HTTPException(

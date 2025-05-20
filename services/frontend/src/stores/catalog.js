@@ -26,7 +26,9 @@ export const useCatalogStore = defineStore('catalog', {
     filtersError: null,
 
     isFilterDrawerOpen: false,
-    isUpdatingFilters: false
+    isUpdatingFilters: false,
+
+    searchQuery: null
   }),
 
   getters: {
@@ -66,11 +68,16 @@ export const useCatalogStore = defineStore('catalog', {
       const effectiveOrdering = ordering !== null ? ordering : this.currentOrdering;
 
       try {
+        const filters = {
+          ...this.activeFilters,
+          q: this.searchQuery
+        };
+
         const response = await catalogService.getProducts(
           page,
           perPage,
           effectiveOrdering,
-          this.activeFilters
+          filters
         );
 
         this.products = response.products;
@@ -91,7 +98,7 @@ export const useCatalogStore = defineStore('catalog', {
       this.filtersError = null;
 
       try {
-        const filters = await catalogService.getFilters();
+        const filters = await catalogService.getFilters(this.searchQuery);
         this.availableFilters = filters;
       } catch (err) {
         this.filtersError = err.response?.data || { message: 'Error loading filters' };
@@ -113,6 +120,8 @@ export const useCatalogStore = defineStore('catalog', {
     },
 
     clearFilters() {
+      const drawerWasOpen = this.isFilterDrawerOpen;
+
       this.isUpdatingFilters = true;
 
       this.activeFilters = {
@@ -123,7 +132,21 @@ export const useCatalogStore = defineStore('catalog', {
 
       nextTick(() => {
         this.isUpdatingFilters = false;
+
+        if (drawerWasOpen) {
+          setTimeout(() => {
+            this.isFilterDrawerOpen = true;
+          }, 0);
+        }
       });
+    },
+
+    clearSearch() {
+      this.searchQuery = null;
+    },
+
+    setSearchQuery(query) {
+      this.searchQuery = query && query.trim() ? query.trim() : null;
     },
 
     loadFiltersFromQuery(query) {
@@ -145,6 +168,12 @@ export const useCatalogStore = defineStore('catalog', {
 
       if (query.max_year) {
         this.activeFilters.max_year = parseInt(query.max_year);
+      }
+
+      if (query.q) {
+        this.searchQuery = query.q;
+      } else {
+        this.searchQuery = null;
       }
 
       nextTick(() => {
@@ -174,6 +203,7 @@ export const useCatalogStore = defineStore('catalog', {
       this.currentOrdering = '-id';
       this.error = null;
       this.isFilterDrawerOpen = false;
+      this.searchQuery = null;
 
       this.availableFilters = {
         gender: null,

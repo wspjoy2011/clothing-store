@@ -91,14 +91,14 @@ router = APIRouter(
     }
 )
 async def get_products_route(
-    page: int = Query(1, ge=1, description="Page number (1-based index)"),
-    per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
-    ordering: Optional[str] = Query(None, description="Ordering fields (e.g., 'year,-id')"),
-    min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
-    max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
-    gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
-    q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
-    catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
+        page: int = Query(1, ge=1, description="Page number (1-based index)"),
+        per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
+        ordering: Optional[str] = Query(None, description="Ordering fields (e.g., 'year,-id')"),
+        min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
+        max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
+        gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
+        q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
 ):
     return await get_product_list_controller(
         page=page,
@@ -110,6 +110,7 @@ async def get_products_route(
         q=q,
         catalog_service=catalog_service,
     )
+
 
 @router.get(
     "/products/filters",
@@ -152,21 +153,20 @@ async def get_products_route(
     }
 )
 async def filters_route(
+        q: Optional[str] = Query(None, description="Optional search query to show only relevant filters"),
         catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
 ) -> FiltersResponseSchema:
     """
     Get available filters for products
 
-    This endpoint allows clients to fetch metadata about available filters that can be
-    applied to the product catalog. The response contains filter structures with their
-    respective type and possible values.
-
-    If the catalog is empty, a 404 error is returned.
+    Args:
+       catalog_service: Catalog service for data access
+       q: Optional search query to limit filters to relevant options
 
     Returns:
-        FiltersResponseSchema: Object containing available filters
+       Filters response schema
 
     Raises:
-        404: If the catalog is empty, no filters are available
+       HTTPException: If the catalog is empty
     """
-    return await get_filters_controller(catalog_service)
+    return await get_filters_controller(catalog_service, q)

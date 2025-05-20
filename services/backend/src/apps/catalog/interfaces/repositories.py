@@ -38,7 +38,7 @@ class ProductRepositoryInterface(ABC):
     async def get_products_count(
             self,
             filter_spec: Optional[FilterSpecificationInterface] = None,
-            search_spec: Optional[SearchSpecificationInterface] = None  # Новый параметр
+            search_spec: Optional[SearchSpecificationInterface] = None
     ) -> int:
         """
         Get total count of products, optionally filtered and searched
@@ -53,9 +53,15 @@ class ProductRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_available_filters(self) -> Optional[FiltersDTO]:
+    async def get_available_filters(
+            self,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> Optional[FiltersDTO]:
         """
         Get available filters and their possible values based on the actual data
+
+        Args:
+            search_spec: Optional search specification to limit filters to relevant options
 
         Returns:
             FiltersDTO object containing all available filters or None if catalog is empty

@@ -31,16 +31,27 @@ export default {
             params.max_year = filters.max_year
         }
 
+        if (filters.q) {
+            params.q = filters.q
+        }
+
         const response = await api.get(`${BASE_URL}/products`, {params})
         return response.data
     },
 
     /**
      * Get available filters for products
+     * @param {string|null} searchQuery - Optional search query to filter results
      * @returns {Promise<Object>} - Filter options
      */
-    async getFilters() {
-        const response = await api.get(`${BASE_URL}/products/filters`)
-        return response.data
+    async getFilters(searchQuery = null) {
+        const params = {};
+
+        if (searchQuery) {
+            params.q = searchQuery;
+        }
+
+        const response = await api.get(`${BASE_URL}/products/filters`, {params});
+        return response.data;
     }
 }

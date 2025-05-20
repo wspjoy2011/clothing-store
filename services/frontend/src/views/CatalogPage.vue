@@ -39,7 +39,21 @@
         <!-- Page header -->
         <v-row justify="center">
           <v-col cols="12">
-            <h1 class="text-h4 font-weight-bold mb-6 text-center">Fashion & Accessories Catalog</h1>
+            <h1 class="text-h4 font-weight-bold mb-2 text-center">Fashion & Accessories Catalog</h1>
+
+            <!-- Search results indicator -->
+            <div v-if="catalogStore.searchQuery" class="text-center mb-6">
+              <v-chip
+                  color="primary"
+                  variant="outlined"
+                  size="large"
+                  closable
+                  @click:close="clearSearch"
+                  prepend-icon="mdi-magnify"
+              >
+                Search results for: "{{ catalogStore.searchQuery }}"
+              </v-chip>
+            </div>
           </v-col>
         </v-row>
 
@@ -56,6 +70,28 @@
                 :options="itemsPerPageOptions"
                 @update:perPage="handleItemsPerPageChange"
             />
+          </v-col>
+        </v-row>
+
+        <!-- Active filters summary -->
+        <v-row v-if="catalogStore.hasActiveFilters && !catalogStore.loading" class="mb-4">
+          <v-col cols="12">
+            <v-sheet rounded class="pa-3" color="grey-lighten-4">
+              <div class="d-flex align-center justify-space-between">
+                <div class="d-flex align-center">
+                  <v-icon icon="mdi-filter-variant" class="mr-2"/>
+                  <span class="text-body-1">Active Filters</span>
+                </div>
+                <v-btn
+                    variant="text"
+                    color="primary"
+                    density="comfortable"
+                    @click="clearAllFilters"
+                >
+                  Clear All
+                </v-btn>
+              </div>
+            </v-sheet>
           </v-col>
         </v-row>
 
@@ -83,10 +119,10 @@
         <v-row v-if="hasProducts" justify="center" class="mt-4 mb-4">
           <v-col cols="12" class="text-center">
             <v-chip
-              color="primary"
-              variant="flat"
-              class="px-4 py-2"
-              size="large"
+                color="primary"
+                variant="flat"
+                class="px-4 py-2"
+                size="large"
             >
               <v-icon start icon="mdi-tag-multiple" class="mr-1"/>
               {{ catalogStore.totalItems }} products found
@@ -98,7 +134,8 @@
         <no-items-found
             v-if="isEmpty"
             title="No products found"
-            message="Sorry, there are no products in this category."
+            message="Try adjusting your filters or search query"
+            icon="mdi-search-off"
         />
 
         <!-- Pagination  -->
@@ -194,6 +231,12 @@ const createQueryFromFilters = () => {
     delete query.max_year;
   }
 
+  if (catalogStore.searchQuery && catalogStore.searchQuery.trim()) {
+    query.q = catalogStore.searchQuery.trim();
+  } else {
+    delete query.q;
+  }
+
   return query;
 };
 
@@ -209,6 +252,9 @@ const clearAllFilters = () => {
   if (route.query.per_page) {
     newQuery.per_page = route.query.per_page;
   }
+  if (route.query.q) {
+    newQuery.q = route.query.q;
+  }
 
   router.push({
     name: 'catalog',
@@ -223,6 +269,23 @@ const clearAllFilters = () => {
 };
 
 provide('clearAllFilters', clearAllFilters);
+
+const clearSearch = () => {
+  catalogStore.clearSearch();
+
+  const query = {...route.query};
+  delete query.q;
+  delete query.page;
+
+  router.push({
+    name: 'catalog',
+    query
+  }).then(() => {
+    catalogStore.fetchFilters().then(() => {
+      catalogStore.fetchProducts(1);
+    });
+  });
+};
 
 const handleOrderingChange = (ordering) => {
   const query = createQueryFromFilters();
@@ -311,11 +374,32 @@ watch(() => catalogStore.activeFilters, () => {
   });
 }, {deep: true});
 
+watch(() => catalogStore.searchQuery, (newValue, oldValue) => {
+  if (newValue !== oldValue && !catalogStore.isUpdatingFilters) {
+    const query = createQueryFromFilters();
+
+    catalogStore.fetchFilters().then(() => {
+      router.push({
+        name: 'catalog',
+        query: {
+          ...query,
+          page: undefined,
+          ordering: catalogStore.currentOrdering !== '-id' ? catalogStore.currentOrdering : undefined,
+          per_page: route.query.per_page
+        }
+      }).then(() => {
+        catalogStore.fetchProducts(1);
+      });
+    });
+  }
+});
+
 watch(() => route.query, (newQuery, oldQuery) => {
   const filterParamsChanged =
       newQuery.gender !== oldQuery.gender ||
       newQuery.min_year !== oldQuery.min_year ||
-      newQuery.max_year !== oldQuery.max_year;
+      newQuery.max_year !== oldQuery.max_year ||
+      newQuery.q !== oldQuery.q;
 
   if (filterParamsChanged) {
     catalogStore.loadFiltersFromQuery(newQuery);
@@ -389,7 +473,6 @@ onUnmounted(() => {
   catalogStore.resetState();
 });
 </script>
-
 
 <style scoped>
 .catalog-layout {

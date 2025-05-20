@@ -101,11 +101,18 @@ class CatalogService(CatalogServiceInterface):
             )
         )
 
-    async def get_available_filters(self) -> Optional[FiltersDTO]:
+    async def get_available_filters(self, q: Optional[str] = None) -> Optional[FiltersDTO]:
         """
         Get available filters and their possible values based on the actual data
+
+        Args:
+            q: Optional search query to limit filters to relevant options
 
         Returns:
             FiltersDTO object containing all available filters or None if catalog is empty
         """
-        return await self._product_repository.get_available_filters()
+        search_spec = None
+        if q:
+            search_spec = self._search_specification_factory(q)
+
+        return await self._product_repository.get_available_filters(search_spec)
