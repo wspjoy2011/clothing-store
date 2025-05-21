@@ -12,7 +12,7 @@
           <span class="text-h5 font-weight-bold">StyleShop</span>
         </div>
 
-        <!-- Navigation Menu - Centered -->
+        <!-- Navigation Menu -->
         <div class="hidden-sm-and-down nav-center">
           <v-tabs
               v-model="activeTab"
@@ -20,8 +20,33 @@
           >
             <v-tab :to="{ name: 'home' }" value="home">Home</v-tab>
             <v-tab :to="{ name: 'catalog' }" value="catalog">Catalog</v-tab>
-            <v-tab value="new">New Arrivals</v-tab>
-            <v-tab value="sale">Sale</v-tab>
+
+            <v-tab value="categories">
+              Categories
+              <v-menu
+                  location="bottom"
+                  :close-on-content-click="false"
+                  transition="slide-y-transition"
+              >
+                <template v-slot:activator="{ props }">
+                  <v-btn
+                      icon
+                      variant="text"
+                      v-bind="props"
+                      class="ml-1"
+                  >
+                    <v-icon>mdi-chevron-down</v-icon>
+                  </v-btn>
+                </template>
+
+                <div class="category-dropdown">
+                  <category-menu
+                      @category-select="navigateToCategory"
+                      :onCategoryClick="navigateToCategory"
+                  />
+                </div>
+              </v-menu>
+            </v-tab>
           </v-tabs>
         </div>
 
@@ -70,55 +95,72 @@
   >
     <v-list>
       <v-list-item
-        title="Home"
-        value="home"
-        prepend-icon="mdi-home"
-        :to="{ name: 'home' }"
+          title="Home"
+          value="home"
+          prepend-icon="mdi-home"
+          :to="{ name: 'home' }"
       ></v-list-item>
 
       <v-list-item
-        title="Catalog"
-        value="catalog"
-        prepend-icon="mdi-view-grid"
-        :to="{ name: 'catalog' }"
+          title="Catalog"
+          value="catalog"
+          prepend-icon="mdi-view-grid"
+          :to="{ name: 'catalog' }"
+      ></v-list-item>
+
+      <v-list-group
+          value="categories"
+          title="Categories"
+          prepend-icon="mdi-shape"
+      >
+        <template v-slot:activator="{ props }">
+          <v-list-item v-bind="props"></v-list-item>
+        </template>
+
+        <div class="pa-2">
+          <category-menu
+              @category-select="navigateToCategory"
+              :onCategoryClick="navigateToCategory"
+          />
+        </div>
+      </v-list-group>
+
+      <v-list-item
+          title="New Arrivals"
+          value="new"
+          prepend-icon="mdi-star"
       ></v-list-item>
 
       <v-list-item
-        title="New Arrivals"
-        value="new"
-        prepend-icon="mdi-star"
-      ></v-list-item>
-
-      <v-list-item
-        title="Sale"
-        value="sale"
-        prepend-icon="mdi-tag"
+          title="Sale"
+          value="sale"
+          prepend-icon="mdi-tag"
       ></v-list-item>
 
       <v-divider></v-divider>
 
       <v-list-item
-        title="Search"
-        @click="showMobileSearch = true"
-        prepend-icon="mdi-magnify"
+          title="Search"
+          @click="showMobileSearch = true"
+          prepend-icon="mdi-magnify"
       ></v-list-item>
 
       <v-list-item
-        title="My Account"
-        value="account"
-        prepend-icon="mdi-account"
+          title="My Account"
+          value="account"
+          prepend-icon="mdi-account"
       ></v-list-item>
 
       <v-list-item
-        title="Shopping Cart"
-        value="cart"
-        prepend-icon="mdi-cart"
+          title="Shopping Cart"
+          value="cart"
+          prepend-icon="mdi-cart"
       ></v-list-item>
 
       <v-list-item
-        title="Toggle Theme"
-        @click="toggleTheme"
-        prepend-icon="mdi-theme-light-dark"
+          title="Toggle Theme"
+          @click="toggleTheme"
+          prepend-icon="mdi-theme-light-dark"
       ></v-list-item>
     </v-list>
   </v-navigation-drawer>
@@ -144,19 +186,19 @@
         >
           <template v-slot:append>
             <v-progress-circular
-              v-if="isSearchLoading"
-              indeterminate
-              size="20"
-              width="2"
-              color="primary"
-              class="mr-2"
+                v-if="isSearchLoading"
+                indeterminate
+                size="20"
+                width="2"
+                color="primary"
+                class="mr-2"
             ></v-progress-circular>
             <v-btn
-              v-else-if="mobileSearchQuery"
-              icon="mdi-close"
-              size="small"
-              variant="text"
-              @click="clearMobileSearch"
+                v-else-if="mobileSearchQuery"
+                icon="mdi-close"
+                size="small"
+                variant="text"
+                @click="clearMobileSearch"
             ></v-btn>
           </template>
         </v-text-field>
@@ -166,13 +208,15 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue';
-import { useTheme } from 'vuetify';
-import { useRouter, useRoute } from 'vue-router';
-import { useCatalogStore } from '@/stores/catalog';
+import {ref, watch, onMounted} from 'vue';
+import {useTheme} from 'vuetify';
+import {useRouter, useRoute} from 'vue-router';
+import {useCatalogStore} from '@/stores/catalog';
+import {useCategoryStore} from '@/stores/categoryStore';
 import ThemeToggle from '@/components/ui/theme/ThemeToggle.vue';
 import SearchBar from '@/components/ui/search/SearchBar.vue';
-import { useUserPreferencesStore } from '@/stores/userPreferences';
+import CategoryMenu from '@/components/catalog/CategoryMenu.vue';
+import {useUserPreferencesStore} from '@/stores/userPreferences';
 
 const activeTab = ref('home');
 const drawer = ref(false);
@@ -180,6 +224,7 @@ const theme = useTheme();
 const router = useRouter();
 const route = useRoute();
 const catalogStore = useCatalogStore();
+const categoryStore = useCategoryStore();
 const preferencesStore = useUserPreferencesStore();
 const showMobileSearch = ref(false);
 const mobileSearchQuery = ref('');
@@ -190,6 +235,10 @@ onMounted(() => {
 
   if (route.query.q) {
     mobileSearchQuery.value = route.query.q;
+  }
+
+  if (!categoryStore.hasCategories && !categoryStore.loading) {
+    categoryStore.fetchCategoryMenu();
   }
 });
 
@@ -221,7 +270,7 @@ function closeMobileSearch() {
   if (!mobileSearchQuery.value.trim() && catalogStore.searchQuery) {
     catalogStore.setSearchQuery('');
     if (route.name === 'catalog') {
-      const query = { ...route.query };
+      const query = {...route.query};
       delete query.q;
       delete query.page;
 
@@ -244,7 +293,7 @@ function handleMobileSearch() {
 
   catalogStore.setSearchQuery(trimmedQuery);
 
-  const query = { ...route.query };
+  const query = {...route.query};
 
   if (trimmedQuery) {
     query.q = trimmedQuery;
@@ -267,6 +316,20 @@ function handleMobileSearch() {
     isSearchLoading.value = false;
   });
 }
+
+function navigateToCategory(categoryInfo) {
+  console.log('Navigating to category:', categoryInfo);
+
+  drawer.value = false;
+
+  router.push({
+    name: 'catalog',
+    query: {
+      [`${categoryInfo.type}_category_id`]: categoryInfo.id,
+      page: 1
+    }
+  });
+}
 </script>
 
 <style scoped>
@@ -282,5 +345,19 @@ function handleMobileSearch() {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
+}
+
+.category-dropdown {
+  min-width: 320px;
+  max-width: 85vw;
+  padding: 0;
+  max-height: 75vh;
+  overflow-y: auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+:deep(.v-theme--dark) .category-dropdown {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
 }
 </style>
