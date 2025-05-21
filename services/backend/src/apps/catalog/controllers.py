@@ -6,7 +6,14 @@ from fastapi import HTTPException
 
 from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.schemas.filters import FiltersResponseSchema, CheckboxFilterSchema, RangeFilterSchema
-from apps.catalog.schemas.responses import ProductListResponseSchema, ProductSchema
+from apps.catalog.schemas.responses import (
+    ProductListResponseSchema,
+    ProductSchema,
+    CategoryMenuResponseSchema,
+    MasterCategorySchema,
+    SubCategorySchema,
+    ArticleTypeSchema
+)
 
 
 async def get_product_list_controller(
@@ -95,3 +102,52 @@ async def get_filters_controller(
             max=filters_dto.year.max
         ) if filters_dto.year else None
     )
+
+
+async def get_category_menu_controller(
+        catalog_service: CatalogServiceInterface
+) -> CategoryMenuResponseSchema:
+    """
+    Controller for retrieving the category menu
+
+    Args:
+        catalog_service: Service for accessing catalog data
+
+    Returns:
+        Response schema with category hierarchy
+
+    Raises:
+        HTTPException: If no categories are available
+    """
+    category_menu = await catalog_service.get_category_menu()
+
+    if not category_menu or not category_menu.categories:
+        raise HTTPException(
+            status_code=404,
+            detail="No categories available in the catalog."
+        )
+
+    response_categories = []
+
+    for master_category in category_menu.categories:
+        response_sub_categories = []
+
+        for sub_category in master_category.sub_categories:
+            response_article_types = [
+                ArticleTypeSchema(id=art_type.id, name=art_type.name)
+                for art_type in sub_category.article_types
+            ]
+
+            response_sub_categories.append(SubCategorySchema(
+                id=sub_category.id,
+                name=sub_category.name,
+                article_types=response_article_types
+            ))
+
+        response_categories.append(MasterCategorySchema(
+            id=master_category.id,
+            name=master_category.name,
+            sub_categories=response_sub_categories
+        ))
+
+    return CategoryMenuResponseSchema(categories=response_categories)

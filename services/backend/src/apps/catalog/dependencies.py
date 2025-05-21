@@ -6,8 +6,12 @@ from apps.catalog.factories import (
     create_product_filter_specification,
     create_search_specification
 )
-from apps.catalog.interfaces.repositories import ProductRepositoryInterface
+from apps.catalog.interfaces.repositories import (
+    ProductRepositoryInterface,
+    CategoryRepositoryInterface
+)
 from apps.catalog.interfaces.services import CatalogServiceInterface
+from apps.catalog.repositories.category import CategoryRepository
 from apps.catalog.repositories.product import ProductRepository
 from apps.catalog.services.catalog import CatalogService
 from db.dependencies import get_database_dao, get_query_builder
@@ -29,6 +33,21 @@ async def get_product_repository(
         Initialized product repository
     """
     return ProductRepository(dao, query_builder)
+
+
+async def get_category_repository(
+        dao: DAOInterface = Depends(get_database_dao),
+) -> CategoryRepositoryInterface:
+    """
+    Dependency for getting category repository.
+
+    Args:
+        dao: Data Access Object for database operations
+
+    Returns:
+        Initialized category repository
+    """
+    return CategoryRepository(dao)
 
 
 def get_pagination_specification_factory() -> callable:
@@ -73,16 +92,18 @@ def get_search_specification_factory() -> callable:
 
 async def get_catalog_service(
         product_repository: ProductRepositoryInterface = Depends(get_product_repository),
+        category_repository: CategoryRepositoryInterface = Depends(get_category_repository),
         pagination_specification_factory: callable = Depends(get_pagination_specification_factory),
         ordering_specification_factory: callable = Depends(get_ordering_specification_factory),
         filter_specification_factory: callable = Depends(get_filter_specification_factory),
-        search_specification_factory: callable = Depends(get_search_specification_factory),  # Добавляем зависимость
+        search_specification_factory: callable = Depends(get_search_specification_factory),
 ) -> CatalogServiceInterface:
     """
     Dependency for getting catalog service.
 
     Args:
         product_repository: Repository for accessing product data
+        category_repository: Repository for accessing category data
         pagination_specification_factory: Factory for creating pagination specifications
         ordering_specification_factory: Factory for creating ordering specifications
         filter_specification_factory: Factory for creating filter specifications
@@ -93,8 +114,9 @@ async def get_catalog_service(
     """
     return CatalogService(
         product_repository=product_repository,
+        category_repository=category_repository,
         pagination_specification_factory=pagination_specification_factory,
         ordering_specification_factory=ordering_specification_factory,
         filter_specification_factory=filter_specification_factory,
-        search_specification_factory=search_specification_factory,  # Передаем фабрику
+        search_specification_factory=search_specification_factory,
     )

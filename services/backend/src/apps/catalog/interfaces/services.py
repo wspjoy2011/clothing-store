@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from apps.catalog.dto.catalog import CatalogDTO
+from apps.catalog.dto.category import CategoryMenuDTO
 from apps.catalog.dto.filters import FiltersDTO
 
 
@@ -46,5 +47,16 @@ class CatalogServiceInterface(ABC):
 
         Returns:
             FiltersDTO object containing all available filters or None if catalog is empty
+        """
+        pass
+
+    @abstractmethod
+    async def get_category_menu(self) -> Optional[CategoryMenuDTO]:
+        """
+        Get the complete category menu with all master categories,
+        subcategories and article types.
+
+        Returns:
+            CategoryMenuDTO: The complete category hierarchy if categories is empty
         """
         pass

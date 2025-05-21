@@ -93,3 +93,71 @@ COMBINED_FILTERS_VALUE = {
     "total_pages": 4,
     "total_items": 32,
 }
+
+CATEGORY_MENU_EXAMPLE = {
+    "categories": [
+        {
+            "id": 1,
+            "name": "Accessories",
+            "sub_categories": [
+                {
+                    "id": 29,
+                    "name": "Accessories",
+                    "article_types": [
+                        {"id": 89, "name": "Accessory Gift Set"},
+                        {"id": 133, "name": "Hair Accessory"},
+                        {"id": 146, "name": "Key chain"}
+                    ]
+                },
+                {
+                    "id": 8,
+                    "name": "Bags",
+                    "article_types": [
+                        {"id": 45, "name": "Backpacks"},
+                        {"id": 43, "name": "Clutches"},
+                        {"id": 10, "name": "Handbags"}
+                    ]
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "name": "Apparel",
+            "sub_categories": [
+                {
+                    "id": 2,
+                    "name": "Bottomwear",
+                    "article_types": [
+                        {"id": 2, "name": "Jeans"},
+                        {"id": 24, "name": "Shorts"},
+                        {"id": 38, "name": "Skirts"}
+                    ]
+                },
+                {
+                    "id": 1,
+                    "name": "Topwear",
+                    "article_types": [
+                        {"id": 1, "name": "Shirts"},
+                        {"id": 5, "name": "Tshirts"},
+                        {"id": 15, "name": "Sweatshirts"}
+                    ]
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "name": "Footwear",
+            "sub_categories": [
+                {
+                    "id": 5,
+                    "name": "Shoes",
+                    "article_types": [
+                        {"id": 7, "name": "Casual Shoes"},
+                        {"id": 17, "name": "Formal Shoes"},
+                        {"id": 23, "name": "Sports Shoes"}
+                    ]
+                }
+            ]
+        }
+    ]
+}

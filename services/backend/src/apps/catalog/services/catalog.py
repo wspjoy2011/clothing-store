@@ -1,8 +1,12 @@
 from typing import Optional, Callable
 
 from apps.catalog.dto.catalog import CatalogDTO, PaginationDTO
+from apps.catalog.dto.category import CategoryMenuDTO
 from apps.catalog.dto.filters import FiltersDTO
-from apps.catalog.interfaces.repositories import ProductRepositoryInterface
+from apps.catalog.interfaces.repositories import (
+    ProductRepositoryInterface,
+    CategoryRepositoryInterface
+)
 from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
@@ -23,6 +27,7 @@ class CatalogService(CatalogServiceInterface):
     def __init__(
             self,
             product_repository: ProductRepositoryInterface,
+            category_repository: CategoryRepositoryInterface,
             pagination_specification_factory: PaginationSpecificationFactory,
             ordering_specification_factory: OrderingSpecificationFactory,
             filter_specification_factory: FilterSpecificationFactory,
@@ -33,11 +38,14 @@ class CatalogService(CatalogServiceInterface):
 
         Args:
             product_repository: Repository for product data access
+            category_repository: Repository for category data access
             pagination_specification_factory: Factory for creating pagination specifications
             ordering_specification_factory: Factory for creating ordering specifications
             filter_specification_factory: Factory for creating filter specifications
+            search_specification_factory: Factory for creating search specifications
         """
         self._product_repository = product_repository
+        self._category_repository = category_repository
         self._pagination_specification_factory = pagination_specification_factory
         self._ordering_specification_factory = ordering_specification_factory
         self._filter_specification_factory = filter_specification_factory
@@ -116,3 +124,13 @@ class CatalogService(CatalogServiceInterface):
             search_spec = self._search_specification_factory(q)
 
         return await self._product_repository.get_available_filters(search_spec)
+
+    async def get_category_menu(self) -> Optional[CategoryMenuDTO]:
+        """
+        Get the complete category menu with all master categories,
+        subcategories and article types.
+
+        Returns:
+            CategoryMenuDTO: The complete category hierarchy if categories is empty
+        """
+        return await self._category_repository.get_category_menu()

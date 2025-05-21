@@ -4,7 +4,8 @@ from fastapi import APIRouter, Query, Depends
 
 from apps.catalog.controllers import (
     get_product_list_controller,
-    get_filters_controller
+    get_filters_controller,
+    get_category_menu_controller
 )
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.interfaces.services import CatalogServiceInterface
@@ -14,10 +15,11 @@ from apps.catalog.schemas.examples.responses import (
     YEAR_FILTERED_VALUE,
     GENDER_FILTERED_VALUE,
     YEAR_DESCENDING_VALUE,
-    COMBINED_FILTERS_VALUE
+    COMBINED_FILTERS_VALUE,
+    CATEGORY_MENU_EXAMPLE
 )
 from apps.catalog.schemas.filters import FiltersResponseSchema
-from apps.catalog.schemas.responses import ProductListResponseSchema
+from apps.catalog.schemas.responses import ProductListResponseSchema, CategoryMenuResponseSchema
 
 router = APIRouter(
     prefix="/catalog",
@@ -170,3 +172,61 @@ async def filters_route(
        HTTPException: If the catalog is empty
     """
     return await get_filters_controller(catalog_service, q)
+
+
+@router.get(
+    "/categories",
+    response_model=CategoryMenuResponseSchema,
+    status_code=200,
+    summary="Get the complete category hierarchy",
+    description=(
+            "<h3>This endpoint retrieves the complete category hierarchy with all master categories, "
+            "subcategories, and article types. The hierarchy is structured as a tree with three levels: "
+            "master categories at the top level, subcategories as children of master categories, and "
+            "article types as children of subcategories. This information can be used to build navigation menus, "
+            "category browsers, or filtering interfaces in e-commerce applications.</h3>"
+    ),
+    responses={
+        404: {
+            "description": "No categories available.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "No categories available in the catalog."}
+                }
+            },
+        }
+    },
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "category_menu": {
+                                "summary": "Complete category hierarchy",
+                                "description": "Example response with all category levels",
+                                "value": CATEGORY_MENU_EXAMPLE
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_categories_route(
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
+) -> CategoryMenuResponseSchema:
+    """
+    Get the complete category hierarchy
+
+    Args:
+        catalog_service: Catalog service for data access
+
+    Returns:
+        Category menu with all hierarchy levels
+
+    Raises:
+        HTTPException: If no categories are available
+    """
+    return await get_category_menu_controller(catalog_service)

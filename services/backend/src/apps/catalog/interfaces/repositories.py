@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from apps.catalog.dto.category import CategoryMenuDTO, MasterCategoryInfoDTO
 from apps.catalog.dto.filters import FiltersDTO
 from apps.catalog.dto.products import ProductDTO
 from apps.catalog.interfaces.specifications import (
@@ -65,5 +66,33 @@ class ProductRepositoryInterface(ABC):
 
         Returns:
             FiltersDTO object containing all available filters or None if catalog is empty
+        """
+        pass
+
+
+class CategoryRepositoryInterface(ABC):
+    """Interface for category repository operations"""
+
+    @abstractmethod
+    async def get_category_menu(self) -> CategoryMenuDTO:
+        """
+        Get the complete category menu structure with all master categories,
+        subcategories and article types.
+
+        Returns:
+            CategoryMenuDTO: The complete category hierarchy
+        """
+        pass
+
+    @abstractmethod
+    async def get_master_category_by_id(self, master_category_id: int) -> Optional[MasterCategoryInfoDTO]:
+        """
+        Get a single master category with its subcategories and article types
+
+        Args:
+            master_category_id: The ID of the master category to retrieve
+
+        Returns:
+            Optional[MasterCategoryInfoDTO]: The master category with its hierarchy or None if not found
         """
         pass
