@@ -18,7 +18,8 @@ export default createVuetify({
                     error: '#FF5252',
                     info: '#2196F3',
                     success: '#4CAF50',
-                    warning: '#FFC107'
+                    warning: '#FFC107',
+                    lightgrey: '#d3d0d0'
                 }
             },
             dark: {
@@ -29,7 +30,8 @@ export default createVuetify({
                     error: '#EF5350',
                     info: '#64B5F6',
                     success: '#81C784',
-                    warning: '#FFD54F'
+                    warning: '#FFD54F',
+                    lightgrey: '#404040'
                 }
             }
         }

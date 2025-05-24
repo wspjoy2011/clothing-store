@@ -1,5 +1,5 @@
 <template>
-  <div class="category-menu">
+  <div class="category-menu" :class="{ 'theme-dark': isDarkTheme }">
     <div v-if="isLoading" class="d-flex justify-center pa-4">
       <v-progress-circular indeterminate color="primary" />
     </div>
@@ -18,6 +18,7 @@
         :key="`category-${category.id}`"
         :item="category"
         @item-click="handleCategoryClick"
+        class="menu-item-vertical"
       />
     </div>
   </div>
@@ -26,6 +27,7 @@
 <script>
 import { mapActions } from 'pinia';
 import { useCategoryStore } from '@/stores/categoryStore';
+import { useTheme } from 'vuetify';
 import CategoryMenuItem from './CategoryMenuItem.vue';
 
 export default {
@@ -81,6 +83,11 @@ export default {
 
     categoriesExist() {
       return this.propHasCategories !== null ? this.propHasCategories : this.storeCategories.length > 0;
+    },
+
+    isDarkTheme() {
+      const theme = useTheme();
+      return theme.global.current.value.dark;
     }
   },
 
@@ -130,24 +137,39 @@ export default {
 }
 
 .category-menu-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
-  padding: 16px;
-  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  max-width: 360px;
+  background-color: white;
 }
 
-@media (max-width: 600px) {
-  .category-menu-container {
-    grid-template-columns: 1fr;
-  }
+.menu-item-vertical {
+  margin-bottom: 8px;
 }
 
-.category-menu-container > * {
-  transition: transform 0.2s ease, opacity 0.2s ease;
+.menu-item-vertical:last-child {
+  margin-bottom: 0;
 }
 
-.category-menu-container > *:hover {
-  transform: translateY(-2px);
+.theme-dark {
+  background-color: #1E1E1E !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+}
+
+.theme-dark .category-menu-container {
+  background-color: #1E1E1E !important;
+}
+
+.theme-dark .category-submenu-card {
+  background-color: #1E1E1E !important;
+}
+
+.theme-dark .nested-item-title:hover {
+  background-color: rgba(80, 80, 80, 0.3);
+}
+
+.theme-dark .category-btn {
+  background-color: #2A2A2A;
 }
 </style>

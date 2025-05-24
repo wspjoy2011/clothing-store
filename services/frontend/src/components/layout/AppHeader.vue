@@ -359,5 +359,6 @@ function navigateToCategory(categoryInfo) {
 
 :deep(.v-theme--dark) .category-dropdown {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  background-color: #1E1E1E;
 }
 </style>

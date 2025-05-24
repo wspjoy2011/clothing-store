@@ -12,7 +12,7 @@
         <v-btn
           variant="elevated"
           v-bind="props"
-          color="primary"
+          color="lightgrey"
           class="category-btn"
           @click="handleItemClick"
         >
@@ -54,7 +54,7 @@
     <v-btn
       v-else
       variant="elevated"
-      color="primary"
+      color="lightgrey"
       class="category-btn"
       @click="handleItemClick"
     >
