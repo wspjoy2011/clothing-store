@@ -151,3 +151,84 @@ async def get_category_menu_controller(
         ))
 
     return CategoryMenuResponseSchema(categories=response_categories)
+
+
+async def get_products_by_category_controller(
+        master_category_id: int,
+        sub_category_id: Optional[int] = None,
+        article_type_id: Optional[int] = None,
+        page: int = 1,
+        per_page: int = 10,
+        ordering: Optional[str] = None,
+        min_year: Optional[int] = None,
+        max_year: Optional[int] = None,
+        gender: Optional[str] = None,
+        q: Optional[str] = None,
+        catalog_service: CatalogServiceInterface = None,
+) -> ProductListResponseSchema:
+    """
+    Controller for retrieving products filtered by category
+
+    Args:
+        master_category_id: ID of the master category (required)
+        sub_category_id: ID of the sub-category (optional)
+        article_type_id: ID of the article type (optional)
+        page: Page number (1-based)
+        per_page: Number of items per page
+        ordering: Ordering string
+        min_year: Minimum year filter
+        max_year: Maximum year filter
+        gender: Gender filter
+        q: Search query
+        catalog_service: Catalog service instance
+
+    Returns:
+        Response with products filtered by category
+    """
+    catalog_dto = await catalog_service.get_products_by_category(
+        master_category_id=master_category_id,
+        sub_category_id=sub_category_id,
+        article_type_id=article_type_id,
+        page=page,
+        per_page=per_page,
+        ordering=ordering,
+        min_year=min_year,
+        max_year=max_year,
+        gender=gender,
+        q=q
+    )
+
+    products = [ProductSchema(**asdict(product)) for product in catalog_dto.products]
+
+    total_pages = catalog_dto.pagination.total_pages
+
+    base_url = f"/api/v1.0/catalog/categories/{master_category_id}/products"
+
+    def build_url_with_params(page_num: int) -> str:
+        params = {'page': page_num, 'per_page': per_page}
+        if sub_category_id is not None:
+            params['sub_category_id'] = sub_category_id
+        if article_type_id is not None:
+            params['article_type_id'] = article_type_id
+        if ordering:
+            params['ordering'] = ordering
+        if min_year is not None:
+            params['min_year'] = min_year
+        if max_year is not None:
+            params['max_year'] = max_year
+        if gender:
+            params['gender'] = gender
+        if q:
+            params['q'] = q
+        return f"{base_url}?{urlencode(params)}"
+
+    prev_page = build_url_with_params(page - 1) if page > 1 else None
+    next_page = build_url_with_params(page + 1) if page < total_pages else None
+
+    return ProductListResponseSchema(
+        products=products,
+        prev_page=None if not products else prev_page,
+        next_page=None if not products else next_page,
+        total_pages=catalog_dto.pagination.total_pages,
+        total_items=catalog_dto.pagination.total_items,
+    )

@@ -7,7 +7,8 @@ from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
     OrderingSpecificationInterface,
     FilterSpecificationInterface,
-    SearchSpecificationInterface
+    SearchSpecificationInterface,
+    CategorySpecificationInterface
 )
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
 from settings.logging_config import get_logger
@@ -51,6 +52,38 @@ class ProductRepository(ProductRepositoryInterface):
             for row in (result or [])
         ]
 
+    async def get_products_with_specifications_by_categories(
+            self,
+            category_spec: CategorySpecificationInterface,
+            pagination_spec: PaginationSpecificationInterface,
+            ordering_spec: Optional[OrderingSpecificationInterface] = None,
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> List[ProductDTO]:
+        """
+        Get products filtered by category and other specifications
+        """
+        self._prepare_query_builder(filter_spec, search_spec, ordering_spec, category_spec)
+
+        self._query_builder.limit(pagination_spec.get_limit()).offset(pagination_spec.get_offset())
+
+        query, params = self._query_builder.build()
+        logger.info(f"Category products query: {query}")
+        logger.info(f"Category products params: {params}")
+
+        result = await self._dao.execute(query, params)
+
+        return [
+            ProductDTO(
+                product_id=int(row[0]),
+                gender=row[1],
+                year=int(row[2]),
+                product_display_name=row[3],
+                image_url=row[4],
+            )
+            for row in (result or [])
+        ]
+
     async def get_products_count(
             self,
             filter_spec: Optional[FilterSpecificationInterface] = None,
@@ -76,6 +109,45 @@ class ProductRepository(ProductRepositoryInterface):
         result = await self._dao.execute(query, params, fetch_one=True)
         return result[0] if result else 0
 
+    async def get_products_count_by_categories(
+            self,
+            category_spec: CategorySpecificationInterface,
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> int:
+        """
+        Get count of products filtered by category and other specifications
+        """
+        self._query_builder.reset().select("COUNT(*)")
+
+        if category_spec and not category_spec.is_empty():
+            category_sql, category_params = category_spec.to_sql()
+
+            joins_part, where_part = category_sql.split("WHERE", 1)
+
+            for join_clause in joins_part.strip().split("JOIN"):
+                if join_clause.strip():
+                    self._query_builder.join(f"JOIN {join_clause.strip()}")
+
+            self._query_builder.where(where_part.strip(), *category_params)
+
+        if filter_spec and not filter_spec.is_empty():
+            filter_sql, filter_params = filter_spec.to_sql()
+            self._parse_sql_conditions(filter_sql, filter_params)
+
+        if search_spec and not search_spec.is_empty():
+            search_sql, search_params = search_spec.to_sql()
+            where_sql, _ = self._split_search_sql(search_sql)
+            self._parse_sql_conditions(where_sql, search_params[:1])
+
+        query, params = self._query_builder.build()
+
+        logger.info(f"Category products count query: {query}")
+        logger.info(f"Category products count params: {params}")
+
+        result = await self._dao.execute(query, params, fetch_one=True)
+        return result[0] if result else 0
+
     async def get_available_filters(
             self,
             search_spec: Optional[SearchSpecificationInterface] = None
@@ -94,23 +166,6 @@ class ProductRepository(ProductRepositoryInterface):
 
         return await self._get_filtered_filters(search_spec)
 
-    async def get_available_filters(
-            self,
-            search_spec: Optional[SearchSpecificationInterface] = None
-    ) -> Optional[FiltersDTO]:
-        """
-        Get available filters and their possible values based on the actual data
-
-        Args:
-            search_spec: Optional search specification to limit filters to relevant options
-
-        Returns:
-            FiltersDTO object containing all available filters or None if catalog is empty
-        """
-        if not search_spec or search_spec.is_empty():
-            return await self._get_all_filters()
-
-        return await self._get_filtered_filters(search_spec)
 
     async def _get_all_filters(self) -> Optional[FiltersDTO]:
         """
@@ -204,12 +259,32 @@ class ProductRepository(ProductRepositoryInterface):
             self,
             filter_spec: Optional[FilterSpecificationInterface],
             search_spec: Optional[SearchSpecificationInterface],
-            ordering_spec: Optional[OrderingSpecificationInterface] = None
+            ordering_spec: Optional[OrderingSpecificationInterface] = None,
+            category_spec: Optional[CategorySpecificationInterface] = None
     ) -> None:
+        """
+        Prepare query builder with specifications
 
+        Args:
+            filter_spec: Optional filter specification
+            search_spec: Optional search specification
+            ordering_spec: Optional ordering specification
+            category_spec: Optional category specification
+        """
         self._query_builder.reset().select(
             "product_id", "gender", "year", "product_display_name", "image_url"
         )
+
+        if category_spec and not category_spec.is_empty():
+            category_sql, category_params = category_spec.to_sql()
+
+            joins_part, where_part = category_sql.split("WHERE", 1)
+
+            for join_clause in joins_part.strip().split("JOIN"):
+                if join_clause.strip():
+                    self._query_builder.join(f"JOIN {join_clause.strip()}")
+
+            self._query_builder.where(where_part.strip(), *category_params)
 
         if filter_spec and not filter_spec.is_empty():
             filter_sql, filter_params = filter_spec.to_sql()

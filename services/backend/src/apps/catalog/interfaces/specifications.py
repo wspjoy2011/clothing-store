@@ -77,3 +77,17 @@ class SearchSpecificationInterface(SpecificationInterface):
     def is_empty(self) -> bool:
         """Check if the search specification is empty."""
         pass
+
+
+class CategorySpecificationInterface(SpecificationInterface):
+    """Interface for category specifications"""
+
+    @abstractmethod
+    def is_empty(self) -> bool:
+        """
+        Check if category specification is empty
+
+        Returns:
+            True if no category criteria are defined, False otherwise
+        """
+        pass

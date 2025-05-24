@@ -1,11 +1,11 @@
 from typing import Optional
 
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, Path
 
 from apps.catalog.controllers import (
     get_product_list_controller,
     get_filters_controller,
-    get_category_menu_controller
+    get_category_menu_controller, get_products_by_category_controller
 )
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.interfaces.services import CatalogServiceInterface
@@ -230,3 +230,92 @@ async def get_categories_route(
         HTTPException: If no categories are available
     """
     return await get_category_menu_controller(catalog_service)
+
+
+@router.get(
+    "/categories/{master_category_id}/products",
+    response_model=ProductListResponseSchema,
+    status_code=200,
+    summary="Get products by category",
+    description=(
+            "<h3>This endpoint retrieves a paginated and filtered list of products from a specific category. "
+            "The master_category_id is required, while sub_category_id and article_type_id are optional for more specific filtering. "
+            "All the filtering, sorting and pagination features from the /products endpoint are also available here, "
+            "but the results are pre-filtered to only include products from the specified category hierarchy.</h3>"
+    ),
+    responses={
+        422: {
+            "description": "Validation error occurred for query parameters.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "field": "page",
+                        "message": "value is not a valid integer"
+                    }
+                }
+            },
+        },
+    },
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "full_filters": {
+                                "summary": "Complete filters",
+                                "description": "Example response with all filter types",
+                                "value": FILTERS_FULL_EXAMPLE
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_products_by_category_route(
+        master_category_id: int = Path(..., description="ID of the master category"),
+        sub_category_id: Optional[int] = Query(None, description="ID of the sub-category (optional)"),
+        article_type_id: Optional[int] = Query(None, description="ID of the article type (optional)"),
+        page: int = Query(1, ge=1, description="Page number (1-based index)"),
+        per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
+        ordering: Optional[str] = Query(None, description="Ordering fields (e.g., 'year,-id')"),
+        min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
+        max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
+        gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
+        q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
+):
+    """
+    Get products by category with pagination, filtering and sorting
+
+    Args:
+        master_category_id: ID of the master category (required)
+        sub_category_id: ID of the sub-category (optional)
+        article_type_id: ID of the article type (optional)
+        page: Page number
+        per_page: Items per page
+        ordering: Ordering string
+        min_year: Minimum year filter
+        max_year: Maximum year filter
+        gender: Gender filter
+        q: Search query
+        catalog_service: Catalog service
+
+    Returns:
+        ProductListResponseSchema: List of products with pagination info
+    """
+    return await get_products_by_category_controller(
+        master_category_id=master_category_id,
+        sub_category_id=sub_category_id,
+        article_type_id=article_type_id,
+        page=page,
+        per_page=per_page,
+        ordering=ordering,
+        min_year=min_year,
+        max_year=max_year,
+        gender=gender,
+        q=q,
+        catalog_service=catalog_service,
+    )

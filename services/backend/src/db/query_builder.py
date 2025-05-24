@@ -10,6 +10,7 @@ class SQLQueryBuilder(SQLQueryBuilderInterface):
         """Initialize with base table name"""
         self._base_table = base_table
         self._select_fields = []
+        self._join_clauses = []
         self._where_conditions = []
         self._order_by_clauses = []
         self._params = []
@@ -55,6 +56,9 @@ class SQLQueryBuilder(SQLQueryBuilderInterface):
         """Build the final SQL query and params list"""
         query = f"SELECT {', '.join(self._select_fields) or '*'} FROM {self._base_table}"
 
+        if self._join_clauses:
+            query += f" {' '.join(self._join_clauses)}"
+
         if self._where_conditions:
             query += f" WHERE {' AND '.join(self._where_conditions)}"
 
@@ -77,6 +81,9 @@ class SQLQueryBuilder(SQLQueryBuilderInterface):
         """Build COUNT query with the same conditions"""
         query = f"SELECT COUNT(*) FROM {self._base_table}"
 
+        if self._join_clauses:
+            query += f" {' '.join(self._join_clauses)}"
+
         if self._where_conditions:
             query += f" WHERE {' AND '.join(self._where_conditions)}"
 
@@ -94,8 +101,15 @@ class SQLQueryBuilder(SQLQueryBuilderInterface):
         """Reset the builder state to initial values"""
         self._select_fields = []
         self._where_conditions = []
+        self._join_clauses = []
         self._order_by_clauses = []
         self._params = []
         self._offset_value = None
         self._limit_value = None
+        return self
+
+    def join(self, join_clause: str) -> Self:
+        """Add JOIN clause to query"""
+        if join_clause and join_clause.strip():
+            self._join_clauses.append(join_clause)
         return self

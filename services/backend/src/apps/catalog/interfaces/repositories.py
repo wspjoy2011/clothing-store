@@ -8,7 +8,8 @@ from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
     OrderingSpecificationInterface,
     FilterSpecificationInterface,
-    SearchSpecificationInterface
+    SearchSpecificationInterface,
+    CategorySpecificationInterface
 )
 
 
@@ -36,6 +37,30 @@ class ProductRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_products_with_specifications_by_categories(
+            self,
+            category_spec: CategorySpecificationInterface,
+            pagination_spec: PaginationSpecificationInterface,
+            ordering_spec: Optional[OrderingSpecificationInterface] = None,
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> list[ProductDTO]:
+        """
+        Get products filtered by category and other specifications
+
+        Args:
+            category_spec: Specification for category filtering
+            pagination_spec: Specification for pagination
+            ordering_spec: Optional specification for ordering results
+            filter_spec: Optional specification for filtering results
+            search_spec: Optional specification for search
+
+        Returns:
+            List of product DTOs
+        """
+        pass
+
+    @abstractmethod
     async def get_products_count(
             self,
             filter_spec: Optional[FilterSpecificationInterface] = None,
@@ -50,6 +75,26 @@ class ProductRepositoryInterface(ABC):
 
         Returns:
             Number of products in the database
+        """
+        pass
+
+    @abstractmethod
+    async def get_products_count_by_categories(
+            self,
+            category_spec: CategorySpecificationInterface,
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> int:
+        """
+        Get count of products filtered by category and other specifications
+
+        Args:
+            category_spec: Specification for category filtering
+            filter_spec: Optional specification for filtering results
+            search_spec: Optional specification for search
+
+        Returns:
+            Number of products matching the criteria
         """
         pass
 

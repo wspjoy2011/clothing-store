@@ -76,3 +76,9 @@ class SQLQueryBuilderInterface(ABC):
     def reset(self) -> Self:
         """Reset the builder state to initial values"""
         pass
+
+    @abstractmethod
+    def join(self, join_clause: str) -> Self:
+        """Add JOIN clause to query"""
+        pass
+

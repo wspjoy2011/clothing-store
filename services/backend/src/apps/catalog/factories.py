@@ -4,7 +4,7 @@ from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
     OrderingSpecificationInterface,
     FilterSpecificationInterface,
-    SearchSpecificationInterface
+    SearchSpecificationInterface, CategorySpecificationInterface
 )
 from apps.catalog.specifications.filtering import ProductFilterSpecification
 from apps.catalog.specifications.pagination import PaginationSpecification
@@ -60,3 +60,28 @@ def create_search_specification(query: Optional[str] = None) -> SearchSpecificat
         SearchSpecificationInterface implementation
     """
     return ProductSearchSpecification(query)
+
+
+def create_category_specification(
+        master_category_id: int,
+        sub_category_id: Optional[int] = None,
+        article_type_id: Optional[int] = None
+) -> CategorySpecificationInterface:
+    """
+    Create a category specification for filtering products by category hierarchy
+
+    Args:
+        master_category_id: Master category ID
+        sub_category_id: Optional subcategory ID
+        article_type_id: Optional article type ID
+
+    Returns:
+        Initialized category specification
+    """
+    from apps.catalog.specifications.category import CategorySpecification
+
+    return CategorySpecification(
+        master_category_id=master_category_id,
+        sub_category_id=sub_category_id,
+        article_type_id=article_type_id
+    )

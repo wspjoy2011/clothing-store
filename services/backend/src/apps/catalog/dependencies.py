@@ -4,7 +4,8 @@ from apps.catalog.factories import (
     create_pagination_specification,
     create_ordering_specification,
     create_product_filter_specification,
-    create_search_specification
+    create_search_specification,
+    create_category_specification
 )
 from apps.catalog.interfaces.repositories import (
     ProductRepositoryInterface,
@@ -90,6 +91,16 @@ def get_search_specification_factory() -> callable:
     return create_search_specification
 
 
+def get_category_specification_factory() -> callable:
+    """
+    Dependency for getting category specification factory.
+
+    Returns:
+        Function to create category specifications
+    """
+    return create_category_specification
+
+
 async def get_catalog_service(
         product_repository: ProductRepositoryInterface = Depends(get_product_repository),
         category_repository: CategoryRepositoryInterface = Depends(get_category_repository),
@@ -97,6 +108,7 @@ async def get_catalog_service(
         ordering_specification_factory: callable = Depends(get_ordering_specification_factory),
         filter_specification_factory: callable = Depends(get_filter_specification_factory),
         search_specification_factory: callable = Depends(get_search_specification_factory),
+        category_specification_factory: callable = Depends(get_category_specification_factory),
 ) -> CatalogServiceInterface:
     """
     Dependency for getting catalog service.
@@ -108,6 +120,7 @@ async def get_catalog_service(
         ordering_specification_factory: Factory for creating ordering specifications
         filter_specification_factory: Factory for creating filter specifications
         search_specification_factory: Factory for creating search specifications
+        category_specification_factory: Factory for creating category specifications
 
     Returns:
         Initialized catalog service
@@ -119,4 +132,5 @@ async def get_catalog_service(
         ordering_specification_factory=ordering_specification_factory,
         filter_specification_factory=filter_specification_factory,
         search_specification_factory=search_specification_factory,
+        category_specification_factory=category_specification_factory,
     )
