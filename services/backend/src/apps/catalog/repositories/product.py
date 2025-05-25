@@ -1,4 +1,4 @@
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Tuple
 
 from apps.catalog.dto.filters import FiltersDTO, CheckboxFilterDTO, RangeFilterDTO
 from apps.catalog.dto.products import ProductDTO
@@ -24,33 +24,19 @@ class ProductRepository(ProductRepositoryInterface):
         self._query_builder = query_builder
 
     async def get_products_with_specifications(
-        self,
-        pagination_spec: PaginationSpecificationInterface,
-        ordering_spec: Optional[OrderingSpecificationInterface] = None,
-        filter_spec: Optional[FilterSpecificationInterface] = None,
-        search_spec: Optional[SearchSpecificationInterface] = None
+            self,
+            pagination_spec: PaginationSpecificationInterface,
+            ordering_spec: Optional[OrderingSpecificationInterface] = None,
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None
     ) -> List[ProductDTO]:
-
-        self._prepare_query_builder(filter_spec, search_spec, ordering_spec)
-
-        self._query_builder.limit(pagination_spec.get_limit()).offset(pagination_spec.get_offset())
-
-        query, params = self._query_builder.build()
-        logger.info(f"Final query: {query}")
-        logger.info(f"Final params: {params}")
-
-        result = await self._dao.execute(query, params)
-
-        return [
-            ProductDTO(
-                product_id=int(row[0]),
-                gender=row[1],
-                year=int(row[2]),
-                product_display_name=row[3],
-                image_url=row[4],
-            )
-            for row in (result or [])
-        ]
+        return await self._get_products_with_specs(
+            pagination_spec=pagination_spec,
+            ordering_spec=ordering_spec,
+            filter_spec=filter_spec,
+            search_spec=search_spec,
+            log_prefix="Final"
+        )
 
     async def get_products_with_specifications_by_categories(
             self,
@@ -60,16 +46,63 @@ class ProductRepository(ProductRepositoryInterface):
             filter_spec: Optional[FilterSpecificationInterface] = None,
             search_spec: Optional[SearchSpecificationInterface] = None
     ) -> List[ProductDTO]:
-        """
-        Get products filtered by category and other specifications
-        """
-        self._prepare_query_builder(filter_spec, search_spec, ordering_spec, category_spec)
+        return await self._get_products_with_specs(
+            pagination_spec=pagination_spec,
+            ordering_spec=ordering_spec,
+            filter_spec=filter_spec,
+            search_spec=search_spec,
+            category_spec=category_spec,
+            log_prefix="Category products"
+        )
 
+    async def get_products_count(
+            self,
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> int:
+        return await self._get_products_count(
+            filter_spec=filter_spec,
+            search_spec=search_spec,
+            log_prefix="Final count"
+        )
+
+    async def get_products_count_by_categories(
+            self,
+            category_spec: CategorySpecificationInterface,
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> int:
+        return await self._get_products_count(
+            filter_spec=filter_spec,
+            search_spec=search_spec,
+            category_spec=category_spec,
+            log_prefix="Category products count"
+        )
+
+    async def get_available_filters(
+            self,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> Optional[FiltersDTO]:
+        if not search_spec or search_spec.is_empty():
+            return await self._get_all_filters()
+
+        return await self._get_filtered_filters(search_spec)
+
+    async def _get_products_with_specs(
+            self,
+            pagination_spec: PaginationSpecificationInterface,
+            ordering_spec: Optional[OrderingSpecificationInterface] = None,
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None,
+            category_spec: Optional[CategorySpecificationInterface] = None,
+            log_prefix: str = "Products"
+    ) -> List[ProductDTO]:
+        self._prepare_query_builder(filter_spec, search_spec, ordering_spec, category_spec)
         self._query_builder.limit(pagination_spec.get_limit()).offset(pagination_spec.get_offset())
 
         query, params = self._query_builder.build()
-        logger.info(f"Category products query: {query}")
-        logger.info(f"Category products params: {params}")
+        logger.info(f"{log_prefix} query: {query}")
+        logger.info(f"{log_prefix} params: {params}")
 
         result = await self._dao.execute(query, params)
 
@@ -84,52 +117,17 @@ class ProductRepository(ProductRepositoryInterface):
             for row in (result or [])
         ]
 
-    async def get_products_count(
+    async def _get_products_count(
             self,
             filter_spec: Optional[FilterSpecificationInterface] = None,
-            search_spec: Optional[SearchSpecificationInterface] = None
+            search_spec: Optional[SearchSpecificationInterface] = None,
+            category_spec: Optional[CategorySpecificationInterface] = None,
+            log_prefix: str = "Count"
     ) -> int:
-
-        self._query_builder.reset()
-
-        if filter_spec and not filter_spec.is_empty():
-            filter_sql, filter_params = filter_spec.to_sql()
-            self._parse_sql_conditions(filter_sql, filter_params)
-
-        if search_spec and not search_spec.is_empty():
-            search_sql, search_params = search_spec.to_sql()
-            where_sql, _ = self._split_search_sql(search_sql)
-
-            self._parse_sql_conditions(where_sql, search_params[:1])
-
-        query, params = self._query_builder.build_count()
-        logger.info(f"Final count query: {query}")
-        logger.info(f"Final count params: {params}")
-
-        result = await self._dao.execute(query, params, fetch_one=True)
-        return result[0] if result else 0
-
-    async def get_products_count_by_categories(
-            self,
-            category_spec: CategorySpecificationInterface,
-            filter_spec: Optional[FilterSpecificationInterface] = None,
-            search_spec: Optional[SearchSpecificationInterface] = None
-    ) -> int:
-        """
-        Get count of products filtered by category and other specifications
-        """
         self._query_builder.reset().select("COUNT(*)")
 
         if category_spec and not category_spec.is_empty():
-            category_sql, category_params = category_spec.to_sql()
-
-            joins_part, where_part = category_sql.split("WHERE", 1)
-
-            for join_clause in joins_part.strip().split("JOIN"):
-                if join_clause.strip():
-                    self._query_builder.join(f"JOIN {join_clause.strip()}")
-
-            self._query_builder.where(where_part.strip(), *category_params)
+            self._apply_category_spec(category_spec)
 
         if filter_spec and not filter_spec.is_empty():
             filter_sql, filter_params = filter_spec.to_sql()
@@ -142,38 +140,13 @@ class ProductRepository(ProductRepositoryInterface):
 
         query, params = self._query_builder.build()
 
-        logger.info(f"Category products count query: {query}")
-        logger.info(f"Category products count params: {params}")
+        logger.info(f"{log_prefix} query: {query}")
+        logger.info(f"{log_prefix} params: {params}")
 
         result = await self._dao.execute(query, params, fetch_one=True)
         return result[0] if result else 0
 
-    async def get_available_filters(
-            self,
-            search_spec: Optional[SearchSpecificationInterface] = None
-    ) -> Optional[FiltersDTO]:
-        """
-        Get available filters and their possible values based on the actual data
-
-        Args:
-            search_spec: Optional search specification to limit filters to relevant options
-
-        Returns:
-            FiltersDTO object containing all available filters or None if catalog is empty
-        """
-        if not search_spec or search_spec.is_empty():
-            return await self._get_all_filters()
-
-        return await self._get_filtered_filters(search_spec)
-
-
     async def _get_all_filters(self) -> Optional[FiltersDTO]:
-        """
-        Get all available filters without additional filtering
-
-        Returns:
-            FiltersDTO object containing all available filters or None if catalog is empty
-        """
         count_query = f"SELECT COUNT(*) FROM {self.APP_NAME}_products"
         logger.info(f"Filters count query: {count_query}")
 
@@ -200,15 +173,6 @@ class ProductRepository(ProductRepositoryInterface):
         )
 
     async def _get_filtered_filters(self, search_spec: SearchSpecificationInterface) -> Optional[FiltersDTO]:
-        """
-        Get available filters based on search query results
-
-        Args:
-            search_spec: Search specification for filtering
-
-        Returns:
-            FiltersDTO object containing filtered available filters or None if no results
-        """
         self._query_builder.reset()
 
         search_sql, search_params = search_spec.to_sql()
@@ -224,10 +188,18 @@ class ProductRepository(ProductRepositoryInterface):
         if not count_result or count_result[0] == 0:
             return None
 
+        gender_values = await self._get_filtered_gender_values(where_sql, search_params)
+
+        min_year, max_year = await self._get_filtered_year_range(where_sql, search_params)
+
+        return FiltersDTO(
+            gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
+            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None
+        )
+
+    async def _get_filtered_gender_values(self, where_sql: str, search_params: List[Any]) -> List[str]:
         self._query_builder.reset().select("DISTINCT gender")
-
         self._parse_sql_conditions(where_sql, search_params[:1])
-
         self._query_builder.where("gender IS NOT NULL")
 
         gender_query, gender_params = self._query_builder.build()
@@ -235,12 +207,15 @@ class ProductRepository(ProductRepositoryInterface):
         logger.info(f"Filtered filters gender params: {gender_params}")
 
         gender_result = await self._dao.execute(gender_query, gender_params)
-        gender_values = [row[0] for row in gender_result] if gender_result else []
+        return [row[0] for row in gender_result] if gender_result else []
 
+    async def _get_filtered_year_range(
+            self,
+            where_sql:
+            str, search_params: List[Any]
+    ) -> Tuple[Optional[int], Optional[int]]:
         self._query_builder.reset().select("MIN(year)", "MAX(year)")
-
         self._parse_sql_conditions(where_sql, search_params[:1])
-
         self._query_builder.where("year IS NOT NULL")
 
         year_query, year_params = self._query_builder.build()
@@ -248,12 +223,7 @@ class ProductRepository(ProductRepositoryInterface):
         logger.info(f"Filtered filters year params: {year_params}")
 
         year_result = await self._dao.execute(year_query, year_params, fetch_one=True)
-        min_year, max_year = year_result if year_result else (None, None)
-
-        return FiltersDTO(
-            gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
-            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None
-        )
+        return year_result if year_result else (None, None)
 
     def _prepare_query_builder(
             self,
@@ -262,29 +232,12 @@ class ProductRepository(ProductRepositoryInterface):
             ordering_spec: Optional[OrderingSpecificationInterface] = None,
             category_spec: Optional[CategorySpecificationInterface] = None
     ) -> None:
-        """
-        Prepare query builder with specifications
-
-        Args:
-            filter_spec: Optional filter specification
-            search_spec: Optional search specification
-            ordering_spec: Optional ordering specification
-            category_spec: Optional category specification
-        """
         self._query_builder.reset().select(
             "product_id", "gender", "year", "product_display_name", "image_url"
         )
 
         if category_spec and not category_spec.is_empty():
-            category_sql, category_params = category_spec.to_sql()
-
-            joins_part, where_part = category_sql.split("WHERE", 1)
-
-            for join_clause in joins_part.strip().split("JOIN"):
-                if join_clause.strip():
-                    self._query_builder.join(f"JOIN {join_clause.strip()}")
-
-            self._query_builder.where(where_part.strip(), *category_params)
+            self._apply_category_spec(category_spec)
 
         if filter_spec and not filter_spec.is_empty():
             filter_sql, filter_params = filter_spec.to_sql()
@@ -312,13 +265,23 @@ class ProductRepository(ProductRepositoryInterface):
             final_ordering = ", ".join(order_by_clauses)
             self._query_builder.order_by(final_ordering, *order_by_params)
 
+    def _apply_category_spec(self, category_spec: CategorySpecificationInterface) -> None:
+        category_sql, category_params = category_spec.to_sql()
+        joins_part, where_part = category_sql.split("WHERE", 1)
+
+        for join_clause in joins_part.strip().split("JOIN"):
+            if join_clause.strip():
+                self._query_builder.join(f"JOIN {join_clause.strip()}")
+
+        self._query_builder.where(where_part.strip(), *category_params)
+
     def _parse_sql_conditions(self, sql_conditions: str, params: List[Any]) -> None:
         if sql_conditions.startswith("WHERE"):
             conditions_text = sql_conditions.replace("WHERE", "").strip()
             self._query_builder.where(conditions_text, *params)
 
     @staticmethod
-    def _split_search_sql(search_sql: str) -> (str, str):
+    def _split_search_sql(search_sql: str) -> Tuple[str, str]:
         if "ORDER BY" in search_sql:
             where_part, order_by_part = search_sql.split("ORDER BY", 1)
             return where_part.strip(), order_by_part.strip()

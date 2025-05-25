@@ -1,4 +1,5 @@
 from typing import Optional, List
+from async_lru import alru_cache
 
 from apps.catalog.dto.category import (
     CategoryMenuDTO,
@@ -19,6 +20,7 @@ class CategoryRepository(CategoryRepositoryInterface):
     def __init__(self, dao: DAOInterface):
         self._dao = dao
 
+    @alru_cache(maxsize=1, ttl=3600)
     async def get_category_menu(self) -> CategoryMenuDTO:
         """
         Get the complete category menu structure with all master categories,
@@ -32,6 +34,7 @@ class CategoryRepository(CategoryRepositoryInterface):
             FROM {self.APP_NAME}_master_category
             ORDER BY name
         """
+        logger.info(f"Master categories query: {master_categories_query}")
         master_categories_result = await self._dao.execute(master_categories_query, [])
 
         if not master_categories_result:
@@ -63,6 +66,9 @@ class CategoryRepository(CategoryRepositoryInterface):
             FROM {self.APP_NAME}_master_category
             WHERE master_category_id = %s
         """
+        logger.info(f"Master category by ID query: {master_category_query}")
+        logger.info(f"Master category by ID params: [{master_category_id}]")
+
         master_category_result = await self._dao.execute(
             master_category_query, [master_category_id], fetch_one=True
         )
@@ -113,6 +119,9 @@ class CategoryRepository(CategoryRepositoryInterface):
             WHERE master_category_id = %s
             ORDER BY name
         """
+        logger.info(f"Subcategories for master category query: {sub_categories_query}")
+        logger.info(f"Subcategories for master category params: [{master_id}]")
+
         sub_categories_result = await self._dao.execute(
             sub_categories_query, [master_id]
         )
@@ -168,6 +177,9 @@ class CategoryRepository(CategoryRepositoryInterface):
             WHERE sub_category_id = %s
             ORDER BY name
         """
+        logger.info(f"Article types for subcategory query: {article_types_query}")
+        logger.info(f"Article types for subcategory params: [{sub_id}]")
+
         article_types_result = await self._dao.execute(
             article_types_query, [sub_id]
         )
