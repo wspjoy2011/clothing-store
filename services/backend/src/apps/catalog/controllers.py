@@ -202,14 +202,18 @@ async def get_products_by_category_controller(
 
     total_pages = catalog_dto.pagination.total_pages
 
-    base_url = f"/api/v1.0/catalog/categories/{master_category_id}/products"
-
     def build_url_with_params(page_num: int) -> str:
+        base_path_parts = ["/api/v1/catalog/categories", str(master_category_id)]
+
+        if sub_category_id:
+            base_path_parts.append(str(sub_category_id))
+            if article_type_id:
+                base_path_parts.append(str(article_type_id))
+
+        base_path_parts.append("products")
+        base_url = "/".join(base_path_parts)
+
         params = {'page': page_num, 'per_page': per_page}
-        if sub_category_id is not None:
-            params['sub_category_id'] = sub_category_id
-        if article_type_id is not None:
-            params['article_type_id'] = article_type_id
         if ordering:
             params['ordering'] = ordering
         if min_year is not None:
