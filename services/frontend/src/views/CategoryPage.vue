@@ -15,21 +15,21 @@
         <template v-if="masterCategory">
           <v-breadcrumbs-item
               :title="masterCategory.name"
-              :to="{ name: 'master-category', params: { masterCategoryId: masterCategoryId } }"
-              :disabled="!subCategoryId && !articleTypeId"
+              :to="{ name: 'master-category', params: { masterCategory: masterCategorySlug } }"
+              :disabled="route.name === 'master-category'"
           />
         </template>
         <template v-if="subCategory">
           <v-breadcrumbs-item
               :title="subCategory.name"
-              :to="{ name: 'sub-category', params: { masterCategoryId, subCategoryId } }"
-              :disabled="!articleTypeId"
+              :to="subCategorySlug ? { name: 'sub-category', params: { masterCategory: masterCategorySlug, subCategory: subCategorySlug } } : null"
+              :disabled="route.name === 'sub-category' || !subCategorySlug"
           />
         </template>
         <template v-if="articleType">
           <v-breadcrumbs-item
               :title="articleType.name"
-              disabled
+              :disabled="true"
           />
         </template>
       </v-breadcrumbs>
@@ -53,7 +53,9 @@
               <v-icon icon="mdi-tag" color="primary"></v-icon>
             </template>
             <v-list-item-title>Master Category: {{ masterCategory.name }}</v-list-item-title>
-            <v-list-item-subtitle>ID: {{ masterCategoryId }}</v-list-item-subtitle>
+            <v-list-item-subtitle>
+              ID: {{ masterCategoryId }} | Slug: {{ masterCategorySlug }}
+            </v-list-item-subtitle>
           </v-list-item>
 
           <v-list-item v-if="subCategory">
@@ -61,7 +63,9 @@
               <v-icon icon="mdi-tag-outline" color="secondary"></v-icon>
             </template>
             <v-list-item-title>Sub Category: {{ subCategory.name }}</v-list-item-title>
-            <v-list-item-subtitle>ID: {{ subCategoryId }}</v-list-item-subtitle>
+            <v-list-item-subtitle>
+              ID: {{ subCategoryId }} | Slug: {{ subCategorySlug }}
+            </v-list-item-subtitle>
           </v-list-item>
 
           <v-list-item v-if="articleType">
@@ -69,7 +73,9 @@
               <v-icon icon="mdi-tshirt-crew-outline" color="success"></v-icon>
             </template>
             <v-list-item-title>Article Type: {{ articleType.name }}</v-list-item-title>
-            <v-list-item-subtitle>ID: {{ articleTypeId }}</v-list-item-subtitle>
+            <v-list-item-subtitle>
+              ID: {{ articleTypeId }} | Slug: {{ articleTypeSlug }}
+            </v-list-item-subtitle>
           </v-list-item>
 
           <v-list-item v-if="categoryPath && categoryPath.length > 0">
@@ -80,6 +86,14 @@
             <v-list-item-subtitle>
               {{ formattedCategoryPath }}
             </v-list-item-subtitle>
+          </v-list-item>
+
+          <v-list-item>
+            <template v-slot:prepend>
+              <v-icon icon="mdi-link-variant" color="warning"></v-icon>
+            </template>
+            <v-list-item-title>Current URL:</v-list-item-title>
+            <v-list-item-subtitle>{{ currentPath }}</v-list-item-subtitle>
           </v-list-item>
         </v-list>
       </v-card>
@@ -104,16 +118,32 @@
 
 <script setup>
 import {computed, onMounted, ref, watch} from 'vue';
-import {useRoute} from 'vue-router';
+import {useRoute, useRouter} from 'vue-router';
 import {useCategoryStore} from '@/stores/categoryStore';
 import ContentLoader from '@/components/ui/loaders/ContentLoader.vue';
 
 const route = useRoute();
+const router = useRouter();
 const categoryStore = useCategoryStore();
 
-const masterCategoryId = computed(() => route.params.masterCategoryId);
-const subCategoryId = computed(() => route.params.subCategoryId);
-const articleTypeId = computed(() => route.params.articleTypeId);
+const masterCategorySlug = computed(() => route.params.masterCategory);
+const subCategorySlug = computed(() => route.params.subCategory);
+const articleTypeSlug = computed(() => route.params.articleType);
+
+const masterCategoryId = computed(() => {
+  return masterCategorySlug.value ?
+      categoryStore.getMasterCategoryIdBySlug(masterCategorySlug.value) : null;
+});
+
+const subCategoryId = computed(() => {
+  if (!masterCategoryId.value || !subCategorySlug.value) return null;
+  return categoryStore.getSubCategoryIdBySlug(masterCategoryId.value, subCategorySlug.value);
+});
+
+const articleTypeId = computed(() => {
+  if (!masterCategoryId.value || !subCategoryId.value || !articleTypeSlug.value) return null;
+  return categoryStore.getArticleTypeIdBySlug(masterCategoryId.value, subCategoryId.value, articleTypeSlug.value);
+});
 
 const masterCategory = ref(null);
 const subCategory = ref(null);
@@ -148,23 +178,42 @@ const formattedCategoryPath = computed(() => {
   if (!categoryPath.value || !categoryPath.value.length) return '';
 
   return categoryPath.value
-      .map(item => item.name)
+      .map(item => `${item.name} (${item.slug})`)
       .join(' > ');
+});
+
+const currentPath = computed(() => {
+  let path = '/category/' + masterCategorySlug.value;
+  if (subCategorySlug.value) {
+    path += '/' + subCategorySlug.value;
+    if (articleTypeSlug.value) {
+      path += '/' + articleTypeSlug.value;
+    }
+  }
+  return path;
 });
 
 const loadCategoryData = async () => {
   isLoading.value = true;
 
   try {
-    const data = await categoryStore.loadCategoryData(
-        masterCategoryId.value,
-        subCategoryId.value,
-        articleTypeId.value
-    );
+    if (!categoryStore.hasCategories) {
+      await categoryStore.fetchCategoryMenu();
+    }
 
-    masterCategory.value = data.masterCategory;
-    subCategory.value = data.subCategory;
-    articleType.value = data.articleType;
+    if (masterCategoryId.value) {
+      const data = await categoryStore.loadCategoryData(
+          masterCategoryId.value,
+          subCategoryId.value,
+          articleTypeId.value
+      );
+
+      masterCategory.value = data.masterCategory;
+      subCategory.value = data.subCategory;
+      articleType.value = data.articleType;
+    } else {
+      console.error("Could not find master category with slug:", masterCategorySlug.value);
+    }
   } catch (error) {
     console.error('Error loading category data:', error);
   } finally {

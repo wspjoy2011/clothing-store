@@ -1,6 +1,7 @@
 import {createRouter, createWebHistory} from 'vue-router'
 import { useUserPreferencesStore } from '@/stores/userPreferences'
 import { useCatalogStore } from '@/stores/catalog'
+import { useCategoryStore } from '@/stores/categoryStore'
 
 import HomePage from '@/views/HomePage.vue'
 import CatalogPage from '@/views/CatalogPage.vue'
@@ -40,10 +41,21 @@ const processCatalogRouteProps = (route) => {
 };
 
 const processCategoryRouteProps = (route) => {
+    const categoryStore = useCategoryStore();
+
+    const masterCategoryId = categoryStore.getMasterCategoryIdBySlug(route.params.masterCategory);
+    const subCategoryId = route.params.subCategory ?
+        categoryStore.getSubCategoryIdBySlug(masterCategoryId, route.params.subCategory) : null;
+    const articleTypeId = route.params.articleType ?
+        categoryStore.getArticleTypeIdBySlug(masterCategoryId, subCategoryId, route.params.articleType) : null;
+
     return {
-        masterCategoryId: route.params.masterCategoryId,
-        subCategoryId: route.params.subCategoryId,
-        articleTypeId: route.params.articleTypeId
+        masterCategoryId,
+        subCategoryId,
+        articleTypeId,
+        masterCategorySlug: route.params.masterCategory,
+        subCategorySlug: route.params.subCategory,
+        articleTypeSlug: route.params.articleType
     }
 };
 
@@ -60,19 +72,19 @@ const routes = [
         props: processCatalogRouteProps
     },
     {
-        path: '/category/:masterCategoryId',
+        path: '/category/:masterCategory',
         name: 'master-category',
         component: CategoryPage,
         props: processCategoryRouteProps
     },
     {
-        path: '/category/:masterCategoryId/:subCategoryId',
+        path: '/category/:masterCategory/:subCategory',
         name: 'sub-category',
         component: CategoryPage,
         props: processCategoryRouteProps
     },
     {
-        path: '/category/:masterCategoryId/:subCategoryId/:articleTypeId',
+        path: '/category/:masterCategory/:subCategory/:articleType',
         name: 'article-type',
         component: CategoryPage,
         props: processCategoryRouteProps
@@ -91,21 +103,38 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-    if (to.params.masterCategoryId) {
-        const catalogStore = useCatalogStore();
+    const categoryStore = useCategoryStore();
 
-        if (!catalogStore.categories || !catalogStore.categories.length) {
+    if (to.params.masterCategory) {
+        if (!categoryStore.categories || !categoryStore.categories.length) {
             try {
-                await catalogStore.fetchCategories();
+                await categoryStore.fetchCategoryMenu();
             } catch (error) {
                 console.error('Error loading categories:', error);
             }
         }
 
-        if (catalogStore.currentCategoryName) {
-            document.title = `StyleShop - ${catalogStore.currentCategoryName}`;
+        const masterCategoryId = categoryStore.getMasterCategoryIdBySlug(to.params.masterCategory);
+        const subCategoryId = to.params.subCategory ?
+            categoryStore.getSubCategoryIdBySlug(masterCategoryId, to.params.subCategory) : null;
+        const articleTypeId = to.params.articleType ?
+            categoryStore.getArticleTypeIdBySlug(masterCategoryId, subCategoryId, to.params.articleType) : null;
+
+        if (!masterCategoryId) {
+            console.error('Category not found:', to.params.masterCategory);
+            next({ name: 'home' });
+            return;
+        }
+
+        if (articleTypeId) {
+            const articleName = categoryStore.getCategoryName(masterCategoryId, subCategoryId, articleTypeId);
+            document.title = `StyleShop - ${articleName}`;
+        } else if (subCategoryId) {
+            const subName = categoryStore.getCategoryName(masterCategoryId, subCategoryId);
+            document.title = `StyleShop - ${subName}`;
         } else {
-            document.title = 'StyleShop - Category';
+            const masterName = categoryStore.getCategoryName(masterCategoryId);
+            document.title = `StyleShop - ${masterName}`;
         }
     } else {
         document.title = to.name === 'catalog' ? 'StyleShop - Catalog' : 'StyleShop';

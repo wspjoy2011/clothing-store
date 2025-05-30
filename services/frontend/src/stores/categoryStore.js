@@ -2,6 +2,10 @@ import {defineStore} from 'pinia';
 import categoryService from "@/services/categoryService.js";
 import router from '@/router';
 
+const createSlug = (name) => {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+};
+
 export const useCategoryStore = defineStore('category', {
     state: () => ({
         categories: [],
@@ -19,12 +23,42 @@ export const useCategoryStore = defineStore('category', {
             return state.categories.find(cat => cat.id.toString() === id.toString());
         },
 
+        getMasterCategorySlug: (state) => (id) => {
+            const category = state.categories.find(cat => cat.id.toString() === id.toString());
+            return category ? createSlug(category.name) : '';
+        },
+
+        getMasterCategoryIdBySlug: (state) => (slug) => {
+            if (!slug) return null;
+            const category = state.categories.find(cat => createSlug(cat.name) === slug);
+            return category ? category.id : null;
+        },
+
         getSubCategory: (state) => (masterId, subId) => {
             if (!masterId || !subId) return null;
             const master = state.categories.find(cat => cat.id.toString() === masterId.toString());
             if (!master || !master.sub_categories) return null;
 
             return master.sub_categories.find(sub => sub.id.toString() === subId.toString());
+        },
+
+        // Get slug for subcategory
+        getSubCategorySlug: (state) => (masterId, subId) => {
+            if (!masterId || !subId) return '';
+            const master = state.categories.find(cat => cat.id.toString() === masterId.toString());
+            if (!master || !master.sub_categories) return '';
+
+            const sub = master.sub_categories.find(sub => sub.id.toString() === subId.toString());
+            return sub ? createSlug(sub.name) : '';
+        },
+
+        getSubCategoryIdBySlug: (state) => (masterId, slug) => {
+            if (!masterId || !slug) return null;
+            const master = state.categories.find(cat => cat.id.toString() === masterId.toString());
+            if (!master || !master.sub_categories) return null;
+
+            const sub = master.sub_categories.find(sub => createSlug(sub.name) === slug);
+            return sub ? sub.id : null;
         },
 
         getArticleType: (state) => (masterId, subId, articleId) => {
@@ -36,6 +70,30 @@ export const useCategoryStore = defineStore('category', {
             if (!sub || !sub.article_types) return null;
 
             return sub.article_types.find(art => art.id.toString() === articleId.toString());
+        },
+
+        getArticleTypeSlug: (state) => (masterId, subId, articleId) => {
+            if (!masterId || !subId || !articleId) return '';
+            const master = state.categories.find(cat => cat.id.toString() === masterId.toString());
+            if (!master || !master.sub_categories) return '';
+
+            const sub = master.sub_categories.find(sub => sub.id.toString() === subId.toString());
+            if (!sub || !sub.article_types) return '';
+
+            const article = sub.article_types.find(art => art.id.toString() === articleId.toString());
+            return article ? createSlug(article.name) : '';
+        },
+
+        getArticleTypeIdBySlug: (state) => (masterId, subId, slug) => {
+            if (!masterId || !subId || !slug) return null;
+            const master = state.categories.find(cat => cat.id.toString() === masterId.toString());
+            if (!master || !master.sub_categories) return null;
+
+            const sub = master.sub_categories.find(sub => sub.id.toString() === subId.toString());
+            if (!sub || !sub.article_types) return null;
+
+            const article = sub.article_types.find(art => createSlug(art.name) === slug);
+            return article ? article.id : null;
         },
 
         getCategoryName: (state) => (masterId, subId, articleId) => {
@@ -83,7 +141,8 @@ export const useCategoryStore = defineStore('category', {
             result.push({
                 id: master.id,
                 name: master.name,
-                type: 'master'
+                type: 'master',
+                slug: createSlug(master.name)
             });
 
             if (!subId) return result;
@@ -95,7 +154,8 @@ export const useCategoryStore = defineStore('category', {
                 id: sub.id,
                 name: sub.name,
                 type: 'sub',
-                parentId: master.id
+                parentId: master.id,
+                slug: createSlug(sub.name)
             });
 
             if (!articleId) return result;
@@ -108,7 +168,8 @@ export const useCategoryStore = defineStore('category', {
                 name: article.name,
                 type: 'article',
                 parentId: sub.id,
-                grandParentId: master.id
+                grandParentId: master.id,
+                slug: createSlug(article.name)
             });
 
             return result;
@@ -150,12 +211,13 @@ export const useCategoryStore = defineStore('category', {
                 return;
             }
 
-            const {type, id} = categoryInfo;
+            const {type, id, name} = categoryInfo;
+            const slug = createSlug(name);
 
             if (type === 'master') {
                 router.push({
                     name: 'master-category',
-                    params: {masterCategoryId: id}
+                    params: {masterCategory: slug}
                 });
             } else if (type === 'sub') {
                 const parentId = categoryInfo.parentId;
@@ -164,11 +226,17 @@ export const useCategoryStore = defineStore('category', {
                     return;
                 }
 
+                const masterCategory = this.getMasterCategory(parentId);
+                if (!masterCategory) {
+                    console.error('Master category not found for parentId:', parentId);
+                    return;
+                }
+
                 router.push({
                     name: 'sub-category',
                     params: {
-                        masterCategoryId: parentId,
-                        subCategoryId: id
+                        masterCategory: createSlug(masterCategory.name),
+                        subCategory: slug
                     }
                 });
             } else if (type === 'article') {
@@ -180,12 +248,24 @@ export const useCategoryStore = defineStore('category', {
                     return;
                 }
 
+                const masterCategory = this.getMasterCategory(grandParentId);
+                if (!masterCategory) {
+                    console.error('Master category not found for grandParentId:', grandParentId);
+                    return;
+                }
+
+                const subCategory = this.getSubCategory(grandParentId, parentId);
+                if (!subCategory) {
+                    console.error('Sub category not found for parentId:', parentId);
+                    return;
+                }
+
                 router.push({
                     name: 'article-type',
                     params: {
-                        masterCategoryId: grandParentId,
-                        subCategoryId: parentId,
-                        articleTypeId: id
+                        masterCategory: createSlug(masterCategory.name),
+                        subCategory: createSlug(subCategory.name),
+                        articleType: slug
                     }
                 });
             }

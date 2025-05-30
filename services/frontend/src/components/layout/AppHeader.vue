@@ -10,17 +10,18 @@
         <div class="d-flex align-center">
           <v-icon icon="mdi-store" size="large" class="mr-2"></v-icon>
           <span class="text-h5 font-weight-bold">StyleShop</span>
-          
+
           <!-- Category Path Indicator -->
           <v-btn
               v-if="showCategoryPath"
               variant="text"
-              class="ml-3 category-path-indicator hidden-sm-and-down"
+              class="ml-3 category-path-indicator hidden-md-and-down"
               @click="toggleCategoryPathVisible"
           >
             <v-icon icon="mdi-tag-multiple" class="mr-1" size="small"></v-icon>
             <span class="text-subtitle-2">{{ shortCategoryPathText }}</span>
-            <v-icon :icon="categoryPathVisible ? 'mdi-chevron-up' : 'mdi-chevron-down'" class="ml-1" size="small"></v-icon>
+            <v-icon :icon="categoryPathVisible ? 'mdi-chevron-up' : 'mdi-chevron-down'" class="ml-1"
+                    size="small"></v-icon>
           </v-btn>
         </div>
 
@@ -84,7 +85,7 @@
           <v-btn
               v-if="showCategoryPath"
               icon
-              class="ml-2 hidden-md-and-up"
+              class="ml-2 hidden-lg-and-up"
               @click="toggleCategoryPathVisible"
           >
             <v-badge
@@ -109,9 +110,9 @@
   </v-app-bar>
 
   <div
-    v-if="showCategoryPath && categoryPathVisible"
-    class="category-path-dropdown"
-    :class="{ 'theme-dark': isDarkTheme }"
+      v-if="showCategoryPath && categoryPathVisible"
+      class="category-path-dropdown"
+      :class="{ 'theme-dark': isDarkTheme }"
   >
     <v-container>
       <div class="d-flex align-center justify-space-between">
@@ -315,13 +316,32 @@ const isCategoryRoute = computed(() => {
       route.name === 'article-type';
 });
 
+const masterCategorySlug = computed(() => route.params.masterCategory);
+const subCategorySlug = computed(() => route.params.subCategory);
+const articleTypeSlug = computed(() => route.params.articleType);
+
+const masterCategoryId = computed(() => {
+  return masterCategorySlug.value ?
+      categoryStore.getMasterCategoryIdBySlug(masterCategorySlug.value) : null;
+});
+
+const subCategoryId = computed(() => {
+  if (!masterCategoryId.value || !subCategorySlug.value) return null;
+  return categoryStore.getSubCategoryIdBySlug(masterCategoryId.value, subCategorySlug.value);
+});
+
+const articleTypeId = computed(() => {
+  if (!masterCategoryId.value || !subCategoryId.value || !articleTypeSlug.value) return null;
+  return categoryStore.getArticleTypeIdBySlug(masterCategoryId.value, subCategoryId.value, articleTypeSlug.value);
+});
+
 const currentCategoryPath = computed(() => {
   if (!isCategoryRoute.value) return [];
 
   return categoryStore.getCategoryPath(
-      route.params.masterCategoryId,
-      route.params.subCategoryId,
-      route.params.articleTypeId
+      masterCategoryId.value,
+      subCategoryId.value,
+      articleTypeId.value
   );
 });
 
@@ -374,29 +394,43 @@ async function navigateToPathCategory(category, index) {
   if (!category || !category.type) return;
 
   categoryPathVisible.value = false;
-
   await nextTick();
 
-  const categoryInfo = {
-    id: category.id,
-    name: category.name,
-    type: category.type
-  };
+  let routeName;
+  const params = {};
 
-  if (category.parentId) {
-    categoryInfo.parentId = category.parentId;
-  }
+  if (category.type === 'master') {
+    routeName = 'master-category';
+    params.masterCategory = category.slug;
+  } else if (category.type === 'sub') {
+    routeName = 'sub-category';
+    const masterCategory = currentCategoryPath.value.find(c => c.type === 'master');
+    if (!masterCategory) return;
 
-  if (category.grandParentId) {
-    categoryInfo.grandParentId = category.grandParentId;
+    params.masterCategory = masterCategory.slug;
+    params.subCategory = category.slug;
+  } else if (category.type === 'article') {
+    routeName = 'article-type';
+    const masterCategory = currentCategoryPath.value.find(c => c.type === 'master');
+    const subCategory = currentCategoryPath.value.find(c => c.type === 'sub');
+    if (!masterCategory || !subCategory) return;
+
+    params.masterCategory = masterCategory.slug;
+    params.subCategory = subCategory.slug;
+    params.articleType = category.slug;
+  } else {
+    return;
   }
 
   setTimeout(() => {
-    categoryStore.navigateToCategory(categoryInfo);
+    router.push({
+      name: routeName,
+      params
+    });
   }, 50);
 }
 
-onMounted(() => {
+onMounted(async () => {
   activeTab.value = route.name || 'home';
 
   if (route.query.q) {
@@ -404,7 +438,7 @@ onMounted(() => {
   }
 
   if (!categoryStore.hasCategories && !categoryStore.loading) {
-    categoryStore.fetchCategoryMenu();
+    await categoryStore.fetchCategoryMenu();
   }
 
   if (isCategoryRoute.value) {
@@ -436,7 +470,7 @@ watch(() => route.params, () => {
   if (isCategoryRoute.value) {
     categoryPathVisible.value = false;
   }
-}, { deep: true });
+}, {deep: true});
 
 function toggleTheme() {
   const newTheme = preferencesStore.theme === 'dark' ? 'light' : 'dark';
