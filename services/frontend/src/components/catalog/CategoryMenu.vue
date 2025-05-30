@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import { mapActions } from 'pinia';
+import { mapActions, mapState } from 'pinia';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useTheme } from 'vuetify';
 import CategoryMenuItem from './CategoryMenuItem.vue';
@@ -53,10 +53,6 @@ export default {
     propHasCategories: {
       type: Boolean,
       default: null
-    },
-    onCategoryClick: {
-      type: Function,
-      default: null
     }
   },
 
@@ -69,8 +65,10 @@ export default {
   },
 
   computed: {
+    ...mapState(useCategoryStore, ['categories']),
+    
     categoriesData() {
-      return this.propCategories !== null ? this.propCategories : this.storeCategories;
+      return this.propCategories !== null ? this.propCategories : this.categories;
     },
 
     isLoading() {
@@ -82,7 +80,7 @@ export default {
     },
 
     categoriesExist() {
-      return this.propHasCategories !== null ? this.propHasCategories : this.storeCategories.length > 0;
+      return this.propHasCategories !== null ? this.propHasCategories : this.categories.length > 0;
     },
 
     isDarkTheme() {
@@ -92,16 +90,11 @@ export default {
   },
 
   methods: {
-    ...mapActions(useCategoryStore, ['fetchCategoryMenu']),
+    ...mapActions(useCategoryStore, ['fetchCategoryMenu', 'navigateToCategory']),
 
     handleCategoryClick(categoryInfo) {
       console.log('Category clicked:', categoryInfo);
-
-      if (this.onCategoryClick) {
-        this.onCategoryClick(categoryInfo);
-      } else {
-        this.$emit('category-select', categoryInfo);
-      }
+      this.navigateToCategory(categoryInfo);
     },
 
     async loadFromStore() {
@@ -110,7 +103,6 @@ export default {
 
       try {
         await store.fetchCategoryMenu();
-        this.storeCategories = store.categories;
         this.storeError = store.error;
       } catch (error) {
         this.storeError = error.message || 'Failed to load categories';

@@ -10,6 +10,18 @@
         <div class="d-flex align-center">
           <v-icon icon="mdi-store" size="large" class="mr-2"></v-icon>
           <span class="text-h5 font-weight-bold">StyleShop</span>
+          
+          <!-- Category Path Indicator -->
+          <v-btn
+              v-if="showCategoryPath"
+              variant="text"
+              class="ml-3 category-path-indicator hidden-sm-and-down"
+              @click="toggleCategoryPathVisible"
+          >
+            <v-icon icon="mdi-tag-multiple" class="mr-1" size="small"></v-icon>
+            <span class="text-subtitle-2">{{ shortCategoryPathText }}</span>
+            <v-icon :icon="categoryPathVisible ? 'mdi-chevron-up' : 'mdi-chevron-down'" class="ml-1" size="small"></v-icon>
+          </v-btn>
         </div>
 
         <!-- Navigation Menu -->
@@ -24,6 +36,7 @@
             <v-tab value="categories">
               Categories
               <v-menu
+                  v-model="categoryStore.categoryMenuOpen"
                   location="bottom"
                   :close-on-content-click="false"
                   transition="slide-y-transition"
@@ -40,10 +53,7 @@
                 </template>
 
                 <div class="category-dropdown">
-                  <category-menu
-                      @category-select="navigateToCategory"
-                      :onCategoryClick="navigateToCategory"
-                  />
+                  <category-menu/>
                 </div>
               </v-menu>
             </v-tab>
@@ -52,18 +62,14 @@
 
         <!-- Right Side Icons -->
         <div class="d-flex align-center">
-          <!-- Theme Toggle -->
           <theme-toggle class="mr-2"/>
 
-          <!-- Search Button and Input -->
           <search-bar class="mr-2"/>
 
-          <!-- User Account -->
           <v-btn icon class="mr-2">
             <v-icon>mdi-account</v-icon>
           </v-btn>
 
-          <!-- Shopping Cart with Badge -->
           <v-btn icon>
             <v-badge
                 color="error"
@@ -74,11 +80,26 @@
             </v-badge>
           </v-btn>
 
+          <!-- Category Path Indicator for Mobile -->
+          <v-btn
+              v-if="showCategoryPath"
+              icon
+              class="ml-2 hidden-md-and-up"
+              @click="toggleCategoryPathVisible"
+          >
+            <v-badge
+                color="primary"
+                dot
+            >
+              <v-icon>mdi-tag-multiple</v-icon>
+            </v-badge>
+          </v-btn>
+
           <!-- Mobile Menu Button -->
           <v-btn
               icon
-              class="ml-4 hidden-md-and-up"
-              @click="drawer = !drawer"
+              class="ml-2 hidden-md-and-up"
+              @click="toggleMobileDrawer"
           >
             <v-icon>mdi-menu</v-icon>
           </v-btn>
@@ -87,9 +108,48 @@
     </v-container>
   </v-app-bar>
 
+  <div
+    v-if="showCategoryPath && categoryPathVisible"
+    class="category-path-dropdown"
+    :class="{ 'theme-dark': isDarkTheme }"
+  >
+    <v-container>
+      <div class="d-flex align-center justify-space-between">
+        <div class="category-breadcrumbs">
+          <v-chip-group>
+            <v-chip
+                v-for="(category, index) in currentCategoryPath"
+                :key="index"
+                :color="getCategoryChipColor(category.type)"
+                variant="elevated"
+                size="small"
+                :class="['mr-1', `text-${getCategoryChipColor(category.type)}`]"
+                @click="navigateToPathCategory(category, index)"
+            >
+              <v-icon
+                  start
+                  :icon="getCategoryIcon(category.type)"
+                  size="small"
+              ></v-icon>
+              {{ category.name }}
+            </v-chip>
+          </v-chip-group>
+        </div>
+        <v-btn
+            icon
+            variant="text"
+            @click="categoryPathVisible = false"
+            size="small"
+        >
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
+      </div>
+    </v-container>
+  </div>
+
   <!-- Mobile Navigation Drawer -->
   <v-navigation-drawer
-      v-model="drawer"
+      v-model="categoryStore.mobileDrawerOpen"
       temporary
       location="right"
   >
@@ -118,12 +178,27 @@
         </template>
 
         <div class="pa-2">
-          <category-menu
-              @category-select="navigateToCategory"
-              :onCategoryClick="navigateToCategory"
-          />
+          <category-menu/>
         </div>
       </v-list-group>
+
+      <!-- Current Category Path -->
+      <template v-if="showCategoryPath">
+        <v-divider class="my-2"></v-divider>
+        <v-list-subheader>Current Category</v-list-subheader>
+
+        <v-list-item
+            v-for="(category, index) in currentCategoryPath"
+            :key="`mobile-path-${index}`"
+            :title="category.name"
+            :prepend-icon="getCategoryIcon(category.type)"
+            :value="category.id"
+            @click="navigateToPathCategory(category, index)"
+        >
+        </v-list-item>
+      </template>
+
+      <v-divider></v-divider>
 
       <v-list-item
           title="New Arrivals"
@@ -208,7 +283,7 @@
 </template>
 
 <script setup>
-import {ref, watch, onMounted} from 'vue';
+import {ref, watch, onMounted, computed, nextTick} from 'vue';
 import {useTheme} from 'vuetify';
 import {useRouter, useRoute} from 'vue-router';
 import {useCatalogStore} from '@/stores/catalog';
@@ -219,7 +294,6 @@ import CategoryMenu from '@/components/catalog/CategoryMenu.vue';
 import {useUserPreferencesStore} from '@/stores/userPreferences';
 
 const activeTab = ref('home');
-const drawer = ref(false);
 const theme = useTheme();
 const router = useRouter();
 const route = useRoute();
@@ -229,6 +303,98 @@ const preferencesStore = useUserPreferencesStore();
 const showMobileSearch = ref(false);
 const mobileSearchQuery = ref('');
 const isSearchLoading = ref(false);
+const categoryPathVisible = ref(false);
+
+const isDarkTheme = computed(() => {
+  return theme.global.current.value.dark;
+});
+
+const isCategoryRoute = computed(() => {
+  return route.name === 'master-category' ||
+      route.name === 'sub-category' ||
+      route.name === 'article-type';
+});
+
+const currentCategoryPath = computed(() => {
+  if (!isCategoryRoute.value) return [];
+
+  return categoryStore.getCategoryPath(
+      route.params.masterCategoryId,
+      route.params.subCategoryId,
+      route.params.articleTypeId
+  );
+});
+
+const showCategoryPath = computed(() => {
+  return isCategoryRoute.value && currentCategoryPath.value.length > 0;
+});
+
+const shortCategoryPathText = computed(() => {
+  if (!currentCategoryPath.value.length) return '';
+
+  if (currentCategoryPath.value.length === 1) {
+    return currentCategoryPath.value[0].name;
+  }
+
+  const lastCategory = currentCategoryPath.value[currentCategoryPath.value.length - 1];
+  return `${lastCategory.name} (${currentCategoryPath.value.length} levels)`;
+});
+
+function toggleCategoryPathVisible() {
+  categoryPathVisible.value = !categoryPathVisible.value;
+}
+
+function getCategoryChipColor(type) {
+  switch (type) {
+    case 'master':
+      return 'primary';
+    case 'sub':
+      return 'secondary';
+    case 'article':
+      return 'success';
+    default:
+      return 'grey';
+  }
+}
+
+function getCategoryIcon(type) {
+  switch (type) {
+    case 'master':
+      return 'mdi-tag';
+    case 'sub':
+      return 'mdi-tag-outline';
+    case 'article':
+      return 'mdi-tshirt-crew-outline';
+    default:
+      return 'mdi-shape-outline';
+  }
+}
+
+async function navigateToPathCategory(category, index) {
+  if (!category || !category.type) return;
+
+  categoryPathVisible.value = false;
+
+  await nextTick();
+
+  const categoryInfo = {
+    id: category.id,
+    name: category.name,
+    type: category.type
+  };
+
+  if (category.parentId) {
+    categoryInfo.parentId = category.parentId;
+  }
+
+  if (category.grandParentId) {
+    categoryInfo.grandParentId = category.grandParentId;
+  }
+
+  setTimeout(() => {
+    categoryStore.navigateToCategory(categoryInfo);
+  }, 50);
+}
 
 onMounted(() => {
   activeTab.value = route.name || 'home';
@@ -239,6 +405,11 @@ onMounted(() => {
 
   if (!categoryStore.hasCategories && !categoryStore.loading) {
     categoryStore.fetchCategoryMenu();
+  }
+
+  if (isCategoryRoute.value) {
+    activeTab.value = 'categories';
+    categoryPathVisible.value = false;
   }
 });
 
@@ -251,13 +422,30 @@ watch(() => catalogStore.searchQuery, (newValue) => {
 watch(() => route.name, (newName) => {
   if (newName) {
     activeTab.value = newName;
+
+    if (newName === 'master-category' || newName === 'sub-category' || newName === 'article-type') {
+      activeTab.value = 'categories';
+      categoryPathVisible.value = false;
+    } else {
+      categoryPathVisible.value = false;
+    }
   }
 });
+
+watch(() => route.params, () => {
+  if (isCategoryRoute.value) {
+    categoryPathVisible.value = false;
+  }
+}, { deep: true });
 
 function toggleTheme() {
   const newTheme = preferencesStore.theme === 'dark' ? 'light' : 'dark';
   preferencesStore.setTheme(newTheme);
   theme.global.name.value = newTheme;
+}
+
+function toggleMobileDrawer() {
+  categoryStore.mobileDrawerOpen = !categoryStore.mobileDrawerOpen;
 }
 
 function clearMobileSearch() {
@@ -274,15 +462,17 @@ function closeMobileSearch() {
       delete query.q;
       delete query.page;
 
-      router.push({
-        name: 'catalog',
-        query
-      });
+      setTimeout(() => {
+        router.push({
+          name: 'catalog',
+          query
+        });
+      }, 50);
     }
   }
 }
 
-function handleMobileSearch() {
+async function handleMobileSearch() {
   if (!mobileSearchQuery.value.trim() && !catalogStore.searchQuery) {
     closeMobileSearch();
     return;
@@ -302,39 +492,31 @@ function handleMobileSearch() {
     delete query.q;
   }
 
-  router.push({
-    name: 'catalog',
-    query
-  }).then(() => {
-    showMobileSearch.value = false;
-    isSearchLoading.value = false;
+  showMobileSearch.value = false;
+  await nextTick();
 
-    if (route.name === 'catalog') {
-      catalogStore.fetchProducts(1);
-    }
-  }).catch(() => {
-    isSearchLoading.value = false;
-  });
-}
+  setTimeout(() => {
+    router.push({
+      name: 'catalog',
+      query
+    }).then(() => {
+      isSearchLoading.value = false;
 
-function navigateToCategory(categoryInfo) {
-  console.log('Navigating to category:', categoryInfo);
-
-  drawer.value = false;
-
-  router.push({
-    name: 'catalog',
-    query: {
-      [`${categoryInfo.type}_category_id`]: categoryInfo.id,
-      page: 1
-    }
-  });
+      if (route.name === 'catalog') {
+        catalogStore.fetchProducts(1);
+      }
+    }).catch((error) => {
+      console.error('Navigation error:', error);
+      isSearchLoading.value = false;
+    });
+  }, 50);
 }
 </script>
 
 <style scoped>
 .header {
   background: linear-gradient(145deg, #fdfbfb 0%, #ebedee 100%);
+  z-index: 100;
 }
 
 :deep(.v-app-bar.v-theme--dark) {
@@ -355,10 +537,178 @@ function navigateToCategory(categoryInfo) {
   overflow-y: auto;
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  background-color: #f5f5f5;
 }
 
-:deep(.v-theme--dark) .category-dropdown {
+.category-path-indicator {
+  display: flex;
+  align-items: center;
+  border-radius: 20px;
+  padding: 0 12px;
+  height: 32px;
+  background-color: rgba(0, 0, 0, 0.05);
+  transition: background-color 0.2s ease;
+}
+
+.category-path-indicator:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.category-path-dropdown {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  z-index: 99;
+  background-color: #f5f5f5;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  padding: 16px 0;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  animation: slideDown 0.3s ease-out;
+  font-size: 1.05rem;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.category-path-dropdown.theme-dark {
+  background-color: #1E1E1E;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+:deep(.v-theme--dark) .category-path-indicator {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.v-theme--dark) .category-path-indicator:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+:deep(.v-theme--dark .category-dropdown) {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
   background-color: #1E1E1E;
+}
+
+:deep(.v-theme--dark .category-menu) {
+  background-color: #1E1E1E;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+:deep(.v-theme--dark .category-menu-container) {
+  background-color: #1E1E1E;
+}
+
+:deep(.v-theme--dark .category-submenu-card) {
+  background-color: #1E1E1E;
+}
+
+:deep(.v-theme--dark .nested-item-title:hover) {
+  background-color: rgba(80, 80, 80, 0.3);
+}
+
+:deep(.v-theme--dark .category-btn) {
+  background-color: #2A2A2A;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.v-chip {
+  background-color: #e0e0e0;
+  color: rgba(0, 0, 0, 0.87);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.v-chip.v-chip--elevated {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.theme-dark .v-chip {
+  background-color: #2A2A2A;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.theme-dark .v-chip.v-chip--elevated {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.theme-dark .v-chip.text-primary {
+  background-color: rgba(144, 202, 249, 0.15);
+  color: #90CAF9;
+}
+
+.theme-dark .v-chip.text-secondary {
+  background-color: rgba(97, 97, 97, 0.15);
+  color: #616161;
+}
+
+.theme-dark .v-chip.text-success {
+  background-color: rgba(129, 199, 132, 0.15);
+  color: #81C784;
+}
+
+:deep(.v-theme--dark .v-list) {
+  background-color: #1E1E1E;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+:deep(.v-theme--dark .v-list-item) {
+  color: rgba(255, 255, 255, 0.87);
+}
+
+:deep(.v-theme--dark .v-list-subheader) {
+  color: #90CAF9;
+}
+
+:deep(.v-theme--dark .v-divider) {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:deep(.v-theme--dark .v-card) {
+  background-color: #1E1E1E;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+:deep(.v-theme--dark .category-submenu)::-webkit-scrollbar {
+  width: 8px;
+}
+
+:deep(.v-theme--dark .category-submenu)::-webkit-scrollbar-track {
+  background: #1E1E1E;
+}
+
+:deep(.v-theme--dark .category-submenu)::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+:deep(.v-theme--dark .category-submenu)::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+.category-breadcrumbs {
+  overflow-x: auto;
+  white-space: nowrap;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.category-breadcrumbs::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .category-path-dropdown {
+    top: 56px;
+  }
 }
 </style>

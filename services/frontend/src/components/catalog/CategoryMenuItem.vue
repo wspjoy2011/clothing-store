@@ -36,6 +36,9 @@
                 :item="subItem"
                 :children-type="getNextChildrenType"
                 :depth="depth + 1"
+                :parent-id="item.id"
+                :grand-parent-id="parentId"
+                @item-click="propagateItemClick"
               />
             </template>
             <template v-else>
@@ -79,6 +82,14 @@ export default {
     depth: {
       type: Number,
       default: 0
+    },
+    parentId: {
+      type: [Number, String],
+      default: null
+    },
+    grandParentId: {
+      type: [Number, String],
+      default: null
     }
   },
 
@@ -109,19 +120,42 @@ export default {
     },
 
     handleItemClick() {
-      this.$emit('item-click', {
+      const categoryInfo = {
         id: this.item.id,
         name: this.item.name,
         type: this.getItemType
-      });
+      };
+
+      if (this.parentId !== null) {
+        categoryInfo.parentId = this.parentId;
+      }
+
+      if (this.grandParentId !== null) {
+        categoryInfo.grandParentId = this.grandParentId;
+      }
+
+      this.$emit('item-click', categoryInfo);
     },
 
     handleNestedItemClick(item) {
-      this.$emit('item-click', {
+      const categoryInfo = {
         id: item.id,
         name: item.name,
         type: this.getNextChildrenType === '' ? 'article' : 'sub'
-      });
+      };
+
+      if (this.getItemType === 'master') {
+        categoryInfo.parentId = this.item.id;
+      } else if (this.getItemType === 'sub') {
+        categoryInfo.parentId = this.item.id;
+        categoryInfo.grandParentId = this.parentId;
+      }
+
+      this.$emit('item-click', categoryInfo);
+    },
+
+    propagateItemClick(categoryInfo) {
+      this.$emit('item-click', categoryInfo);
     }
   }
 }
