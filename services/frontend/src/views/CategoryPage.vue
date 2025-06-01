@@ -1,129 +1,261 @@
 <template>
-  <div class="category-page">
-    <div class="container-custom mx-auto my-6">
-      <!-- Breadcrumbs -->
-      <v-breadcrumbs class="pa-0 mb-4">
-        <v-breadcrumbs-item
-            title="Home"
-            prepend-icon="mdi-home"
-            to="/"
-        />
-        <v-breadcrumbs-item
-            title="Catalog"
-            to="/catalog"
-        />
-        <template v-if="masterCategory">
-          <v-breadcrumbs-item
-              :title="masterCategory.name"
-              :to="{ name: 'master-category', params: { masterCategory: masterCategorySlug } }"
-              :disabled="route.name === 'master-category'"
-          />
-        </template>
-        <template v-if="subCategory">
-          <v-breadcrumbs-item
-              :title="subCategory.name"
-              :to="subCategorySlug ? { name: 'sub-category', params: { masterCategory: masterCategorySlug, subCategory: subCategorySlug } } : null"
-              :disabled="route.name === 'sub-category' || !subCategorySlug"
-          />
-        </template>
-        <template v-if="articleType">
-          <v-breadcrumbs-item
-              :title="articleType.name"
-              :disabled="true"
-          />
-        </template>
-      </v-breadcrumbs>
-
-      <!-- Category Header -->
-      <div class="category-header mb-6">
-        <h1 class="text-h4 font-weight-bold mb-2">
-          {{ currentCategoryTitle }}
-        </h1>
-        <p class="text-subtitle-1" v-if="currentCategoryDescription">
-          {{ currentCategoryDescription }}
-        </p>
+  <div class="catalog-layout">
+    <!-- Filter Drawer -->
+    <v-navigation-drawer
+        v-model="catalogStore.isFilterDrawerOpen"
+        location="left"
+        temporary
+        width="320"
+        class="filter-drawer"
+    >
+      <div class="drawer-header">
+        <h3 class="text-h6">Filters</h3>
+        <v-btn icon="mdi-close" variant="text" size="small" @click="catalogStore.toggleFilterDrawer(false)"/>
       </div>
+      <filter-sidebar/>
+    </v-navigation-drawer>
 
-      <!-- Debug Info -->
-      <v-card class="mb-6 pa-4">
-        <h3 class="text-h6 mb-2">Category Information</h3>
-        <v-list>
-          <v-list-item v-if="masterCategory">
-            <template v-slot:prepend>
-              <v-icon icon="mdi-tag" color="primary"></v-icon>
-            </template>
-            <v-list-item-title>Master Category: {{ masterCategory.name }}</v-list-item-title>
-            <v-list-item-subtitle>
-              ID: {{ masterCategoryId }} | Slug: {{ masterCategorySlug }}
-            </v-list-item-subtitle>
-          </v-list-item>
+    <!-- Filter Toggle Button -->
+    <div v-if="hasProducts" class="filter-toggle-container">
+      <v-btn
+          icon="mdi-filter"
+          variant="outlined"
+          size="small"
+          class="filter-btn"
+          @click="catalogStore.toggleFilterDrawer(true)"
+      >
+        <v-badge
+            :content="catalogStore.activeFiltersCount"
+            :value="catalogStore.activeFiltersCount > 0"
+            :color="catalogStore.activeFiltersCount > 0 ? 'error' : 'primary'"
+            location="top end"
+        />
+      </v-btn>
+    </div>
 
-          <v-list-item v-if="subCategory">
-            <template v-slot:prepend>
-              <v-icon icon="mdi-tag-outline" color="secondary"></v-icon>
-            </template>
-            <v-list-item-title>Sub Category: {{ subCategory.name }}</v-list-item-title>
-            <v-list-item-subtitle>
-              ID: {{ subCategoryId }} | Slug: {{ subCategorySlug }}
-            </v-list-item-subtitle>
-          </v-list-item>
+    <!-- Main Content Area -->
+    <div class="main-content">
+      <div class="container-custom mx-auto my-6">
+        <!-- Breadcrumbs -->
+        <div class="breadcrumbs-container mb-5">
+          <nav aria-label="breadcrumb">
+            <ul class="breadcrumbs">
+              <li class="breadcrumb-item">
+                <router-link to="/" class="breadcrumb-link">
+                  <v-icon icon="mdi-home" size="small" class="breadcrumb-icon"/>
+                  <span>Home</span>
+                </router-link>
+              </li>
 
-          <v-list-item v-if="articleType">
-            <template v-slot:prepend>
-              <v-icon icon="mdi-tshirt-crew-outline" color="success"></v-icon>
-            </template>
-            <v-list-item-title>Article Type: {{ articleType.name }}</v-list-item-title>
-            <v-list-item-subtitle>
-              ID: {{ articleTypeId }} | Slug: {{ articleTypeSlug }}
-            </v-list-item-subtitle>
-          </v-list-item>
+              <li class="breadcrumb-divider">
+                <v-icon icon="mdi-chevron-right" size="small" class="chevron-icon"/>
+              </li>
 
-          <v-list-item v-if="categoryPath && categoryPath.length > 0">
-            <template v-slot:prepend>
-              <v-icon icon="mdi-map-marker-path" color="info"></v-icon>
-            </template>
-            <v-list-item-title>Category Path:</v-list-item-title>
-            <v-list-item-subtitle>
-              {{ formattedCategoryPath }}
-            </v-list-item-subtitle>
-          </v-list-item>
+              <li class="breadcrumb-item">
+                <router-link to="/catalog" class="breadcrumb-link">
+                  <v-icon icon="mdi-shopping" size="small" class="breadcrumb-icon"/>
+                  <span>Catalog</span>
+                </router-link>
+              </li>
 
-          <v-list-item>
-            <template v-slot:prepend>
-              <v-icon icon="mdi-link-variant" color="warning"></v-icon>
-            </template>
-            <v-list-item-title>Current URL:</v-list-item-title>
-            <v-list-item-subtitle>{{ currentPath }}</v-list-item-subtitle>
-          </v-list-item>
-        </v-list>
-      </v-card>
+              <template v-if="masterCategory">
+                <li class="breadcrumb-divider">
+                  <v-icon icon="mdi-chevron-right" size="small" class="chevron-icon"/>
+                </li>
+                <li class="breadcrumb-item" :class="{ 'active': route.name === 'master-category' }">
+                  <router-link
+                      v-if="route.name !== 'master-category'"
+                      :to="{ name: 'master-category', params: { masterCategory: masterCategorySlug } }"
+                      class="breadcrumb-link"
+                  >
+                    <v-icon icon="mdi-shape" size="small" class="breadcrumb-icon"/>
+                    <span>{{ masterCategory.name }}</span>
+                  </router-link>
+                  <span v-else class="breadcrumb-text">
+                    <v-icon icon="mdi-shape" size="small" class="breadcrumb-icon"/>
+                    {{ masterCategory.name }}
+                  </span>
+                </li>
+              </template>
 
-      <content-loader v-if="isLoading"/>
+              <template v-if="subCategory">
+                <li class="breadcrumb-divider">
+                  <v-icon icon="mdi-chevron-right" size="small" class="chevron-icon"/>
+                </li>
+                <li class="breadcrumb-item" :class="{ 'active': route.name === 'sub-category' }">
+                  <router-link
+                      v-if="subCategorySlug && route.name !== 'sub-category'"
+                      :to="{ name: 'sub-category', params: { masterCategory: masterCategorySlug, subCategory: subCategorySlug } }"
+                      class="breadcrumb-link"
+                  >
+                    <v-icon icon="mdi-tag" size="small" class="breadcrumb-icon"/>
+                    <span>{{ subCategory.name }}</span>
+                  </router-link>
+                  <span v-else class="breadcrumb-text">
+                    <v-icon icon="mdi-tag" size="small" class="breadcrumb-icon"/>
+                    {{ subCategory.name }}
+                  </span>
+                </li>
+              </template>
 
-      <v-card class="pa-4" v-if="!isLoading">
-        <h3 class="text-h6 mb-3">Products will be loaded here</h3>
-        <p>This is a placeholder that will be replaced with actual category products</p>
-        <div class="mt-4">
-          <v-btn
-              color="primary"
-              @click="$router.push('/catalog')"
-              prepend-icon="mdi-arrow-left">
-            Back to Catalog
-          </v-btn>
+              <template v-if="articleType">
+                <li class="breadcrumb-divider">
+                  <v-icon icon="mdi-chevron-right" size="small" class="chevron-icon"/>
+                </li>
+                <li class="breadcrumb-item active">
+                  <span class="breadcrumb-text">
+                    <v-icon icon="mdi-tshirt-crew" size="small" class="breadcrumb-icon"/>
+                    {{ articleType.name }}
+                  </span>
+                </li>
+              </template>
+            </ul>
+          </nav>
         </div>
-      </v-card>
+
+        <!-- Category Header -->
+        <div class="category-header mb-6 text-center">
+          <h1 class="text-h4 font-weight-bold mb-3">
+            {{ currentCategoryTitle }}
+          </h1>
+          <div class="divider-container">
+            <div class="divider-line"></div>
+          </div>
+          <p class="text-subtitle-1 mt-4 mx-auto" v-if="currentCategoryDescription" style="max-width: 800px;">
+            {{ currentCategoryDescription }}
+          </p>
+        </div>
+
+        <!-- Search results indicator -->
+        <v-row v-if="catalogStore.searchQuery" justify="center" class="mb-6">
+          <v-col cols="12" class="text-center">
+            <v-chip
+                color="primary"
+                variant="outlined"
+                size="large"
+                closable
+                @click:close="clearSearch"
+                prepend-icon="mdi-magnify"
+            >
+              Search results for: "{{ catalogStore.searchQuery }}"
+            </v-chip>
+          </v-col>
+        </v-row>
+
+        <!-- Control panel -->
+        <v-row v-if="hasProducts" justify="center" align="center" class="mb-3">
+          <v-col cols="12" sm="6" md="4" lg="3">
+            <product-sorting @update:ordering="handleOrderingChange"/>
+          </v-col>
+
+          <v-spacer class="d-none d-md-flex"></v-spacer>
+
+          <v-col cols="12" sm="6" md="4" lg="3" class="d-flex justify-end">
+            <items-per-page-select
+                :options="itemsPerPageOptions"
+                @update:perPage="handleItemsPerPageChange"
+            />
+          </v-col>
+        </v-row>
+
+        <!-- Active filters summary -->
+        <v-row v-if="catalogStore.hasActiveFilters && !isLoading" class="mb-4">
+          <v-col cols="12">
+            <v-sheet rounded class="pa-3" color="grey-lighten-4">
+              <div class="d-flex align-center justify-space-between">
+                <div class="d-flex align-center">
+                  <v-icon icon="mdi-filter-variant" class="mr-2"/>
+                  <span class="text-body-1">Active Filters</span>
+                </div>
+                <v-btn
+                    variant="text"
+                    color="primary"
+                    density="comfortable"
+                    @click="clearAllFilters"
+                >
+                  Clear All
+                </v-btn>
+              </div>
+            </v-sheet>
+          </v-col>
+        </v-row>
+
+        <!-- Loader -->
+        <content-loader v-if="isLoading"/>
+
+        <!-- Error message -->
+        <error-alert v-if="error" :message="error.message"/>
+
+        <!-- Products grid -->
+        <v-row v-if="!isLoading && !error && products.length > 0">
+          <v-col
+              v-for="product in products"
+              :key="product.product_id"
+              cols="12"
+              sm="6"
+              md="4"
+              lg="3"
+          >
+            <clothes-card :product="product"/>
+          </v-col>
+        </v-row>
+
+        <!-- Products count indicator -->
+        <v-row v-if="hasProducts" justify="center" class="mt-4 mb-4">
+          <v-col cols="12" class="text-center">
+            <v-chip
+                color="primary"
+                variant="flat"
+                class="px-4 py-2"
+                size="large"
+            >
+              <v-icon start icon="mdi-tag-multiple" class="mr-1"/>
+              {{ totalItems }} products found in {{ currentCategoryTitle }}
+            </v-chip>
+          </v-col>
+        </v-row>
+
+        <!-- No products found -->
+        <no-items-found
+            v-if="isEmpty"
+            title="No products found in this category"
+            message="Try adjusting your filters or search query"
+            icon="mdi-search-off"
+        />
+
+        <!-- Pagination  -->
+        <v-row justify="center" v-if="hasItems">
+          <v-col cols="12" class="px-0">
+            <app-pagination
+                :current-page="currentPage"
+                :total-pages="totalPages"
+                @update:page="handlePageChange"
+            />
+          </v-col>
+        </v-row>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import {computed, onMounted, ref, watch} from 'vue';
-import {useRoute, useRouter} from 'vue-router';
+import {computed, onMounted} from 'vue';
+import {useRoute} from 'vue-router';
+import {useCatalogStore} from '@/stores/catalog';
 import {useCategoryStore} from '@/stores/categoryStore';
+import {useCategoryProducts} from '@/composables/catalog/useCategoryProducts';
+
+import ClothesCard from '@/components/catalog/ClothesCard.vue';
 import ContentLoader from '@/components/ui/loaders/ContentLoader.vue';
+import ErrorAlert from '@/components/ui/alerts/ErrorAlert.vue';
+import AppPagination from '@/components/ui/pagination/AppPagination.vue';
+import ItemsPerPageSelect from '@/components/ui/pagination/ItemsPerPageSelect.vue';
+import NoItemsFound from '@/components/ui/empty-states/NoItemsFound.vue';
+import ProductSorting from '@/components/ui/sorting/ProductSorting.vue';
+import FilterSidebar from '@/components/ui/filters/FilterSidebar.vue';
 
 const route = useRoute();
-const router = useRouter();
+const catalogStore = useCatalogStore();
 const categoryStore = useCategoryStore();
 
 const masterCategorySlug = computed(() => route.params.masterCategory);
@@ -145,10 +277,20 @@ const articleTypeId = computed(() => {
   return categoryStore.getArticleTypeIdBySlug(masterCategoryId.value, subCategoryId.value, articleTypeSlug.value);
 });
 
-const masterCategory = ref(null);
-const subCategory = ref(null);
-const articleType = ref(null);
-const isLoading = ref(true);
+const masterCategory = computed(() => {
+  return masterCategoryId.value ?
+      categoryStore.getMasterCategory(masterCategoryId.value) : null;
+});
+
+const subCategory = computed(() => {
+  if (!masterCategoryId.value || !subCategoryId.value) return null;
+  return categoryStore.getSubCategory(masterCategoryId.value, subCategoryId.value);
+});
+
+const articleType = computed(() => {
+  if (!masterCategoryId.value || !subCategoryId.value || !articleTypeId.value) return null;
+  return categoryStore.getArticleType(masterCategoryId.value, subCategoryId.value, articleTypeId.value);
+});
 
 const currentCategoryTitle = computed(() => {
   return categoryStore.getCategoryName(
@@ -166,73 +308,75 @@ const currentCategoryDescription = computed(() => {
   );
 });
 
-const categoryPath = computed(() => {
-  return categoryStore.getCategoryPath(
-      masterCategoryId.value,
-      subCategoryId.value,
-      articleTypeId.value
-  );
-});
+const {
+  isLoading,
+  error,
+  products,
+  totalPages,
+  totalItems,
+  currentPage,
+  hasProducts,
+  isEmpty,
+  hasItems,
+  itemsPerPageOptions,
+  handlePageChange,
+  handleItemsPerPageChange,
+  clearAllFilters,
+  handleOrderingChange,
+  clearSearch,
+  initialize
+} = useCategoryProducts(route);
 
-const formattedCategoryPath = computed(() => {
-  if (!categoryPath.value || !categoryPath.value.length) return '';
-
-  return categoryPath.value
-      .map(item => `${item.name} (${item.slug})`)
-      .join(' > ');
-});
-
-const currentPath = computed(() => {
-  let path = '/category/' + masterCategorySlug.value;
-  if (subCategorySlug.value) {
-    path += '/' + subCategorySlug.value;
-    if (articleTypeSlug.value) {
-      path += '/' + articleTypeSlug.value;
-    }
+onMounted(() => {
+  if (!categoryStore.hasCategories) {
+    categoryStore.fetchCategoryMenu().then(() => {
+      initialize();
+    });
+  } else {
+    initialize();
   }
-  return path;
 });
-
-const loadCategoryData = async () => {
-  isLoading.value = true;
-
-  try {
-    if (!categoryStore.hasCategories) {
-      await categoryStore.fetchCategoryMenu();
-    }
-
-    if (masterCategoryId.value) {
-      const data = await categoryStore.loadCategoryData(
-          masterCategoryId.value,
-          subCategoryId.value,
-          articleTypeId.value
-      );
-
-      masterCategory.value = data.masterCategory;
-      subCategory.value = data.subCategory;
-      articleType.value = data.articleType;
-    } else {
-      console.error("Could not find master category with slug:", masterCategorySlug.value);
-    }
-  } catch (error) {
-    console.error('Error loading category data:', error);
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-watch(
-    () => route.params,
-    () => {
-      loadCategoryData();
-    },
-    {deep: true}
-);
-
-onMounted(loadCategoryData);
 </script>
 
 <style scoped>
+.catalog-layout {
+  display: flex;
+  min-height: calc(100vh - 64px);
+  position: relative;
+}
+
+.filter-drawer {
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.filter-toggle-container {
+  position: fixed;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+}
+
+.filter-btn {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  background-color: white;
+}
+
+.main-content {
+  flex-grow: 1;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .container-custom {
   width: 100%;
   max-width: 1280px;
@@ -243,6 +387,167 @@ onMounted(loadCategoryData);
 .category-header {
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   padding-bottom: 16px;
+}
+
+.breadcrumbs-container {
+  border-radius: 8px;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+}
+
+.theme--light .breadcrumbs-container {
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.theme--dark .breadcrumbs-container {
+  background-color: rgba(30, 30, 30, 0.7);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  align-items: center;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.breadcrumb-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.theme--light .breadcrumb-link {
+  color: #5c6bc0;
+}
+
+.theme--dark .breadcrumb-link {
+  color: #7986cb;
+}
+
+.theme--light .breadcrumb-link:hover {
+  color: #3f51b5;
+  background-color: rgba(63, 81, 181, 0.08);
+}
+
+.theme--dark .breadcrumb-link:hover {
+  color: #9fa8da;
+  background-color: rgba(121, 134, 203, 0.15);
+}
+
+.breadcrumb-text {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 4px 8px;
+}
+
+.theme--light .breadcrumb-text {
+  color: #424242;
+}
+
+.theme--dark .breadcrumb-text {
+  color: #e0e0e0;
+}
+
+.breadcrumb-icon {
+  margin-right: 6px;
+}
+
+.breadcrumb-divider {
+  display: flex;
+  align-items: center;
+  margin: 0 2px;
+}
+
+.theme--light .breadcrumb-divider {
+  color: #bdbdbd;
+}
+
+.theme--dark .breadcrumb-divider {
+  color: #616161;
+}
+
+.chevron-icon {
+  font-size: 18px;
+}
+
+.theme--light .chevron-icon {
+  color: #9e9e9e;
+}
+
+.theme--dark .chevron-icon {
+  color: #757575;
+}
+
+.active .breadcrumb-link {
+  font-weight: 600;
+}
+
+.theme--light .active .breadcrumb-link,
+.theme--light .active .breadcrumb-text {
+  color: #424242;
+}
+
+.theme--dark .active .breadcrumb-link,
+.theme--dark .active .breadcrumb-text {
+  color: #e0e0e0;
+}
+
+.theme--light .active .breadcrumb-text {
+  background-color: rgba(0, 0, 0, 0.03);
+  border-radius: 4px;
+}
+
+.theme--dark .active .breadcrumb-text {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+  .breadcrumbs-container {
+    padding: 8px 12px;
+  }
+
+  .breadcrumb-item {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 600px) {
+  .breadcrumb-icon {
+    margin-right: 4px;
+  }
+
+  .breadcrumb-divider {
+    margin: 0;
+  }
+
+  .breadcrumb-link,
+  .breadcrumb-text {
+    padding: 3px 4px;
+  }
+
+  .filter-toggle-container {
+    top: auto;
+    bottom: 24px;
+    left: 24px;
+    transform: none;
+  }
 }
 
 @media (min-width: 960px) {
