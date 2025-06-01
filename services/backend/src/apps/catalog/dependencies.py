@@ -48,7 +48,7 @@ async def get_category_repository(
     Returns:
         Initialized category repository
     """
-    return CategoryRepository(dao)
+    return CategoryRepository.get_instance(dao)
 
 
 def get_pagination_specification_factory() -> callable:
