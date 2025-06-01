@@ -114,6 +114,23 @@ class ProductRepositoryInterface(ABC):
         """
         pass
 
+    @abstractmethod
+    async def get_available_filters_by_categories(
+            self,
+            category_spec: CategorySpecificationInterface,
+    ) -> Optional[FiltersDTO]:
+        """
+        Get available filters and their possible values based on products in specific categories
+
+        Args:
+            category_spec: Specification for category filtering
+            search_spec: Optional search specification to limit filters to relevant options
+
+        Returns:
+            FiltersDTO object containing all available filters for the specified categories or None if no products found
+        """
+        pass
+
 
 class CategoryRepositoryInterface(ABC):
     """Interface for category repository operations"""

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query, Depends, Path
 from apps.catalog.controllers import (
     get_product_list_controller,
     get_filters_controller,
-    get_category_menu_controller, get_products_by_category_controller
+    get_category_menu_controller, get_products_by_category_controller, get_filters_by_categories_controller
 )
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.interfaces.services import CatalogServiceInterface
@@ -33,6 +33,11 @@ API_PATHS: dict[str, str] = {
     "products_by_master_category": "/categories/{master_category_id}/products",
     "products_by_subcategory": "/categories/{master_category_id}/{subcategory_id}/products",
     "products_by_article_type": "/categories/{master_category_id}/{subcategory_id}/{article_type_id}/products",
+
+    # Category-based filters
+    "filters_by_master_category": "/categories/{master_category_id}/filters",
+    "filters_by_subcategory": "/categories/{master_category_id}/{subcategory_id}/filters",
+    "filters_by_article_type": "/categories/{master_category_id}/{subcategory_id}/{article_type_id}/filters",
 }
 
 router = APIRouter(
@@ -504,4 +509,199 @@ async def get_products_by_article_type_route(
         gender=gender,
         q=q,
         catalog_service=catalog_service,
+    )
+
+
+@router.get(
+    API_PATHS["filters_by_master_category"],
+    response_model=FiltersResponseSchema,
+    status_code=200,
+    summary="Get available filters for master category",
+    description=(
+            "<h3>This endpoint retrieves available filters for products in a specific master category. "
+            "It provides information about available filter options such as gender values and year ranges "
+            "based only on products within the specified master category. "
+            "Clients can use this information to build dynamic filter UIs that adapt to the current category state.</h3>"
+    ),
+    responses={
+        404: {
+            "description": "No products found in the specified category.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "No products found in the specified categories. No filters available."}
+                }
+            },
+        }
+    },
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "full_filters": {
+                                "summary": "Complete filters for category",
+                                "description": "Example response with all filter types for specific category",
+                                "value": FILTERS_FULL_EXAMPLE
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_filters_by_master_category_route(
+        master_category_id: int = Path(..., description="ID of the master category"),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
+) -> FiltersResponseSchema:
+    """
+    Get available filters for products in master category
+
+    Args:
+        master_category_id: ID of the master category (required)
+        catalog_service: Catalog service for data access
+
+    Returns:
+        Filters response schema
+
+    Raises:
+        HTTPException: If no products found in the specified category
+    """
+    return await get_filters_by_categories_controller(
+        master_category_id=master_category_id,
+        catalog_service=catalog_service
+    )
+
+
+@router.get(
+    API_PATHS["filters_by_subcategory"],
+    response_model=FiltersResponseSchema,
+    status_code=200,
+    summary="Get available filters for subcategory",
+    description=(
+            "<h3>This endpoint retrieves available filters for products in a specific subcategory. "
+            "It provides information about available filter options such as gender values and year ranges "
+            "based only on products within the specified subcategory. "
+            "Clients can use this information to build dynamic filter UIs that adapt to the current subcategory state.</h3>"
+    ),
+    responses={
+        404: {
+            "description": "No products found in the specified subcategory.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "No products found in the specified categories. No filters available."}
+                }
+            },
+        }
+    },
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "full_filters": {
+                                "summary": "Complete filters for subcategory",
+                                "description": "Example response with all filter types for specific subcategory",
+                                "value": FILTERS_FULL_EXAMPLE
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_filters_by_subcategory_route(
+        master_category_id: int = Path(..., description="ID of the master category"),
+        subcategory_id: int = Path(..., description="ID of the subcategory"),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
+) -> FiltersResponseSchema:
+    """
+    Get available filters for products in subcategory
+
+    Args:
+        master_category_id: ID of the master category (required)
+        subcategory_id: ID of the subcategory (required)
+        catalog_service: Catalog service for data access
+
+    Returns:
+        Filters response schema
+
+    Raises:
+        HTTPException: If no products found in the specified subcategory
+    """
+    return await get_filters_by_categories_controller(
+        master_category_id=master_category_id,
+        sub_category_id=subcategory_id,
+        catalog_service=catalog_service
+    )
+
+
+@router.get(
+    API_PATHS["filters_by_article_type"],
+    response_model=FiltersResponseSchema,
+    status_code=200,
+    summary="Get available filters for article type",
+    description=(
+            "<h3>This endpoint retrieves available filters for products in a specific article type. "
+            "It provides information about available filter options such as gender values and year ranges "
+            "based only on products within the specified article type. "
+            "Clients can use this information to build dynamic filter UIs that adapt to the current article type state.</h3>"
+    ),
+    responses={
+        404: {
+            "description": "No products found in the specified article type.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "No products found in the specified categories. No filters available."}
+                }
+            },
+        }
+    },
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "full_filters": {
+                                "summary": "Complete filters for article type",
+                                "description": "Example response with all filter types for specific article type",
+                                "value": FILTERS_FULL_EXAMPLE
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_filters_by_article_type_route(
+        master_category_id: int = Path(..., description="ID of the master category"),
+        subcategory_id: int = Path(..., description="ID of the subcategory"),
+        article_type_id: int = Path(..., description="ID of the article type"),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
+) -> FiltersResponseSchema:
+    """
+    Get available filters for products in article type
+
+    Args:
+        master_category_id: ID of the master category (required)
+        subcategory_id: ID of the subcategory (required)
+        article_type_id: ID of the article type (required)
+        catalog_service: Catalog service for data access
+
+    Returns:
+        Filters response schema
+
+    Raises:
+        HTTPException: If no products found in the specified article type
+    """
+    return await get_filters_by_categories_controller(
+        master_category_id=master_category_id,
+        sub_category_id=subcategory_id,
+        article_type_id=article_type_id,
+        catalog_service=catalog_service
     )

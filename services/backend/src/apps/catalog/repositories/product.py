@@ -88,6 +88,56 @@ class ProductRepository(ProductRepositoryInterface):
 
         return await self._get_filtered_filters(search_spec)
 
+    async def get_available_filters_by_categories(
+            self,
+            category_spec: CategorySpecificationInterface,
+    ) -> Optional[FiltersDTO]:
+        """
+        Get available filters and their possible values based on products in specific categories
+
+        Args:
+            category_spec: Specification for category filtering
+
+        Returns:
+            FiltersDTO object containing all available filters for the specified categories or None if no products found
+        """
+        if category_spec.is_empty():
+            return await self._get_all_filters()
+
+        return await self._get_category_filters(category_spec)
+
+    async def _get_category_filters(self, category_spec: CategorySpecificationInterface) -> Optional[FiltersDTO]:
+        """Get filters for specific categories"""
+        category_sql, category_params = category_spec.to_sql()
+
+        count_query = f"SELECT COUNT(*) FROM {self.APP_NAME}_products " + category_sql
+        logger.info(f"Category filters count query: {count_query}")
+        logger.info(f"Category filters count params: {category_params}")
+
+        count_result = await self._dao.execute(count_query, category_params, fetch_one=True)
+
+        if not count_result or count_result[0] == 0:
+            return None
+
+        gender_query = f"SELECT DISTINCT gender FROM {self.APP_NAME}_products " + category_sql
+        logger.info(f"Category filters gender query: {gender_query}")
+        logger.info(f"Category filters gender params: {category_params}")
+
+        gender_result = await self._dao.execute(gender_query, category_params)
+        gender_values = [row[0] for row in gender_result] if gender_result else []
+
+        year_query = f"SELECT MIN(year), MAX(year) FROM {self.APP_NAME}_products " + category_sql + " AND year IS NOT NULL"
+        logger.info(f"Category filters year query: {year_query}")
+        logger.info(f"Category filters year params: {category_params}")
+
+        year_result = await self._dao.execute(year_query, category_params, fetch_one=True)
+        min_year, max_year = year_result if year_result else (None, None)
+
+        return FiltersDTO(
+            gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
+            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None
+        )
+
     async def _get_products_with_specs(
             self,
             pagination_spec: PaginationSpecificationInterface,

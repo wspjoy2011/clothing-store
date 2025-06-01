@@ -236,3 +236,47 @@ async def get_products_by_category_controller(
         total_pages=catalog_dto.pagination.total_pages,
         total_items=catalog_dto.pagination.total_items,
     )
+
+
+async def get_filters_by_categories_controller(
+        master_category_id: int,
+        sub_category_id: Optional[int] = None,
+        article_type_id: Optional[int] = None,
+        catalog_service: CatalogServiceInterface = None,
+) -> FiltersResponseSchema:
+    """
+    Get available filters for products in specific categories
+
+    Args:
+        master_category_id: ID of the master category (required)
+        sub_category_id: ID of the sub-category (optional)
+        article_type_id: ID of the article type (optional)
+        catalog_service: Catalog service for data access
+
+    Returns:
+        Filters response schema
+
+    Raises:
+        HTTPException: If no products found in the specified categories
+    """
+    filters_dto = await catalog_service.get_available_filters_by_categories(
+        master_category_id=master_category_id,
+        sub_category_id=sub_category_id,
+        article_type_id=article_type_id
+    )
+
+    if filters_dto is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No products found in the specified categories. No filters available."
+        )
+
+    return FiltersResponseSchema(
+        gender=CheckboxFilterSchema(
+            values=filters_dto.gender.values
+        ) if filters_dto.gender else None,
+        year=RangeFilterSchema(
+            min=filters_dto.year.min,
+            max=filters_dto.year.max
+        ) if filters_dto.year else None
+    )

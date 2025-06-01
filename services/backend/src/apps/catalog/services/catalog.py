@@ -203,6 +203,29 @@ class CatalogService(CatalogServiceInterface):
 
         return await self._product_repository.get_available_filters(search_spec)
 
+    async def get_available_filters_by_categories(
+            self,
+            master_category_id: int,
+            sub_category_id: Optional[int] = None,
+            article_type_id: Optional[int] = None
+    ) -> Optional[FiltersDTO]:
+        """
+        Get available filters and their possible values based on products in specific categories
+
+        Args:
+            master_category_id: ID of the master category (required)
+            sub_category_id: ID of the sub-category (optional)
+            article_type_id: ID of the article type (optional)
+
+        Returns:
+            FiltersDTO object containing all available filters for the specified categories or None if no products found
+        """
+        category_spec = self._category_specification_factory(
+            master_category_id, sub_category_id, article_type_id
+        )
+
+        return await self._product_repository.get_available_filters_by_categories(category_spec)
+
     async def get_category_menu(self) -> Optional[CategoryMenuDTO]:
         """
         Get the complete category menu with all master categories,
