@@ -81,12 +81,41 @@
                 <div class="d-flex align-center">
                   <v-icon icon="mdi-filter-variant" class="mr-2"/>
                   <span class="text-body-1">Active Filters</span>
+                  <v-chip
+                      v-if="catalogStore.activeFilters.gender"
+                      size="small"
+                      class="ml-2"
+                      closable
+                      @click:close="catalogStore.activeFilters.gender = null"
+                  >
+                    Gender: {{ catalogStore.activeFilters.gender }}
+                  </v-chip>
+                  <v-chip
+                      v-if="catalogStore.activeFilters.min_year || catalogStore.activeFilters.max_year"
+                      size="small"
+                      class="ml-2"
+                      closable
+                      @click:close="catalogStore.activeFilters.min_year = null; catalogStore.activeFilters.max_year = null"
+                  >
+                    Year: {{
+                      catalogStore.activeFilters.min_year || catalogStore.availableFilters.year?.min
+                    }}-{{ catalogStore.activeFilters.max_year || catalogStore.availableFilters.year?.max }}
+                  </v-chip>
+                  <v-progress-circular
+                      v-if="catalogStore.filtersLoading"
+                      size="16"
+                      width="2"
+                      indeterminate
+                      class="ml-2"
+                      color="primary"
+                  />
                 </div>
                 <v-btn
                     variant="text"
                     color="primary"
                     density="comfortable"
                     @click="clearAllFilters"
+                    :disabled="catalogStore.filtersLoading"
                 >
                   Clear All
                 </v-btn>
@@ -154,16 +183,16 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue';
-import { useRoute } from 'vue-router';
+import {onMounted, onUnmounted} from 'vue';
+import {useRoute} from 'vue-router';
 
-import { useCatalogStore } from '@/stores/catalog';
-import { useProductPagination } from '@/composables/catalog/useProductPagination';
-import { useProductFiltering } from '@/composables/catalog/useProductFiltering';
-import { useProductSearch } from '@/composables/catalog/useProductSearch';
-import { useProductSorting } from '@/composables/catalog/useProductSorting';
-import { useProductRouting } from '@/composables/catalog/useProductRouting';
-import { useProductUI } from '@/composables/catalog/useProductUI';
+import {useCatalogStore} from '@/stores/catalog';
+import {useProductPagination} from '@/composables/catalog/useProductPagination';
+import {useProductFiltering} from '@/composables/catalog/useProductFiltering';
+import {useProductSearch} from '@/composables/catalog/useProductSearch';
+import {useProductSorting} from '@/composables/catalog/useProductSorting';
+import {useProductRouting} from '@/composables/catalog/useProductRouting';
+import {useProductUI} from '@/composables/catalog/useProductUI';
 
 import ClothesCard from '@/components/catalog/ClothesCard.vue';
 import ContentLoader from '@/components/ui/loaders/ContentLoader.vue';
@@ -177,9 +206,9 @@ import FilterSidebar from '@/components/ui/filters/FilterSidebar.vue';
 const route = useRoute();
 const catalogStore = useCatalogStore();
 
-const { createQueryFromFilters, clearAllFilters } = useProductFiltering(route);
+const {createQueryFromFilters, clearAllFilters} = useProductFiltering(route);
 
-const { hasProducts, isEmpty } = useProductUI();
+const {hasProducts, isEmpty} = useProductUI();
 
 const {
   itemsPerPageOptions,
@@ -189,11 +218,11 @@ const {
   handleItemsPerPageChange
 } = useProductPagination(createQueryFromFilters, route);
 
-const { clearSearch } = useProductSearch(createQueryFromFilters, route);
+const {clearSearch} = useProductSearch(createQueryFromFilters, route);
 
-const { handleOrderingChange } = useProductSorting(createQueryFromFilters);
+const {handleOrderingChange} = useProductSorting(createQueryFromFilters);
 
-const { initialize, cleanup } = useProductRouting(createQueryFromFilters, ensureValidPage);
+const {initialize, cleanup} = useProductRouting(createQueryFromFilters, ensureValidPage);
 
 onMounted(initialize);
 onUnmounted(cleanup);
@@ -243,6 +272,22 @@ onUnmounted(cleanup);
   max-width: 1280px;
   padding: 0 16px;
   box-sizing: border-box;
+}
+
+.v-theme--dark .v-sheet {
+  background-color: #2c2c2c !important;
+  color: #ffffff !important;
+}
+
+.v-theme--dark .v-chip {
+  background-color: #1976d2 !important;
+  color: #ffffff !important;
+}
+
+.v-theme--dark .filter-btn {
+  background-color: #1e1e1e !important;
+  color: #ffffff !important;
+  border-color: #424242 !important;
 }
 
 @media (min-width: 960px) {

@@ -2,7 +2,7 @@
   <div class="catalog-layout">
     <!-- Filter Drawer -->
     <v-navigation-drawer
-        v-model="catalogStore.isFilterDrawerOpen"
+        v-model="categoryStore.isFilterDrawerOpen"
         location="left"
         temporary
         width="320"
@@ -10,7 +10,7 @@
     >
       <div class="drawer-header">
         <h3 class="text-h6">Filters</h3>
-        <v-btn icon="mdi-close" variant="text" size="small" @click="catalogStore.toggleFilterDrawer(false)"/>
+        <v-btn icon="mdi-close" variant="text" size="small" @click="categoryStore.toggleFilterDrawer(false)"/>
       </div>
       <filter-sidebar/>
     </v-navigation-drawer>
@@ -22,12 +22,12 @@
           variant="outlined"
           size="small"
           class="filter-btn"
-          @click="catalogStore.toggleFilterDrawer(true)"
+          @click="categoryStore.toggleFilterDrawer(true)"
       >
         <v-badge
-            :content="catalogStore.activeFiltersCount"
-            :value="catalogStore.activeFiltersCount > 0"
-            :color="catalogStore.activeFiltersCount > 0 ? 'error' : 'primary'"
+            :content="categoryStore.activeFiltersCount"
+            :value="categoryStore.activeFiltersCount > 0"
+            :color="categoryStore.activeFiltersCount > 0 ? 'error' : 'primary'"
             location="top end"
         />
       </v-btn>
@@ -127,7 +127,7 @@
         </div>
 
         <!-- Search results indicator -->
-        <v-row v-if="catalogStore.searchQuery" justify="center" class="mb-6">
+        <v-row v-if="searchQuery && searchQuery.trim()" justify="center" class="mb-6">
           <v-col cols="12" class="text-center">
             <v-chip
                 color="primary"
@@ -137,7 +137,7 @@
                 @click:close="clearSearch"
                 prepend-icon="mdi-magnify"
             >
-              Search results for: "{{ catalogStore.searchQuery }}"
+              Search results for: "{{ searchQuery }}"
             </v-chip>
           </v-col>
         </v-row>
@@ -159,24 +159,72 @@
         </v-row>
 
         <!-- Active filters summary -->
-        <v-row v-if="catalogStore.hasActiveFilters && !isLoading" class="mb-4">
+        <v-row v-if="categoryStore.hasActiveFilters && !isLoading" class="mb-4">
           <v-col cols="12">
             <v-sheet rounded class="pa-3" color="grey-lighten-4">
               <div class="d-flex align-center justify-space-between">
                 <div class="d-flex align-center">
                   <v-icon icon="mdi-filter-variant" class="mr-2"/>
                   <span class="text-body-1">Active Filters</span>
+                  <v-chip
+                      v-if="activeFilters.gender"
+                      size="small"
+                      class="ml-2"
+                      closable
+                      @click:close="activeFilters.gender = null"
+                  >
+                    Gender: {{ activeFilters.gender }}
+                  </v-chip>
+                  <v-chip
+                      v-if="activeFilters.min_year || activeFilters.max_year"
+                      size="small"
+                      class="ml-2"
+                      closable
+                      @click:close="activeFilters.min_year = null; activeFilters.max_year = null"
+                  >
+                    Year: {{
+                      activeFilters.min_year || availableFilters.year?.min
+                    }}-{{ activeFilters.max_year || availableFilters.year?.max }}
+                  </v-chip>
+                  <v-progress-circular
+                      v-if="isLoadingFilters"
+                      size="16"
+                      width="2"
+                      indeterminate
+                      class="ml-2"
+                      color="primary"
+                  />
                 </div>
                 <v-btn
                     variant="text"
                     color="primary"
                     density="comfortable"
                     @click="clearAllFilters"
+                    :disabled="isLoadingFilters"
                 >
                   Clear All
                 </v-btn>
               </div>
             </v-sheet>
+          </v-col>
+        </v-row>
+
+        <!-- Filter loading error -->
+        <v-row v-if="filtersError && !isLoadingFilters" class="mb-4">
+          <v-col cols="12">
+            <v-alert
+                type="warning"
+                variant="tonal"
+                closable
+                @click:close="filtersError = null"
+            >
+              <template v-slot:title>
+                <span class="text-subtitle-1 font-weight-medium">Filter Loading Error</span>
+              </template>
+              <span class="text-body-2">
+                Unable to load filters for this category. Some filtering options may not be available.
+              </span>
+            </v-alert>
           </v-col>
         </v-row>
 
@@ -223,7 +271,7 @@
             icon="mdi-search-off"
         />
 
-        <!-- Pagination  -->
+        <!-- Pagination -->
         <v-row justify="center" v-if="hasItems">
           <v-col cols="12" class="px-0">
             <app-pagination
@@ -239,9 +287,8 @@
 </template>
 
 <script setup>
-import {computed, onMounted} from 'vue';
+import {computed, onMounted, onUnmounted, provide} from 'vue';
 import {useRoute} from 'vue-router';
-import {useCatalogStore} from '@/stores/catalog';
 import {useCategoryStore} from '@/stores/categoryStore';
 import {useCategoryProducts} from '@/composables/catalog/useCategoryProducts';
 
@@ -255,7 +302,6 @@ import ProductSorting from '@/components/ui/sorting/ProductSorting.vue';
 import FilterSidebar from '@/components/ui/filters/FilterSidebar.vue';
 
 const route = useRoute();
-const catalogStore = useCatalogStore();
 const categoryStore = useCategoryStore();
 
 const masterCategorySlug = computed(() => route.params.masterCategory);
@@ -315,17 +361,37 @@ const {
   totalPages,
   totalItems,
   currentPage,
+
+  isLoadingFilters,
+  filtersError,
+  availableFilters,
+  activeFilters,
+  searchQuery,
+
   hasProducts,
   isEmpty,
   hasItems,
   itemsPerPageOptions,
+
   handlePageChange,
   handleItemsPerPageChange,
-  clearAllFilters,
   handleOrderingChange,
   clearSearch,
-  initialize
+  clearAllFilters,
+
+  initialize,
 } = useCategoryProducts(route);
+
+provide('categoryAvailableFilters', availableFilters);
+provide('filtersError', filtersError);
+provide('hasActiveFilters', computed(() => categoryStore.hasActiveFilters));
+provide('clearAllFilters', clearAllFilters);
+
+const cleanup = () => {
+  if (categoryStore.isFilterDrawerOpen) {
+    categoryStore.toggleFilterDrawer(false);
+  }
+};
 
 onMounted(() => {
   if (!categoryStore.hasCategories) {
@@ -335,6 +401,10 @@ onMounted(() => {
   } else {
     initialize();
   }
+});
+
+onUnmounted(() => {
+  cleanup();
 });
 </script>
 
@@ -387,6 +457,19 @@ onMounted(() => {
 .category-header {
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   padding-bottom: 16px;
+}
+
+.divider-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.divider-line {
+  width: 80px;
+  height: 3px;
+  background: linear-gradient(45deg, #1976d2, #42a5f5);
+  border-radius: 2px;
 }
 
 .breadcrumbs-container {
@@ -516,6 +599,22 @@ onMounted(() => {
 .theme--dark .active .breadcrumb-text {
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
+}
+
+.v-theme--dark .v-sheet {
+  background-color: #2c2c2c !important;
+  color: #ffffff !important;
+}
+
+.v-theme--dark .v-chip {
+  background-color: #1976d2 !important;
+  color: #ffffff !important;
+}
+
+.v-theme--dark .filter-btn {
+  background-color: #1e1e1e !important;
+  color: #ffffff !important;
+  border-color: #424242 !important;
 }
 
 @media (max-width: 768px) {

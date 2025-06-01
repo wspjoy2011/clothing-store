@@ -2,22 +2,22 @@
   <v-card class="filter-sidebar">
     <v-card-text class="pa-0">
       <v-alert
-        v-if="catalogStore.filtersError"
-        type="error"
-        variant="tonal"
-        density="compact"
-        class="ma-3"
+          v-if="filtersError"
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="ma-3"
       >
         Failed to load filters
       </v-alert>
 
-      <div v-if="catalogStore.hasActiveFilters" class="d-flex justify-end px-4 py-2">
+      <div v-if="hasActiveFilters" class="d-flex justify-end px-4 py-2">
         <v-btn
-          variant="text"
-          density="compact"
-          color="primary"
-          size="small"
-          @click="clearFilters"
+            variant="text"
+            density="compact"
+            color="primary"
+            size="small"
+            @click="clearFilters"
         >
           Clear All
         </v-btn>
@@ -32,16 +32,31 @@
 </template>
 
 <script setup>
-import { computed, inject } from 'vue';
-import { useCatalogStore } from '@/stores/catalog';
+import {computed, inject} from 'vue';
 import GenderFilter from './GenderFilter.vue';
 import YearRangeFilter from './YearRangeFilter.vue';
 
-const catalogStore = useCatalogStore();
-const clearAllFilters = inject('clearAllFilters');
+const clearAllFilters = inject('clearAllFilters', null);
+const availableFilters = inject('availableFilters', null);
+const categoryAvailableFilters = inject('categoryAvailableFilters', null);
+const hasActiveFilters = inject('hasActiveFilters', false);
+const filtersError = inject('filtersError', null);
 
-const hasGenderFilter = computed(() => true);
-const hasYearFilter = computed(() => true);
+const currentAvailableFilters = computed(() => {
+  return categoryAvailableFilters?.value || availableFilters?.value;
+});
+
+const hasGenderFilter = computed(() => {
+  return currentAvailableFilters.value?.gender &&
+      currentAvailableFilters.value.gender.values &&
+      currentAvailableFilters.value.gender.values.length > 0;
+});
+
+const hasYearFilter = computed(() => {
+  return currentAvailableFilters.value?.year &&
+      currentAvailableFilters.value.year.min !== null &&
+      currentAvailableFilters.value.year.max !== null;
+});
 
 const clearFilters = () => {
   if (clearAllFilters) {

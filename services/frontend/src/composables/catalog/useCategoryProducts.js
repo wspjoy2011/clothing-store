@@ -1,13 +1,11 @@
-import {ref, computed, watch} from 'vue';
+import {ref, computed, watch, provide} from 'vue';
 import {useRouter} from 'vue-router';
-import {useCatalogStore} from '@/stores/catalog';
 import {useCategoryStore} from '@/stores/categoryStore';
+import {useCategoryFiltering} from './useCategoryFiltering';
 import categoryService from '@/services/categoryService';
-
 
 export function useCategoryProducts(route) {
     const router = useRouter();
-    const catalogStore = useCatalogStore();
     const categoryStore = useCategoryStore();
 
     const isLoading = ref(true);
@@ -16,6 +14,9 @@ export function useCategoryProducts(route) {
     const totalPages = ref(0);
     const totalItems = ref(0);
     const currentPage = ref(1);
+
+    const isLoadingFilters = ref(false);
+    const filtersError = ref(null);
 
     const masterCategoryId = computed(() => {
         const slug = route.params.masterCategory;
@@ -31,46 +32,6 @@ export function useCategoryProducts(route) {
         if (!masterCategoryId.value || !subCategoryId.value || !route.params.articleType) return null;
         return categoryStore.getArticleTypeIdBySlug(masterCategoryId.value, subCategoryId.value, route.params.articleType);
     });
-
-    const createQueryFromFilters = () => {
-        const query = {...route.query};
-        const activeFilters = catalogStore.activeFilters;
-        const availableFilters = catalogStore.availableFilters;
-
-        if (activeFilters.gender !== null) {
-            query.gender = activeFilters.gender;
-        } else {
-            delete query.gender;
-        }
-
-        if (
-            availableFilters?.year &&
-            activeFilters.min_year !== null &&
-            activeFilters.min_year !== availableFilters.year.min
-        ) {
-            query.min_year = activeFilters.min_year;
-        } else {
-            delete query.min_year;
-        }
-
-        if (
-            availableFilters?.year &&
-            activeFilters.max_year !== null &&
-            activeFilters.max_year !== availableFilters.year.max
-        ) {
-            query.max_year = activeFilters.max_year;
-        } else {
-            delete query.max_year;
-        }
-
-        if (catalogStore.searchQuery && catalogStore.searchQuery.trim()) {
-            query.q = catalogStore.searchQuery.trim();
-        } else {
-            delete query.q;
-        }
-
-        return query;
-    };
 
     const itemsPerPageOptions = [8, 12, 16, 20];
 
@@ -101,9 +62,9 @@ export function useCategoryProducts(route) {
 
         try {
             const filters = {};
-            if (catalogStore.activeFilters.gender) filters.gender = catalogStore.activeFilters.gender;
-            if (catalogStore.activeFilters.min_year) filters.min_year = catalogStore.activeFilters.min_year;
-            if (catalogStore.activeFilters.max_year) filters.max_year = catalogStore.activeFilters.max_year;
+            if (categoryStore.activeFilters.gender) filters.gender = categoryStore.activeFilters.gender;
+            if (categoryStore.activeFilters.min_year) filters.min_year = categoryStore.activeFilters.min_year;
+            if (categoryStore.activeFilters.max_year) filters.max_year = categoryStore.activeFilters.max_year;
 
             const result = await categoryService.getProductsByCategory(
                 masterCategoryId.value,
@@ -113,7 +74,7 @@ export function useCategoryProducts(route) {
                 route.query.per_page || 12,
                 ordering,
                 filters,
-                catalogStore.searchQuery
+                categoryStore.searchQuery
             );
 
             products.value = result.products;
@@ -130,9 +91,37 @@ export function useCategoryProducts(route) {
         }
     };
 
+    const filtering = useCategoryFiltering(route, fetchCategoryProducts);
+
+    const fetchCategoryFilters = async () => {
+        if (!masterCategoryId.value) {
+            filtering.setAvailableFilters({gender: null, year: null});
+            return;
+        }
+
+        isLoadingFilters.value = true;
+        filtersError.value = null;
+
+        try {
+            const filters = await categoryService.getFiltersByCategory(
+                masterCategoryId.value,
+                subCategoryId.value,
+                articleTypeId.value
+            );
+
+            filtering.setAvailableFilters(filters || {gender: null, year: null});
+        } catch (err) {
+            filtersError.value = err;
+            filtering.setAvailableFilters({gender: null, year: null});
+            console.error('Error fetching category filters:', err);
+        } finally {
+            isLoadingFilters.value = false;
+        }
+    };
+
     const handlePageChange = (page) => {
         const validPage = ensureValidPage(page);
-        const query = createQueryFromFilters();
+        const query = filtering.createQueryFromFilters();
 
         const routeName = route.name;
         const params = {...route.params};
@@ -150,7 +139,7 @@ export function useCategoryProducts(route) {
     };
 
     const handleItemsPerPageChange = (count) => {
-        const query = createQueryFromFilters();
+        const query = filtering.createQueryFromFilters();
         const routeName = route.name;
         const params = {...route.params};
 
@@ -167,31 +156,8 @@ export function useCategoryProducts(route) {
         fetchCategoryProducts(1, route.query.ordering || '-id');
     };
 
-    const clearAllFilters = () => {
-        catalogStore.clearFilters();
-
-        const newQuery = {};
-        if (route.query.ordering && route.query.ordering !== '-id') {
-            newQuery.ordering = route.query.ordering;
-        }
-        if (route.query.per_page) {
-            newQuery.per_page = route.query.per_page;
-        }
-
-        const routeName = route.name;
-        const params = {...route.params};
-
-        router.push({
-            name: routeName,
-            params,
-            query: newQuery
-        });
-
-        fetchCategoryProducts(1, route.query.ordering || '-id');
-    };
-
     const handleOrderingChange = (ordering) => {
-        const query = createQueryFromFilters();
+        const query = filtering.createQueryFromFilters();
         const routeName = route.name;
         const params = {...route.params};
 
@@ -209,51 +175,35 @@ export function useCategoryProducts(route) {
     };
 
     const clearSearch = () => {
-        catalogStore.clearSearch();
+        filtering.clearSearch();
 
-        const query = {...route.query};
-        delete query.q;
-        delete query.page;
-
+        const query = filtering.createQueryFromFilters();
         const routeName = route.name;
         const params = {...route.params};
 
         router.push({
             name: routeName,
             params,
-            query
+            query: {
+                ...query,
+                page: undefined
+            }
         });
 
         fetchCategoryProducts(1, route.query.ordering || '-id');
     };
 
-    watch(() => route.params, () => {
-        fetchCategoryProducts(parseInt(route.query.page) || 1, route.query.ordering || '-id');
-    }, {deep: true});
+    const initialize = async () => {
+        filtering.loadFiltersFromQuery(route.query);
 
-    watch(() => route.query, (newQuery, oldQuery) => {
-        const filterParamsChanged =
-            newQuery.gender !== oldQuery.gender ||
-            newQuery.min_year !== oldQuery.min_year ||
-            newQuery.max_year !== oldQuery.max_year ||
-            newQuery.q !== oldQuery.q;
+        await fetchCategoryFilters();
 
-        const pageChanged = newQuery.page !== oldQuery.page;
-        const orderingChanged = newQuery.ordering !== oldQuery.ordering;
-        const perPageChanged = newQuery.per_page !== oldQuery.per_page;
+        const page = parseInt(route.query.page) || 1;
+        await fetchCategoryProducts(page, route.query.ordering || '-id');
+    };
 
-        if (filterParamsChanged || pageChanged || orderingChanged || perPageChanged) {
-            const page = parseInt(newQuery.page) || 1;
-            const ordering = newQuery.ordering || '-id';
-
-            fetchCategoryProducts(page, ordering);
-        }
-    }, {deep: true});
-
-    const initialize = () => {
-        catalogStore.loadFiltersFromQuery(route.query);
-
-        fetchCategoryProducts(parseInt(route.query.page) || 1, route.query.ordering || '-id');
+    const cleanup = () => {
+        filtering.clearAvailableFilters();
     };
 
     return {
@@ -263,15 +213,27 @@ export function useCategoryProducts(route) {
         totalPages,
         totalItems,
         currentPage,
+        itemsPerPageOptions,
+        isLoadingFilters,
+        filtersError,
+
         hasProducts,
         isEmpty,
         hasItems,
-        itemsPerPageOptions,
+        masterCategoryId,
+        subCategoryId,
+        articleTypeId,
+
+        ...filtering,
+
+        fetchCategoryProducts,
+        fetchCategoryFilters,
         handlePageChange,
         handleItemsPerPageChange,
-        clearAllFilters,
         handleOrderingChange,
         clearSearch,
-        initialize
+        ensureValidPage,
+        initialize,
+        cleanup
     };
 }

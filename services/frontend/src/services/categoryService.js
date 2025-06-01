@@ -77,4 +77,30 @@ export default {
             throw error;
         }
     },
+    /**
+     * Get available filters for products in specific categories
+     * @param {number} masterCategoryId - Master category ID (required)
+     * @param {number|null} subCategoryId - Subcategory ID (optional)
+     * @param {number|null} articleTypeId - Article type ID (optional)
+     * @returns {Promise<Object>} - Filter options for the specified categories
+     */
+    async getFiltersByCategory(masterCategoryId, subCategoryId = null, articleTypeId = null) {
+        try {
+            let url = `${BASE_URL}/categories/${masterCategoryId}/filters`;
+
+            if (subCategoryId !== null) {
+                url = `${BASE_URL}/categories/${masterCategoryId}/${subCategoryId}/filters`;
+
+                if (articleTypeId !== null) {
+                    url = `${BASE_URL}/categories/${masterCategoryId}/${subCategoryId}/${articleTypeId}/filters`;
+                }
+            }
+
+            const response = await api.get(url);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching category filters:', error);
+            throw error;
+        }
+    }
 };

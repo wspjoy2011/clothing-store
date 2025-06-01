@@ -1,4 +1,4 @@
-import {provide, watch} from 'vue';
+import {provide, watch, computed} from 'vue';
 import {useRouter} from 'vue-router';
 import {useCatalogStore} from '@/stores/catalog';
 
@@ -76,6 +76,11 @@ export function useProductFiltering(route) {
     };
 
     provide('clearAllFilters', clearAllFilters);
+    provide('availableFilters', computed(() => catalogStore.availableFilters));
+    provide('activeFilters', computed(() => catalogStore.activeFilters));
+    provide('hasActiveFilters', computed(() => catalogStore.hasActiveFilters));
+    provide('filtersError', computed(() => catalogStore.filtersError));
+    provide('isLoadingFilters', computed(() => catalogStore.filtersLoading));
 
     watch(() => catalogStore.activeFilters, () => {
         if (catalogStore.isUpdatingFilters) return;

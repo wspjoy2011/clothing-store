@@ -1,5 +1,5 @@
 <template>
-  <v-footer class="footer" elevation="2" app :class="{ 'footer-dark': isDarkTheme }">
+  <v-footer class="footer" elevation="2" :class="{ 'footer-dark': isDarkTheme }">
     <v-container class="py-4">
       <v-row class="align-center">
         <!-- Brand and About (hidden on small screens) -->
@@ -78,7 +78,7 @@ const isDarkTheme = computed(() => preferencesStore.theme === 'dark');
 }
 
 .footer-dark {
-  background: linear-gradient(145deg, #1a1a1a 0%, #2c2c2c 100%) !important;
+  background: linear-gradient(145deg, #1a1a1a 0%, #2c2c2c 100%);
 }
 
 .social-icons {

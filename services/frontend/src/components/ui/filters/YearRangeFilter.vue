@@ -18,29 +18,29 @@
         <!-- Year inputs  -->
         <div class="d-flex align-center mb-4">
           <v-text-field
-            v-model="minYearInput"
-            type="number"
-            variant="outlined"
-            density="compact"
-            hide-details
-            :min="minYear"
-            :max="maxYear"
-            @change="handleMinYearChange"
-            class="year-input"
+              v-model="minYearInput"
+              type="number"
+              variant="outlined"
+              density="compact"
+              hide-details
+              :min="minYear"
+              :max="maxYear"
+              @change="handleMinYearChange"
+              class="year-input"
           ></v-text-field>
 
           <span class="mx-2">—</span>
 
           <v-text-field
-            v-model="maxYearInput"
-            type="number"
-            variant="outlined"
-            density="compact"
-            hide-details
-            :min="minYear"
-            :max="maxYear"
-            @change="handleMaxYearChange"
-            class="year-input"
+              v-model="maxYearInput"
+              type="number"
+              variant="outlined"
+              density="compact"
+              hide-details
+              :min="minYear"
+              :max="maxYear"
+              @change="handleMaxYearChange"
+              class="year-input"
           ></v-text-field>
         </div>
 
@@ -73,28 +73,35 @@
 </template>
 
 <script setup>
-import {ref, computed, watch} from 'vue';
-import {useCatalogStore} from '@/stores/catalog';
+import {ref, computed, watch, inject} from 'vue';
 
-const catalogStore = useCatalogStore();
 const rangeValue = ref([0, 0]);
 const minYearInput = ref('');
 const maxYearInput = ref('');
 
-const filtersLoading = computed(() => catalogStore.filtersLoading);
+const availableFilters = inject('availableFilters', null);
+const categoryAvailableFilters = inject('categoryAvailableFilters', null);
+const activeFilters = inject('activeFilters', null);
+const isLoadingFilters = inject('isLoadingFilters', false);
+
+const currentAvailableFilters = computed(() => {
+  return categoryAvailableFilters?.value || availableFilters?.value;
+});
+
+const filtersLoading = computed(() => isLoadingFilters?.value || false);
 
 const hasYearRange = computed(() => {
-  return catalogStore.availableFilters?.year &&
-      catalogStore.availableFilters.year.min !== null &&
-      catalogStore.availableFilters.year.max !== null;
+  return currentAvailableFilters.value?.year &&
+      currentAvailableFilters.value.year.min !== null &&
+      currentAvailableFilters.value.year.max !== null;
 });
 
 const minYear = computed(() => {
-  return hasYearRange.value ? catalogStore.availableFilters.year.min : 0;
+  return hasYearRange.value ? currentAvailableFilters.value.year.min : 0;
 });
 
 const maxYear = computed(() => {
-  return hasYearRange.value ? catalogStore.availableFilters.year.max : 0;
+  return hasYearRange.value ? currentAvailableFilters.value.year.max : 0;
 });
 
 const isFiltered = computed(() => {
@@ -148,7 +155,7 @@ const resetRange = () => {
   }
 };
 
-watch(() => catalogStore.availableFilters.year, (newYearFilter) => {
+watch(() => currentAvailableFilters.value?.year, (newYearFilter) => {
   if (newYearFilter && newYearFilter.min !== null && newYearFilter.max !== null) {
     rangeValue.value = [newYearFilter.min, newYearFilter.max];
     minYearInput.value = newYearFilter.min.toString();
@@ -157,33 +164,35 @@ watch(() => catalogStore.availableFilters.year, (newYearFilter) => {
 }, {immediate: true});
 
 watch(rangeValue, (newVal) => {
-  if (hasYearRange.value) {
-    minYearInput.value = newVal[0].toString();
-    maxYearInput.value = newVal[1].toString();
+  if (!hasYearRange.value || !activeFilters) return;
 
-    if (newVal[0] !== catalogStore.activeFilters.min_year ||
-        newVal[1] !== catalogStore.activeFilters.max_year) {
-      catalogStore.setFilter('year', newVal);
-    }
+  minYearInput.value = newVal[0].toString();
+  maxYearInput.value = newVal[1].toString();
+
+  if (newVal[0] === minYear.value && newVal[1] === maxYear.value) {
+    activeFilters.value.min_year = null;
+    activeFilters.value.max_year = null;
+  } else {
+    activeFilters.value.min_year = newVal[0];
+    activeFilters.value.max_year = newVal[1];
   }
 }, {deep: true});
 
 watch([
-  () => catalogStore.activeFilters.min_year,
-  () => catalogStore.activeFilters.max_year
+  () => activeFilters?.value?.min_year,
+  () => activeFilters?.value?.max_year
 ], ([newMin, newMax]) => {
-  if (hasYearRange.value) {
-    if (newMin === null && newMax === null) {
-      resetRange();
-    } else if (newMin !== null && newMax !== null &&
+  if (!hasYearRange.value) return;
+
+  if (newMin === null && newMax === null) {
+    resetRange();
+  } else if (newMin !== null && newMax !== null &&
       (rangeValue.value[0] !== newMin || rangeValue.value[1] !== newMax)) {
-      rangeValue.value = [newMin, newMax];
-      minYearInput.value = newMin.toString();
-      maxYearInput.value = newMax.toString();
-    }
+    rangeValue.value = [newMin, newMax];
+    minYearInput.value = newMin.toString();
+    maxYearInput.value = newMax.toString();
   }
 }, {immediate: true});
-
 </script>
 
 <style scoped>
