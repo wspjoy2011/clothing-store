@@ -28,6 +28,14 @@ class AppConfig(BaseSettings):
     # CORS settings
     FRONTEND_CORS_ORIGINS: str
 
+    # Elasticsearch settings
+    ELASTICSEARCH_HOST: str
+    ELASTICSEARCH_PORT: int
+    ELASTICSEARCH_USER: str
+    ELASTICSEARCH_PASSWORD: str
+    ELASTICSEARCH_SCHEME: str
+    ELASTICSEARCH_PRODUCTS_INDEX: str
+
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8"
@@ -47,6 +55,29 @@ class AppConfig(BaseSettings):
     def CORS_ORIGINS(self) -> list[str]:
         """Parse the comma-separated list of allowed origins for CORS"""
         return [origin.strip() for origin in self.FRONTEND_CORS_ORIGINS.split(",")]
+
+    @property
+    def ELASTICSEARCH_URL(self) -> str:
+        """Full Elasticsearch URL for client connection"""
+        return f"{self.ELASTICSEARCH_SCHEME}://{self.ELASTICSEARCH_HOST}:{self.ELASTICSEARCH_PORT}"
+
+    @property
+    def ELASTICSEARCH_AUTH(self) -> tuple[str, str]:
+        """Elasticsearch authentication tuple (username, password)"""
+        return (self.ELASTICSEARCH_USER, self.ELASTICSEARCH_PASSWORD)
+
+    @property
+    def ELASTICSEARCH_CLIENT_CONFIG(self) -> dict:
+        """Complete configuration dictionary for Elasticsearch client"""
+        return {
+            "hosts": [self.ELASTICSEARCH_URL],
+            "http_auth": self.ELASTICSEARCH_AUTH,
+            "verify_certs": False,
+            "ssl_show_warn": False,
+            "request_timeout": 30,
+            "retry_on_timeout": True,
+            "max_retries": 3
+        }
 
 
 # Global config instance

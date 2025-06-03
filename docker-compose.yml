@@ -30,7 +30,7 @@ services:
       context: services/frontend
       dockerfile: Dockerfile
     container_name: clothing-store-frontend
-    command: ["npm", "run", "dev", "--", "--config", "/usr/src/clothing-store/frontend/vite.config.js"]
+    command: [ "npm", "run", "dev", "--", "--config", "/usr/src/clothing-store/frontend/vite.config.js" ]
     env_file:
       - services/frontend/.env
     environment:
@@ -83,11 +83,117 @@ services:
     networks:
       - clothing_store_network
 
+  elasticsearch:
+    image: 'docker.elastic.co/elasticsearch/elasticsearch:9.0.1'
+    restart: unless-stopped
+    container_name: elasticsearch_clothing_store
+    env_file:
+      - services/backend/.env
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=clothing-store-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=true
+      - xpack.security.enrollment.enabled=false
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - elasticsearch_clothing_store_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - clothing_store_network
+    healthcheck:
+      test: >
+        sh -c "curl -u elastic:${ELASTICSEARCH_PASSWORD} -f http://localhost:9200/_cluster/health || exit 1"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  elasticsearch-setup:
+    image: curlimages/curl
+    container_name: elasticsearch_setup_clothing_store
+    env_file:
+      - services/backend/.env
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - clothing_store_network
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - |
+        echo 'Waiting for Elasticsearch to be ready...'
+        sleep 30
+        echo "Checking if index ${ELASTICSEARCH_PRODUCTS_INDEX} exists..."
+        if curl -s -o /dev/null -w "%{http_code}" -u "${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}" \
+          "${ELASTICSEARCH_SCHEME}://${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}/${ELASTICSEARCH_PRODUCTS_INDEX}" | grep -q "200"; then
+          echo "Index already exists — skipping creation"
+          exit 0
+        else
+          echo "Creating index ${ELASTICSEARCH_PRODUCTS_INDEX}..."
+          curl -u "${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD}" \
+            -X PUT "${ELASTICSEARCH_SCHEME}://${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}/${ELASTICSEARCH_PRODUCTS_INDEX}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "mappings": {
+                "properties": {
+                  "product_display_name": {
+                    "type": "completion",
+                    "analyzer": "simple",
+                    "preserve_separators": true,
+                    "preserve_position_increments": true,
+                    "max_input_length": 50
+                  }
+                }
+              },
+              "settings": {
+                "number_of_shards": 1,
+                "number_of_replicas": 0
+              }
+            }'
+        fi
+
+  backend-runner:
+    build:
+      context: services/backend
+      dockerfile: Dockerfile
+    container_name: clothing-store-backend-runner
+    env_file:
+      - services/backend/.env
+    environment:
+      - PYTHONPATH=/usr/src/clothing-store/backend
+    volumes:
+      - ./services/backend/src:/usr/src/clothing-store/backend
+      - ./dataset:/usr/src/dataset
+      - ./logs:/usr/src/logs
+    networks:
+      - clothing_store_network
+    profiles:
+      - tools
+    command: [ "tail", "-f", "/dev/null" ]
 
 volumes:
   postgres_clothing_store_data:
     driver: local
   pgadmin_clothing_store_data:
+    driver: local
+  elasticsearch_clothing_store_data:
     driver: local
 
 networks:
