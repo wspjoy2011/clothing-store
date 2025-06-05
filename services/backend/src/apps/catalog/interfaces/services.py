@@ -114,3 +114,17 @@ class CatalogServiceInterface(ABC):
             CategoryMenuDTO: The complete category hierarchy if categories is empty
         """
         pass
+
+    @abstractmethod
+    async def get_product_suggestions(self, query: str, limit: int = 10) -> list[str]:
+        """
+        Get product name suggestions for autocomplete
+
+        Args:
+            query: Search query string
+            limit: Maximum number of suggestions to return
+
+        Returns:
+            List of product name suggestions
+        """
+        pass

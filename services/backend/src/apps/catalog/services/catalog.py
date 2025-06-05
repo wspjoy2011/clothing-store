@@ -15,6 +15,7 @@ from apps.catalog.interfaces.specifications import (
     SearchSpecificationInterface,
     CategorySpecificationInterface
 )
+from search.interfaces import AutocompleteClientInterface
 
 PaginationSpecificationFactory = Callable[[int, int], PaginationSpecificationInterface]
 OrderingSpecificationFactory = Callable[[Optional[str]], OrderingSpecificationInterface]
@@ -34,7 +35,8 @@ class CatalogService(CatalogServiceInterface):
             ordering_specification_factory: OrderingSpecificationFactory,
             filter_specification_factory: FilterSpecificationFactory,
             search_specification_factory: SearchSpecificationFactory,
-            category_specification_factory: CategorySpecificationFactory
+            category_specification_factory: CategorySpecificationFactory,
+            autocomplete_client: AutocompleteClientInterface
     ):
         """
         Initialize catalog service
@@ -47,6 +49,7 @@ class CatalogService(CatalogServiceInterface):
             filter_specification_factory: Factory for creating filter specifications
             search_specification_factory: Factory for creating search specifications
             category_specification_factory: Factory for creating category specifications
+            autocomplete_client: Client for autocomplete operations
         """
         self._product_repository = product_repository
         self._category_repository = category_repository
@@ -55,6 +58,7 @@ class CatalogService(CatalogServiceInterface):
         self._filter_specification_factory = filter_specification_factory
         self._search_specification_factory = search_specification_factory
         self._category_specification_factory = category_specification_factory
+        self._autocomplete_client = autocomplete_client
 
     async def get_products(
             self,
@@ -235,3 +239,16 @@ class CatalogService(CatalogServiceInterface):
             CategoryMenuDTO: The complete category hierarchy if categories is empty
         """
         return await self._category_repository.get_category_menu()
+
+    async def get_product_suggestions(self, query: str, limit: int = 10) -> list[str]:
+        """
+        Get product name suggestions for autocomplete
+
+        Args:
+            query: Search query string
+            limit: Maximum number of suggestions to return
+
+        Returns:
+            List of product name suggestions
+        """
+        return await self._autocomplete_client.get_suggestions(query, limit)

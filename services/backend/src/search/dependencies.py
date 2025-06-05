@@ -25,23 +25,16 @@ def _get_autocomplete_client_instance() -> ElasticsearchAutocompleteClient:
     )
 
 
-@asynccontextmanager
-async def get_autocomplete_client() -> AsyncGenerator[AutocompleteClientInterface, None]:
+def get_autocomplete_client() -> AutocompleteClientInterface:
     """
-    Dependency injection for autocomplete client with proper lifecycle management.
+    Dependency injection for autocomplete client.
 
-    Yields:
+    Returns:
         Configured autocomplete client instance
     """
     client = _get_autocomplete_client_instance()
-    try:
-        logger.debug("Providing autocomplete client dependency")
-        yield client
-    except Exception as e:
-        logger.error(f"Error in autocomplete client dependency: {e}")
-        raise
-    finally:
-        logger.debug("Autocomplete client dependency completed")
+    logger.debug("Providing autocomplete client dependency")
+    return client
 
 
 async def cleanup_autocomplete_client():

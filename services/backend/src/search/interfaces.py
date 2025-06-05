@@ -8,7 +8,7 @@ class AutocompleteClientInterface(ABC):
     """
 
     @abstractmethod
-    async def suggest_products(self, query: str, size: int = 10) -> List[str]:
+    async def get_suggestions(self, query: str, size: int = 10) -> List[str]:
         """
         Get product name suggestions based on partial input.
 

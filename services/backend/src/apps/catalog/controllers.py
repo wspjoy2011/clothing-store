@@ -280,3 +280,31 @@ async def get_filters_by_categories_controller(
             max=filters_dto.year.max
         ) if filters_dto.year else None
     )
+
+
+async def get_product_suggestions_controller(
+        query: str,
+        limit: int,
+        catalog_service: CatalogServiceInterface,
+) -> list[str]:
+    """
+    Controller for getting product name suggestions for autocomplete
+
+    Args:
+        query: Search query string
+        limit: Maximum number of suggestions to return
+        catalog_service: Catalog service for data access
+
+    Returns:
+        List of product name suggestions
+
+    Raises:
+        HTTPException: If query is too short or empty
+    """
+    if not query.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Search query must be at least 1 character long"
+        )
+
+    return await catalog_service.get_product_suggestions(query.strip(), limit)

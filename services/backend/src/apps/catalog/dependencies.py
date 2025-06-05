@@ -17,6 +17,8 @@ from apps.catalog.repositories.product import ProductRepository
 from apps.catalog.services.catalog import CatalogService
 from db.dependencies import get_database_dao, get_query_builder
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
+from search.dependencies import get_autocomplete_client
+from search.interfaces import AutocompleteClientInterface
 
 
 async def get_product_repository(
@@ -109,6 +111,7 @@ async def get_catalog_service(
         filter_specification_factory: callable = Depends(get_filter_specification_factory),
         search_specification_factory: callable = Depends(get_search_specification_factory),
         category_specification_factory: callable = Depends(get_category_specification_factory),
+        autocomplete_client: AutocompleteClientInterface = Depends(get_autocomplete_client),
 ) -> CatalogServiceInterface:
     """
     Dependency for getting catalog service.
@@ -121,6 +124,7 @@ async def get_catalog_service(
         filter_specification_factory: Factory for creating filter specifications
         search_specification_factory: Factory for creating search specifications
         category_specification_factory: Factory for creating category specifications
+        autocomplete_client: Autocomplete client for product suggestions
 
     Returns:
         Initialized catalog service
@@ -133,4 +137,5 @@ async def get_catalog_service(
         filter_specification_factory=filter_specification_factory,
         search_specification_factory=search_specification_factory,
         category_specification_factory=category_specification_factory,
+        autocomplete_client=autocomplete_client,
     )

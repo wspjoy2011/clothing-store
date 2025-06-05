@@ -85,7 +85,7 @@ class ElasticsearchAutocompleteClient(AutocompleteClientInterface):
             if client:
                 logger.debug("Elasticsearch client context closed")
 
-    async def suggest_products(self, query: str, size: int = 10) -> List[str]:
+    async def get_suggestions(self, query: str, size: int = 10) -> List[str]:
         """
         Get product name suggestions using Elasticsearch completion suggester.
 
