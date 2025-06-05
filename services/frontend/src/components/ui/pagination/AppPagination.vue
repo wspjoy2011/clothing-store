@@ -13,6 +13,8 @@
 </template>
 
 <script setup>
+import { inject } from 'vue';
+
 const props = defineProps({
   currentPage: {
     type: Number,
@@ -30,7 +32,13 @@ const props = defineProps({
 
 const emit = defineEmits(['update:page']);
 
+const categoryHandlers = inject('categoryPaginationHandlers', null);
+
 const updatePage = (page) => {
-  emit('update:page', page);
+  if (categoryHandlers?.handlePageChange) {
+    categoryHandlers.handlePageChange(page);
+  } else {
+    emit('update:page', page);
+  }
 };
 </script>

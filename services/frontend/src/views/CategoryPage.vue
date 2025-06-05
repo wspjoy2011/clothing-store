@@ -287,7 +287,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, onUnmounted, provide} from 'vue';
+import {computed, onMounted, onUnmounted, provide, watch} from 'vue';
 import {useRoute} from 'vue-router';
 import {useCategoryStore} from '@/stores/categoryStore';
 import {useCategoryProducts} from '@/composables/catalog/useCategoryProducts';
@@ -380,6 +380,9 @@ const {
   clearAllFilters,
 
   initialize,
+  cleanup,
+  disableFilterWatcher,
+  enableFilterWatcher,
 } = useCategoryProducts(route);
 
 provide('categoryAvailableFilters', availableFilters);
@@ -387,24 +390,44 @@ provide('filtersError', filtersError);
 provide('hasActiveFilters', computed(() => categoryStore.hasActiveFilters));
 provide('clearAllFilters', clearAllFilters);
 
-const cleanup = () => {
+watch(
+  () => [route.params.masterCategory, route.params.subCategory, route.params.articleType],
+  async (newParams, oldParams) => {
+    if (newParams.some((param, index) => param !== oldParams?.[index])) {
+      console.log('Category route changed, reinitializing...');
+
+      disableFilterWatcher();
+
+      categoryStore.resetCategoryFilters();
+
+      if (!categoryStore.hasCategories) {
+        await categoryStore.fetchCategoryMenu();
+      }
+
+      await initialize();
+
+      enableFilterWatcher();
+    }
+  },
+  { immediate: false }
+);
+
+const cleanupComponent = () => {
   if (categoryStore.isFilterDrawerOpen) {
     categoryStore.toggleFilterDrawer(false);
   }
+  cleanup();
 };
 
-onMounted(() => {
+onMounted(async () => {
   if (!categoryStore.hasCategories) {
-    categoryStore.fetchCategoryMenu().then(() => {
-      initialize();
-    });
-  } else {
-    initialize();
+    await categoryStore.fetchCategoryMenu();
   }
+  await initialize();
 });
 
 onUnmounted(() => {
-  cleanup();
+  cleanupComponent();
 });
 </script>
 

@@ -11,7 +11,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted, watch, inject } from 'vue';
 import { useUserPreferencesStore } from '@/stores/userPreferences';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -26,6 +26,8 @@ const emit = defineEmits(['update:perPage']);
 const preferencesStore = useUserPreferencesStore();
 const route = useRoute();
 const router = useRouter();
+
+const categoryHandlers = inject('categoryPaginationHandlers', null);
 
 onMounted(() => {
   if (route.query.per_page) {
@@ -52,8 +54,13 @@ const selectedValue = computed({
   get: () => preferencesStore.itemsPerPage,
   set: (value) => {
     preferencesStore.setItemsPerPage(value);
-    updateUrlWithPerPage(value);
-    emit('update:perPage', value);
+
+    if (categoryHandlers?.handleItemsPerPageChange) {
+      categoryHandlers.handleItemsPerPageChange(value);
+    } else {
+      updateUrlWithPerPage(value);
+      emit('update:perPage', value);
+    }
   }
 });
 

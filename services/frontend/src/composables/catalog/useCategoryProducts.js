@@ -1,4 +1,4 @@
-import {ref, computed, watch, provide} from 'vue';
+import {ref, computed, provide} from 'vue';
 import {useRouter} from 'vue-router';
 import {useCategoryStore} from '@/stores/categoryStore';
 import {useCategoryFiltering} from './useCategoryFiltering';
@@ -131,11 +131,13 @@ export function useCategoryProducts(route) {
             params,
             query: {
                 ...query,
-                page: validPage > 1 ? validPage : undefined
+                page: validPage > 1 ? validPage : undefined,
+                ordering: route.query.ordering !== '-id' ? route.query.ordering : undefined,
+                per_page: route.query.per_page
             }
+        }).then(() => {
+            fetchCategoryProducts(validPage, route.query.ordering || '-id');
         });
-
-        fetchCategoryProducts(validPage, route.query.ordering || '-id');
     };
 
     const handleItemsPerPageChange = (count) => {
@@ -149,11 +151,12 @@ export function useCategoryProducts(route) {
             query: {
                 ...query,
                 page: undefined,
-                per_page: count
+                per_page: count,
+                ordering: route.query.ordering !== '-id' ? route.query.ordering : undefined
             }
+        }).then(() => {
+            fetchCategoryProducts(1, route.query.ordering || '-id');
         });
-
-        fetchCategoryProducts(1, route.query.ordering || '-id');
     };
 
     const handleOrderingChange = (ordering) => {
@@ -167,11 +170,12 @@ export function useCategoryProducts(route) {
             query: {
                 ...query,
                 page: undefined,
-                ordering: ordering !== '-id' ? ordering : undefined
+                ordering: ordering !== '-id' ? ordering : undefined,
+                per_page: route.query.per_page
             }
+        }).then(() => {
+            fetchCategoryProducts(1, ordering);
         });
-
-        fetchCategoryProducts(1, ordering);
     };
 
     const clearSearch = () => {
@@ -186,18 +190,30 @@ export function useCategoryProducts(route) {
             params,
             query: {
                 ...query,
-                page: undefined
+                page: undefined,
+                ordering: route.query.ordering !== '-id' ? route.query.ordering : undefined,
+                per_page: route.query.per_page
             }
+        }).then(() => {
+            fetchCategoryProducts(1, route.query.ordering || '-id');
         });
-
-        fetchCategoryProducts(1, route.query.ordering || '-id');
     };
+
+    provide('categoryPaginationHandlers', {
+        handlePageChange,
+        handleItemsPerPageChange
+    });
+
+    provide('categoryPaginationData', {
+        currentPage: computed(() => currentPage.value),
+        totalPages: computed(() => totalPages.value),
+        hasItems: computed(() => hasItems.value),
+        itemsPerPageOptions
+    });
 
     const initialize = async () => {
         filtering.loadFiltersFromQuery(route.query);
-
         await fetchCategoryFilters();
-
         const page = parseInt(route.query.page) || 1;
         await fetchCategoryProducts(page, route.query.ordering || '-id');
     };

@@ -53,5 +53,30 @@ export default {
 
         const response = await api.get(`${BASE_URL}/products/filters`, {params});
         return response.data;
+    },
+
+    /**
+     * Get product name suggestions for autocomplete
+     * @param {string} query - Search query (minimum 1 character)
+     * @param {number} limit - Maximum number of suggestions to return
+     * @returns {Promise<string[]>} - Array of product name suggestions
+     */
+    async getProductSuggestions(query, limit = 10) {
+        if (!query || query.trim().length === 0) {
+            return [];
+        }
+
+        const params = {
+            q: query.trim(),
+            limit: Math.min(limit, 20)
+        };
+
+        try {
+            const response = await api.get(`${BASE_URL}/products/suggestions`, { params });
+            return response.data || [];
+        } catch (error) {
+            console.error('Error fetching product suggestions:', error);
+            return [];
+        }
     }
 }

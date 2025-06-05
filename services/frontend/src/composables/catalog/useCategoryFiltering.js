@@ -1,10 +1,12 @@
-import {computed, watch, provide} from 'vue';
+import {computed, watch, provide, ref} from 'vue';
 import {useRouter} from 'vue-router';
 import {useCategoryStore} from '@/stores/categoryStore';
 
 export function useCategoryFiltering(route, fetchProducts) {
     const router = useRouter();
     const categoryStore = useCategoryStore();
+
+    const isChangingCategory = ref(false);
 
     const createQueryFromFilters = () => {
         const query = {...route.query};
@@ -86,7 +88,7 @@ export function useCategoryFiltering(route, fetchProducts) {
     provide('isLoadingFilters', computed(() => categoryStore.filtersLoading));
 
     watch(() => categoryStore.activeFilters, () => {
-        if (categoryStore.isUpdatingFilters) return;
+        if (categoryStore.isUpdatingFilters || isChangingCategory.value) return;
 
         const drawerWasOpen = categoryStore.isFilterDrawerOpen;
 
@@ -110,6 +112,14 @@ export function useCategoryFiltering(route, fetchProducts) {
         });
     }, {deep: true});
 
+    const disableFilterWatcher = () => {
+        isChangingCategory.value = true;
+    };
+
+    const enableFilterWatcher = () => {
+        isChangingCategory.value = false;
+    };
+
     return {
         availableFilters: computed(() => categoryStore.availableFilters),
         activeFilters: computed(() => categoryStore.activeFilters),
@@ -129,6 +139,8 @@ export function useCategoryFiltering(route, fetchProducts) {
         toggleFilterDrawer: (state) => categoryStore.toggleFilterDrawer(state),
         loadFiltersFromQuery: (query) => categoryStore.loadFiltersFromQuery(query),
         createQueryFromFilters,
-        clearAllFilters
+        clearAllFilters,
+        disableFilterWatcher,
+        enableFilterWatcher
     };
 }
