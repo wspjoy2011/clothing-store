@@ -34,4 +34,3 @@ async def get_connection_pool() -> AsyncConnectionPool:
         await _pool.open()
         await _pool.wait()
     return _pool
-

@@ -10,10 +10,11 @@ services:
       - services/backend/.env
     environment:
       - LOG_LEVEL=debug
-      - PYTHONPATH=/usr/src/clothing-store/backend
+      - PYTHONPATH=/usr/src/clothing-store/backend:/usr/src/clothing-store
       - WATCHFILES_FORCE_POLLING=true
     volumes:
       - ./services/backend/src:/usr/src/clothing-store/backend
+      - ./services/backend/migrations:/usr/src/clothing-store/migrations
       - ./dataset:/usr/src/dataset
       - ./logs:/usr/src/logs
     depends_on:
@@ -177,9 +178,10 @@ services:
     env_file:
       - services/backend/.env
     environment:
-      - PYTHONPATH=/usr/src/clothing-store/backend
+      - PYTHONPATH=/usr/src/clothing-store/backend:/usr/src/clothing-store
     volumes:
       - ./services/backend/src:/usr/src/clothing-store/backend
+      - ./services/backend/migrations:/usr/src/clothing-store/migrations
       - ./dataset:/usr/src/dataset
       - ./logs:/usr/src/logs
     networks:

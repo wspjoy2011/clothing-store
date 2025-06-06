@@ -1,5 +1,9 @@
 FROM python:3.12.9
 
+# Define application root directory
+ARG APP_ROOT=/usr/src/clothing-store
+ENV APP_ROOT=${APP_ROOT}
+
 # Python configuration
 # Don't write .pyc files
 # Output logs immediately
@@ -32,13 +36,16 @@ RUN poetry config virtualenvs.create false && \
     poetry install --no-root --only main
 
 # Set working directory for the app itself
-WORKDIR /usr/src/clothing-store/backend
+WORKDIR ${APP_ROOT}/backend
 
 # Copy source code into the container
 COPY src .
 
 # Copy commands into the container
 COPY commands /commands
+
+# Copy migrations into the container
+COPY migrations ${APP_ROOT}/migrations
 
 # Ensure Unix-style line endings for scripts
 RUN dos2unix /commands/*.sh
