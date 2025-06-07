@@ -4,6 +4,7 @@ PRODUCT_EXAMPLE1 = {
     "year": 2023,
     "product_display_name": "Running Shoes",
     "image_url": "https://example.com/product1.jpg",
+    "slug": "running-shoes-1",
 }
 
 PRODUCT_EXAMPLE2 = {
@@ -12,6 +13,7 @@ PRODUCT_EXAMPLE2 = {
     "year": 2022,
     "product_display_name": "Comfortable Sandals",
     "image_url": "https://example.com/product2.jpg",
+    "slug": "comfortable-sandals-2",
 }
 
 PRODUCT_EXAMPLE3 = {
@@ -20,6 +22,7 @@ PRODUCT_EXAMPLE3 = {
     "year": 2023,
     "product_display_name": "Floral Blouse",
     "image_url": "https://example.com/product3.jpg",
+    "slug": "floral-blouse-3",
 }
 
 PRODUCT_EXAMPLE5 = {
@@ -28,6 +31,7 @@ PRODUCT_EXAMPLE5 = {
     "year": 2020,
     "product_display_name": "Classic Denim Jeans",
     "image_url": "https://example.com/product5.jpg",
+    "slug": "classic-denim-jeans-5",
 }
 
 PRODUCT_EXAMPLE8 = {
@@ -36,6 +40,7 @@ PRODUCT_EXAMPLE8 = {
     "year": 2020,
     "product_display_name": "Summer Dress",
     "image_url": "https://example.com/product8.jpg",
+    "slug": "summer-dress-8",
 }
 
 PRODUCT_EXAMPLE14 = {
@@ -44,6 +49,7 @@ PRODUCT_EXAMPLE14 = {
     "year": 2021,
     "product_display_name": "Leather Jacket",
     "image_url": "https://example.com/product14.jpg",
+    "slug": "leather-jacket-14",
 }
 
 PRODUCT_EXAMPLE17 = {
@@ -52,6 +58,7 @@ PRODUCT_EXAMPLE17 = {
     "year": 2020,
     "product_display_name": "Winter Coat",
     "image_url": "https://example.com/product17.jpg",
+    "slug": "winter-coat-17",
 }
 
 STANDARD_RESPONSE_VALUE = {

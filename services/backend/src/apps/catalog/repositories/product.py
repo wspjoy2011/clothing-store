@@ -163,6 +163,7 @@ class ProductRepository(ProductRepositoryInterface):
                 year=int(row[2]),
                 product_display_name=row[3],
                 image_url=row[4],
+                slug=row[5],
             )
             for row in (result or [])
         ]
@@ -283,7 +284,7 @@ class ProductRepository(ProductRepositoryInterface):
             category_spec: Optional[CategorySpecificationInterface] = None
     ) -> None:
         self._query_builder.reset().select(
-            "product_id", "gender", "year", "product_display_name", "image_url"
+            "product_id", "gender", "year", "product_display_name", "image_url", "slug"
         )
 
         if category_spec and not category_spec.is_empty():
