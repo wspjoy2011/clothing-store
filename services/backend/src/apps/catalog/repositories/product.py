@@ -65,6 +65,39 @@ class ProductRepository(ProductRepositoryInterface):
             slug=result[5],
         )
 
+    async def get_product_by_slug(self, slug: str) -> Optional[ProductDTO]:
+        """
+        Get a single product by its slug
+
+        Args:
+            slug: The slug of the product to retrieve
+
+        Returns:
+            ProductDTO if found, None otherwise
+        """
+        query = f"""
+            SELECT product_id, gender, year, product_display_name, image_url, slug
+            FROM {self.APP_NAME}_products 
+            WHERE slug = %s
+        """
+
+        logger.info(f"Get product by slug query: {query}")
+        logger.info(f"Get product by slug params: [{slug}]")
+
+        result = await self._dao.execute(query, [slug], fetch_one=True)
+
+        if not result:
+            return None
+
+        return ProductDTO(
+            product_id=int(result[0]),
+            gender=result[1],
+            year=int(result[2]),
+            product_display_name=result[3],
+            image_url=result[4],
+            slug=result[5],
+        )
+
     async def get_products_with_specifications(
             self,
             pagination_spec: PaginationSpecificationInterface,

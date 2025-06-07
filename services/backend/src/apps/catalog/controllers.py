@@ -96,6 +96,34 @@ async def get_product_by_id_controller(
     return ProductSchema(**asdict(product_dto))
 
 
+async def get_product_by_slug_controller(
+        slug: str,
+        catalog_service: CatalogServiceInterface,
+) -> ProductSchema:
+    """
+    Controller for getting detailed information about a single product by slug
+
+    Args:
+        slug: The slug of the product to retrieve
+        catalog_service: Catalog service for data access
+
+    Returns:
+        ProductSchema with detailed product information
+
+    Raises:
+        HTTPException: If product is not found (404)
+    """
+    product_dto = await catalog_service.get_product_by_slug(slug)
+
+    if product_dto is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Product with slug '{slug}' not found"
+        )
+
+    return ProductSchema(**asdict(product_dto))
+
+
 async def get_filters_controller(
         catalog_service: CatalogServiceInterface,
         q: Optional[str] = None

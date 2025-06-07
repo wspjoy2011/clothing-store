@@ -10,12 +10,12 @@
         <v-progress-circular color="primary" indeterminate size="30"/>
       </div>
       <v-img
-        :src="props.product.image_url"
-        height="250"
-        cover
-        class="product-image"
-        @load="imageLoaded"
-        @error="imageLoaded"
+          :src="props.product.image_url"
+          height="250"
+          cover
+          class="product-image"
+          @load="imageLoaded"
+          @error="imageLoaded"
       />
     </div>
 
@@ -29,7 +29,13 @@
     </v-card-subtitle>
 
     <v-card-actions>
-      <v-btn color="primary" variant="flat" class="text-none" block>
+      <v-btn
+          color="primary"
+          variant="flat"
+          class="text-none"
+          block
+          @click="goToProductDetail"
+      >
         View Details
       </v-btn>
     </v-card-actions>
@@ -37,7 +43,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import {ref} from 'vue';
+import {useRouter} from 'vue-router';
 
 const props = defineProps({
   product: {
@@ -49,17 +56,28 @@ const props = defineProps({
         'gender',
         'year',
         'product_display_name',
-        'image_url'
+        'image_url',
+        'slug'
       ].every(prop => prop in product);
     }
   }
 });
 
+const router = useRouter();
 const hover = ref(false);
 const imageLoading = ref(true);
 
 const imageLoaded = () => {
   imageLoading.value = false;
+};
+
+const goToProductDetail = () => {
+  router.push({
+    name: 'product-detail',
+    params: {
+      productSlug: props.product.slug
+    }
+  });
 };
 </script>
 
@@ -67,6 +85,7 @@ const imageLoaded = () => {
 .product-card {
   transition: transform 0.2s ease-in-out;
   width: 100%;
+  cursor: pointer;
 }
 
 .product-card:hover {

@@ -24,100 +24,82 @@
   </div>
 </template>
 
-<script>
-import { mapActions, mapState } from 'pinia';
-import { useCategoryStore } from '@/stores/categoryStore';
+<script setup>
+import { ref, computed, onMounted } from 'vue';
 import { useTheme } from 'vuetify';
+import { useCategoryStore } from '@/stores/categoryStore';
 import CategoryMenuItem from './CategoryMenuItem.vue';
 
-export default {
-  name: 'CategoryMenu',
-
-  components: {
-    CategoryMenuItem
+const props = defineProps({
+  propCategories: {
+    type: Array,
+    default: null
   },
-
-  props: {
-    propCategories: {
-      type: Array,
-      default: null
-    },
-    propLoading: {
-      type: Boolean,
-      default: null
-    },
-    propError: {
-      type: [String, Object],
-      default: null
-    },
-    propHasCategories: {
-      type: Boolean,
-      default: null
-    }
+  propLoading: {
+    type: Boolean,
+    default: null
   },
-
-  data() {
-    return {
-      storeCategories: [],
-      storeLoading: false,
-      storeError: null
-    };
+  propError: {
+    type: [String, Object],
+    default: null
   },
-
-  computed: {
-    ...mapState(useCategoryStore, ['categories']),
-    
-    categoriesData() {
-      return this.propCategories !== null ? this.propCategories : this.categories;
-    },
-
-    isLoading() {
-      return this.propLoading !== null ? this.propLoading : this.storeLoading;
-    },
-
-    hasError() {
-      return this.propError !== null ? this.propError : this.storeError;
-    },
-
-    categoriesExist() {
-      return this.propHasCategories !== null ? this.propHasCategories : this.categories.length > 0;
-    },
-
-    isDarkTheme() {
-      const theme = useTheme();
-      return theme.global.current.value.dark;
-    }
-  },
-
-  methods: {
-    ...mapActions(useCategoryStore, ['fetchCategoryMenu', 'navigateToCategory']),
-
-    handleCategoryClick(categoryInfo) {
-      console.log('Category clicked:', categoryInfo);
-      this.navigateToCategory(categoryInfo);
-    },
-
-    async loadFromStore() {
-      const store = useCategoryStore();
-      this.storeLoading = true;
-
-      try {
-        await store.fetchCategoryMenu();
-        this.storeError = store.error;
-      } catch (error) {
-        this.storeError = error.message || 'Failed to load categories';
-      } finally {
-        this.storeLoading = false;
-      }
-    }
-  },
-
-  created() {
-    if (this.propCategories === null && !this.propHasCategories && !this.propLoading) {
-      this.loadFromStore();
-    }
+  propHasCategories: {
+    type: Boolean,
+    default: null
   }
-}
+});
+
+const theme = useTheme();
+const categoryStore = useCategoryStore();
+
+const storeLoading = ref(false);
+const storeError = ref(null);
+
+const isDarkTheme = computed(() => {
+  return theme.global.current.value.dark;
+});
+
+const categoriesData = computed(() => {
+  return props.propCategories !== null ? props.propCategories : categoryStore.categories;
+});
+
+const isLoading = computed(() => {
+  return props.propLoading !== null ? props.propLoading : storeLoading.value;
+});
+
+const hasError = computed(() => {
+  return props.propError !== null ? props.propError : storeError.value;
+});
+
+const categoriesExist = computed(() => {
+  return props.propHasCategories !== null ? props.propHasCategories : categoryStore.categories.length > 0;
+});
+
+// Methods
+const handleCategoryClick = (categoryInfo) => {
+  console.log('Category clicked:', categoryInfo);
+  categoryStore.navigateToCategory(categoryInfo);
+};
+
+const loadFromStore = async () => {
+  storeLoading.value = true;
+
+  try {
+    await categoryStore.fetchCategoryMenu();
+    storeError.value = categoryStore.error;
+  } catch (error) {
+    storeError.value = error.message || 'Failed to load categories';
+  } finally {
+    storeLoading.value = false;
+  }
+};
+
+// Lifecycle
+onMounted(() => {
+  if (props.propCategories === null && !props.propHasCategories && !props.propLoading) {
+    loadFromStore();
+  }
+});
 </script>
 
 <style scoped>

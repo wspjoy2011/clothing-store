@@ -40,6 +40,26 @@ export default {
     },
 
     /**
+     * Get a single product by ID
+     * @param {number} productId - Product ID
+     * @returns {Promise<Object>} - Product data
+     */
+    async getProductById(productId) {
+        const response = await api.get(`${BASE_URL}/products/${productId}`);
+        return response.data;
+    },
+
+    /**
+     * Get a single product by slug
+     * @param {string} slug - Product slug
+     * @returns {Promise<Object>} - Product data
+     */
+    async getProductBySlug(slug) {
+        const response = await api.get(`${BASE_URL}/products/slug/${slug}`);
+        return response.data;
+    },
+
+    /**
      * Get available filters for products
      * @param {string|null} searchQuery - Optional search query to filter results
      * @returns {Promise<Object>} - Filter options
@@ -72,7 +92,7 @@ export default {
         };
 
         try {
-            const response = await api.get(`${BASE_URL}/products/suggestions`, { params });
+            const response = await api.get(`${BASE_URL}/products/suggestions`, {params});
             return response.data || [];
         } catch (error) {
             console.error('Error fetching product suggestions:', error);

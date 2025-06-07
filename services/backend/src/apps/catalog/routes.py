@@ -9,7 +9,8 @@ from apps.catalog.controllers import (
     get_products_by_category_controller,
     get_filters_by_categories_controller,
     get_product_suggestions_controller,
-    get_product_by_id_controller
+    get_product_by_id_controller,
+    get_product_by_slug_controller
 )
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.interfaces.services import CatalogServiceInterface
@@ -34,6 +35,7 @@ API_PATHS: dict[str, str] = {
     # Products
     "products": "/products",
     "product_by_id": "/products/{product_id}",
+    "product_by_slug": "/products/slug/{slug}",
     "products_filters": "/products/filters",
     "products_suggestions": "/products/suggestions",
 
@@ -213,6 +215,79 @@ async def get_product_by_id_route(
     """
     return await get_product_by_id_controller(
         product_id=product_id,
+        catalog_service=catalog_service,
+    )
+
+
+@router.get(
+    API_PATHS["product_by_slug"],
+    response_model=ProductSchema,
+    status_code=200,
+    summary="Get detailed product information by slug",
+    description=(
+            "<h3>This endpoint retrieves detailed information about a single product by its unique slug. "
+            "Returns all available product data including name, gender, year, image URL, and ID. "
+            "Use this endpoint when you have a product slug (typically from URLs) and need to get "
+            "complete product information for display purposes.</h3>"
+    ),
+    responses={
+        404: {
+            "description": "Product not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Product with slug 'example-product' not found"}
+                }
+            },
+        },
+        422: {
+            "description": "Validation error occurred for path parameters.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "field": "slug",
+                        "message": "ensure this value has at least 1 characters"
+                    }
+                }
+            },
+        },
+    },
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "product_detail": {
+                                "summary": "Product details by slug",
+                                "description": "Example response with complete product information retrieved by slug",
+                                "value": PRODUCT_EXAMPLE1
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_product_by_slug_route(
+        slug: str = Path(..., description="Unique slug of the product", min_length=1),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
+):
+    """
+    Get detailed information about a single product by its slug
+
+    Args:
+        slug: Unique slug of the product
+        catalog_service: Catalog service for data access
+
+    Returns:
+        ProductSchema: Complete product information
+
+    Raises:
+        HTTPException: 404 if product is not found, 422 for validation errors
+    """
+    return await get_product_by_slug_controller(
+        slug=slug,
         catalog_service=catalog_service,
     )
 

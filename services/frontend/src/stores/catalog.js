@@ -1,221 +1,313 @@
-import { defineStore } from 'pinia'
+import {defineStore} from 'pinia'
 import catalogService from '@/services/catalogService'
-import { useUserPreferencesStore } from '@/stores/userPreferences'
-import { nextTick } from 'vue'
+import {useUserPreferencesStore} from '@/stores/userPreferences'
+import {nextTick} from 'vue'
 
 export const useCatalogStore = defineStore('catalog', {
-  state: () => ({
-    products: [],
-    currentPage: 1,
-    totalPages: 0,
-    totalItems: 0,
-    currentOrdering: '-id',
-    loading: false,
-    error: null,
+    state: () => ({
+        products: [],
+        currentPage: 1,
+        totalPages: 0,
+        totalItems: 0,
+        currentOrdering: '-id',
+        loading: false,
+        error: null,
 
-    availableFilters: {
-      gender: null,
-      year: null
-    },
-    activeFilters: {
-      gender: null,
-      min_year: null,
-      max_year: null
-    },
-    filtersLoading: false,
-    filtersError: null,
+        currentProduct: null,
+        productLoading: false,
+        productError: null,
 
-    isFilterDrawerOpen: false,
-    isUpdatingFilters: false,
+        availableFilters: {
+            gender: null,
+            year: null
+        },
+        activeFilters: {
+            gender: null,
+            min_year: null,
+            max_year: null
+        },
+        filtersLoading: false,
+        filtersError: null,
 
-    searchQuery: null
-  }),
+        isFilterDrawerOpen: false,
+        isUpdatingFilters: false,
 
-  getters: {
-    activeFiltersCount() {
-      let count = 0;
+        searchQuery: null
+    }),
 
-      if (this.activeFilters.gender !== null) {
-        count++;
-      }
+    getters: {
+        activeFiltersCount() {
+            let count = 0;
 
-      if (
-        this.availableFilters?.year &&
-        ((this.activeFilters.min_year !== null &&
-          this.activeFilters.min_year !== this.availableFilters.year.min) ||
-         (this.activeFilters.max_year !== null &&
-          this.activeFilters.max_year !== this.availableFilters.year.max))
-      ) {
-        count++;
-      }
+            if (this.activeFilters.gender !== null) {
+                count++;
+            }
 
-      return count;
-    },
+            if (
+                this.availableFilters?.year &&
+                ((this.activeFilters.min_year !== null &&
+                        this.activeFilters.min_year !== this.availableFilters.year.min) ||
+                    (this.activeFilters.max_year !== null &&
+                        this.activeFilters.max_year !== this.availableFilters.year.max))
+            ) {
+                count++;
+            }
 
-    hasActiveFilters() {
-      return this.activeFiltersCount > 0;
-    }
-  },
+            return count;
+        },
 
-  actions: {
-    async fetchProducts(page = 1, ordering = null) {
-      this.loading = true;
-      this.error = null;
+        hasActiveFilters() {
+            return this.activeFiltersCount > 0;
+        },
 
-      const preferencesStore = useUserPreferencesStore();
-      const perPage = preferencesStore.itemsPerPage;
+        getProductIdBySlug: (state) => (slug) => {
+            if (!slug) return null;
+            const product = state.products.find(p => p.slug === slug);
+            return product ? product.product_id : null;
+        },
 
-      const effectiveOrdering = ordering !== null ? ordering : this.currentOrdering;
+        getProductSlugById: (state) => (productId) => {
+            if (!productId) return null;
+            const product = state.products.find(p => p.product_id === productId);
+            return product ? product.slug : null;
+        },
 
-      try {
-        const filters = {
-          ...this.activeFilters,
-          q: this.searchQuery
-        };
-
-        const response = await catalogService.getProducts(
-          page,
-          perPage,
-          effectiveOrdering,
-          filters
-        );
-
-        this.products = response.products;
-        this.totalPages = response.total_pages;
-        this.totalItems = response.total_items;
-        this.currentPage = page;
-        this.currentOrdering = effectiveOrdering;
-      } catch (err) {
-        this.error = err.response?.data || { message: 'Error loading products' };
-        this.products = [];
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async fetchFilters() {
-      this.filtersLoading = true;
-      this.filtersError = null;
-
-      try {
-        const filters = await catalogService.getFilters(this.searchQuery);
-        this.availableFilters = filters;
-      } catch (err) {
-        this.filtersError = err.response?.data || { message: 'Error loading filters' };
-        this.availableFilters = { gender: null, year: null };
-      } finally {
-        this.filtersLoading = false;
-      }
-    },
-
-    setFilter(filterType, value) {
-      if (this.isUpdatingFilters) return;
-
-      if (filterType === 'year' && value) {
-        this.activeFilters.min_year = value[0];
-        this.activeFilters.max_year = value[1];
-      } else if (filterType === 'gender') {
-        this.activeFilters.gender = value;
-      }
-    },
-
-    clearFilters() {
-      const drawerWasOpen = this.isFilterDrawerOpen;
-
-      this.isUpdatingFilters = true;
-
-      this.activeFilters = {
-        gender: null,
-        min_year: null,
-        max_year: null
-      };
-
-      nextTick(() => {
-        this.isUpdatingFilters = false;
-
-        if (drawerWasOpen) {
-          setTimeout(() => {
-            this.isFilterDrawerOpen = true;
-          }, 0);
+        hasProductById: (state) => (productId) => {
+            if (!productId) return false;
+            return state.products.some(p => p.product_id === productId);
         }
-      });
     },
 
-    clearSearch() {
-      this.searchQuery = null;
-    },
+    actions: {
+        async fetchProducts(page = 1, ordering = null) {
+            this.loading = true;
+            this.error = null;
 
-    setSearchQuery(query) {
-      this.searchQuery = query && query.trim() ? query.trim() : null;
-    },
+            const preferencesStore = useUserPreferencesStore();
+            const perPage = preferencesStore.itemsPerPage;
 
-    loadFiltersFromQuery(query) {
-      this.isUpdatingFilters = true;
+            const effectiveOrdering = ordering !== null ? ordering : this.currentOrdering;
 
-      this.activeFilters = {
-        gender: null,
-        min_year: null,
-        max_year: null
-      };
+            try {
+                const filters = {
+                    ...this.activeFilters,
+                    q: this.searchQuery
+                };
 
-      if (query.gender) {
-        this.activeFilters.gender = query.gender;
-      }
+                const response = await catalogService.getProducts(
+                    page,
+                    perPage,
+                    effectiveOrdering,
+                    filters
+                );
 
-      if (query.min_year) {
-        this.activeFilters.min_year = parseInt(query.min_year);
-      }
+                this.products = response.products;
+                this.totalPages = response.total_pages;
+                this.totalItems = response.total_items;
+                this.currentPage = page;
+                this.currentOrdering = effectiveOrdering;
+            } catch (err) {
+                this.error = err.response?.data || {message: 'Error loading products'};
+                this.products = [];
+            } finally {
+                this.loading = false;
+            }
+        },
 
-      if (query.max_year) {
-        this.activeFilters.max_year = parseInt(query.max_year);
-      }
+        async fetchProductById(productId) {
+            this.productLoading = true;
+            this.productError = null;
 
-      if (query.q) {
-        this.searchQuery = query.q;
-      } else {
-        this.searchQuery = null;
-      }
+            try {
+                const product = await catalogService.getProductById(productId);
+                this.currentProduct = product;
+                return product;
+            } catch (err) {
+                this.productError = err.response?.data || {message: 'Error loading product'};
+                this.currentProduct = null;
+                throw err;
+            } finally {
+                this.productLoading = false;
+            }
+        },
 
-      nextTick(() => {
-        this.isUpdatingFilters = false;
-      });
-    },
+        async fetchProductBySlug(slug) {
+            this.productLoading = true;
+            this.productError = null;
 
-    setOrdering(ordering) {
-      if (ordering !== this.currentOrdering) {
-        this.currentOrdering = ordering;
-      }
-    },
+            try {
+                const product = await catalogService.getProductBySlug(slug);
+                this.currentProduct = product;
+                return product;
+            } catch (err) {
+                this.productError = err.response?.data || {message: 'Error loading product'};
+                this.currentProduct = null;
+                throw err;
+            } finally {
+                this.productLoading = false;
+            }
+        },
 
-    toggleFilterDrawer(value = null) {
-      if (value !== null) {
-        this.isFilterDrawerOpen = value;
-      } else {
-        this.isFilterDrawerOpen = !this.isFilterDrawerOpen;
-      }
-    },
+        async getProductById(productId) {
+            if (this.currentProduct && this.currentProduct.product_id === productId) {
+                return this.currentProduct;
+            }
 
-    resetState() {
-      this.products = [];
-      this.currentPage = 1;
-      this.totalPages = 0;
-      this.totalItems = 0;
-      this.currentOrdering = '-id';
-      this.error = null;
-      this.isFilterDrawerOpen = false;
-      this.searchQuery = null;
+            const existingProduct = this.products.find(p => p.product_id === productId);
+            if (existingProduct) {
+                this.currentProduct = existingProduct;
+                return existingProduct;
+            }
 
-      this.availableFilters = {
-        gender: null,
-        year: null
-      };
-      this.activeFilters = {
-        gender: null,
-        min_year: null,
-        max_year: null
-      };
-      this.filtersError = null;
-      this.isUpdatingFilters = false;
+            return await this.fetchProductById(productId);
+        },
+
+        async getProductBySlug(slug) {
+            if (this.currentProduct && this.currentProduct.slug === slug) {
+                return this.currentProduct;
+            }
+
+            const existingProduct = this.products.find(p => p.slug === slug);
+            if (existingProduct) {
+                this.currentProduct = existingProduct;
+                return existingProduct;
+            }
+
+            return await this.fetchProductBySlug(slug);
+        },
+
+        async fetchFilters() {
+            this.filtersLoading = true;
+            this.filtersError = null;
+
+            try {
+                const filters = await catalogService.getFilters(this.searchQuery);
+                this.availableFilters = filters;
+            } catch (err) {
+                this.filtersError = err.response?.data || {message: 'Error loading filters'};
+                this.availableFilters = {gender: null, year: null};
+            } finally {
+                this.filtersLoading = false;
+            }
+        },
+
+        setFilter(filterType, value) {
+            if (this.isUpdatingFilters) return;
+
+            if (filterType === 'year' && value) {
+                this.activeFilters.min_year = value[0];
+                this.activeFilters.max_year = value[1];
+            } else if (filterType === 'gender') {
+                this.activeFilters.gender = value;
+            }
+        },
+
+        clearFilters() {
+            const drawerWasOpen = this.isFilterDrawerOpen;
+
+            this.isUpdatingFilters = true;
+
+            this.activeFilters = {
+                gender: null,
+                min_year: null,
+                max_year: null
+            };
+
+            nextTick(() => {
+                this.isUpdatingFilters = false;
+
+                if (drawerWasOpen) {
+                    setTimeout(() => {
+                        this.isFilterDrawerOpen = true;
+                    }, 0);
+                }
+            });
+        },
+
+        clearSearch() {
+            this.searchQuery = null;
+        },
+
+        setSearchQuery(query) {
+            this.searchQuery = query && query.trim() ? query.trim() : null;
+        },
+
+        loadFiltersFromQuery(query) {
+            this.isUpdatingFilters = true;
+
+            this.activeFilters = {
+                gender: null,
+                min_year: null,
+                max_year: null
+            };
+
+            if (query.gender) {
+                this.activeFilters.gender = query.gender;
+            }
+
+            if (query.min_year) {
+                this.activeFilters.min_year = parseInt(query.min_year);
+            }
+
+            if (query.max_year) {
+                this.activeFilters.max_year = parseInt(query.max_year);
+            }
+
+            if (query.q) {
+                this.searchQuery = query.q;
+            } else {
+                this.searchQuery = null;
+            }
+
+            nextTick(() => {
+                this.isUpdatingFilters = false;
+            });
+        },
+
+        setOrdering(ordering) {
+            if (ordering !== this.currentOrdering) {
+                this.currentOrdering = ordering;
+            }
+        },
+
+        toggleFilterDrawer(value = null) {
+            if (value !== null) {
+                this.isFilterDrawerOpen = value;
+            } else {
+                this.isFilterDrawerOpen = !this.isFilterDrawerOpen;
+            }
+        },
+
+        clearCurrentProduct() {
+            this.currentProduct = null;
+            this.productError = null;
+        },
+
+        resetState() {
+            this.products = [];
+            this.currentPage = 1;
+            this.totalPages = 0;
+            this.totalItems = 0;
+            this.currentOrdering = '-id';
+            this.error = null;
+            this.isFilterDrawerOpen = false;
+            this.searchQuery = null;
+
+            this.currentProduct = null;
+            this.productLoading = false;
+            this.productError = null;
+
+            this.availableFilters = {
+                gender: null,
+                year: null
+            };
+            this.activeFilters = {
+                gender: null,
+                min_year: null,
+                max_year: null
+            };
+            this.filtersError = null;
+            this.isUpdatingFilters = false;
+        }
     }
-  }
 });

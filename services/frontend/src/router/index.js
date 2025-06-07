@@ -6,6 +6,7 @@ import { useCategoryStore } from '@/stores/categoryStore'
 import HomePage from '@/views/HomePage.vue'
 import CatalogPage from '@/views/CatalogPage.vue'
 import CategoryPage from '@/views/CategoryPage.vue'
+import ProductDetailPage from '@/views/ProductDetailPage.vue'
 
 const processCatalogRouteProps = (route) => {
     const preferencesStore = useUserPreferencesStore();
@@ -59,6 +60,17 @@ const processCategoryRouteProps = (route) => {
     }
 };
 
+const processProductRouteProps = (route) => {
+    const catalogStore = useCatalogStore();
+
+    const productId = catalogStore.getProductIdBySlug(route.params.productSlug);
+
+    return {
+        productSlug: route.params.productSlug,
+        productId: productId
+    }
+};
+
 const routes = [
     {
         path: '/',
@@ -70,6 +82,12 @@ const routes = [
         name: 'catalog',
         component: CatalogPage,
         props: processCatalogRouteProps
+    },
+    {
+        path: '/product/:productSlug',
+        name: 'product-detail',
+        component: ProductDetailPage,
+        props: processProductRouteProps
     },
     {
         path: '/category/:masterCategory',
@@ -136,6 +154,8 @@ router.beforeEach(async (to, from, next) => {
             const masterName = categoryStore.getCategoryName(masterCategoryId);
             document.title = `StyleShop - ${masterName}`;
         }
+    } else if (to.name === 'product-detail') {
+        document.title = 'StyleShop - Product Details';
     } else {
         document.title = to.name === 'catalog' ? 'StyleShop - Catalog' : 'StyleShop';
     }

@@ -86,6 +86,19 @@ class CatalogServiceInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_product_by_slug(self, slug: str) -> Optional[ProductDTO]:
+        """
+        Get detailed information about a single product by its slug
+
+        Args:
+            slug: The slug of the product to retrieve
+
+        Returns:
+            ProductDTO with detailed product information if found, None otherwise
+        """
+        pass
+
+    @abstractmethod
     async def get_available_filters(self, q: Optional[str] = None) -> Optional[FiltersDTO]:
         """
         Get available filters and their possible values based on the actual data

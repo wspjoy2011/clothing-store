@@ -28,6 +28,19 @@ class ProductRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_product_by_slug(self, slug: str) -> Optional[ProductDTO]:
+        """
+        Get a single product by its slug
+
+        Args:
+            slug: The slug of the product to retrieve
+
+        Returns:
+            ProductDTO if found, None otherwise
+        """
+        pass
+
+    @abstractmethod
     async def get_products_with_specifications(
             self,
             pagination_spec: PaginationSpecificationInterface,

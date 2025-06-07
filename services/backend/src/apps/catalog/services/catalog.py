@@ -204,6 +204,18 @@ class CatalogService(CatalogServiceInterface):
         """
         return await self._product_repository.get_product_by_id(product_id)
 
+    async def get_product_by_slug(self, slug: str) -> Optional[ProductDTO]:
+        """
+        Get detailed information about a single product by its slug
+
+        Args:
+            slug: The slug of the product to retrieve
+
+        Returns:
+            ProductDTO with detailed product information if found, None otherwise
+        """
+        return await self._product_repository.get_product_by_slug(slug)
+
     async def get_available_filters(self, q: Optional[str] = None) -> Optional[FiltersDTO]:
         """
         Get available filters and their possible values based on the actual data
