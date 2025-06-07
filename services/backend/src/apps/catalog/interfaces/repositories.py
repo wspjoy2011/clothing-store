@@ -15,6 +15,19 @@ from apps.catalog.interfaces.specifications import (
 
 class ProductRepositoryInterface(ABC):
     @abstractmethod
+    async def get_product_by_id(self, product_id: int) -> Optional[ProductDTO]:
+        """
+        Get a single product by its ID
+
+        Args:
+            product_id: The ID of the product to retrieve
+
+        Returns:
+            ProductDTO if found, None otherwise
+        """
+        pass
+
+    @abstractmethod
     async def get_products_with_specifications(
             self,
             pagination_spec: PaginationSpecificationInterface,

@@ -8,7 +8,8 @@ from apps.catalog.controllers import (
     get_category_menu_controller,
     get_products_by_category_controller,
     get_filters_by_categories_controller,
-    get_product_suggestions_controller
+    get_product_suggestions_controller,
+    get_product_by_id_controller
 )
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.interfaces.services import CatalogServiceInterface
@@ -19,14 +20,20 @@ from apps.catalog.schemas.examples.responses import (
     GENDER_FILTERED_VALUE,
     YEAR_DESCENDING_VALUE,
     COMBINED_FILTERS_VALUE,
-    CATEGORY_MENU_EXAMPLE
+    CATEGORY_MENU_EXAMPLE,
+    PRODUCT_EXAMPLE1
 )
 from apps.catalog.schemas.filters import FiltersResponseSchema
-from apps.catalog.schemas.responses import ProductListResponseSchema, CategoryMenuResponseSchema
+from apps.catalog.schemas.responses import (
+    ProductListResponseSchema,
+    CategoryMenuResponseSchema,
+    ProductSchema
+)
 
 API_PATHS: dict[str, str] = {
     # Products
     "products": "/products",
+    "product_by_id": "/products/{product_id}",
     "products_filters": "/products/filters",
     "products_suggestions": "/products/suggestions",
 
@@ -133,6 +140,79 @@ async def get_products_route(
         max_year=max_year,
         gender=gender,
         q=q,
+        catalog_service=catalog_service,
+    )
+
+
+@router.get(
+    API_PATHS["product_by_id"],
+    response_model=ProductSchema,
+    status_code=200,
+    summary="Get detailed product information by ID",
+    description=(
+            "<h3>This endpoint retrieves detailed information about a single product by its unique ID. "
+            "Returns all available product data including name, gender, year, image URL, and slug. "
+            "Use this endpoint to display product details on product pages or for any operations "
+            "that require complete product information.</h3>"
+    ),
+    responses={
+        404: {
+            "description": "Product not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Product with ID 123 not found"}
+                }
+            },
+        },
+        422: {
+            "description": "Validation error occurred for path parameters.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "field": "product_id",
+                        "message": "value is not a valid integer"
+                    }
+                }
+            },
+        },
+    },
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "product_detail": {
+                                "summary": "Product details",
+                                "description": "Example response with complete product information",
+                                "value": PRODUCT_EXAMPLE1
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_product_by_id_route(
+        product_id: int = Path(..., description="Unique identifier of the product", ge=1),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
+):
+    """
+    Get detailed information about a single product by its ID
+
+    Args:
+        product_id: Unique identifier of the product
+        catalog_service: Catalog service for data access
+
+    Returns:
+        ProductSchema: Complete product information
+
+    Raises:
+        HTTPException: 404 if product is not found, 422 for validation errors
+    """
+    return await get_product_by_id_controller(
+        product_id=product_id,
         catalog_service=catalog_service,
     )
 

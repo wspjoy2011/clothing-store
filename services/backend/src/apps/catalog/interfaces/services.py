@@ -4,6 +4,7 @@ from typing import Optional
 from apps.catalog.dto.catalog import CatalogDTO
 from apps.catalog.dto.category import CategoryMenuDTO
 from apps.catalog.dto.filters import FiltersDTO
+from apps.catalog.dto.products import ProductDTO
 
 
 class CatalogServiceInterface(ABC):
@@ -68,6 +69,19 @@ class CatalogServiceInterface(ABC):
 
         Returns:
             CatalogDTO with products and pagination info
+        """
+        pass
+
+    @abstractmethod
+    async def get_product_by_id(self, product_id: int) -> Optional[ProductDTO]:
+        """
+        Get detailed information about a single product by its ID
+
+        Args:
+            product_id: The ID of the product to retrieve
+
+        Returns:
+            ProductDTO with detailed product information if found, None otherwise
         """
         pass
 

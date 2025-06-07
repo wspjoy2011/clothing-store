@@ -68,6 +68,34 @@ async def get_product_list_controller(
     )
 
 
+async def get_product_by_id_controller(
+        product_id: int,
+        catalog_service: CatalogServiceInterface,
+) -> ProductSchema:
+    """
+    Controller for getting detailed information about a single product
+
+    Args:
+        product_id: The ID of the product to retrieve
+        catalog_service: Catalog service for data access
+
+    Returns:
+        ProductSchema with detailed product information
+
+    Raises:
+        HTTPException: If product is not found (404)
+    """
+    product_dto = await catalog_service.get_product_by_id(product_id)
+
+    if product_dto is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Product with ID {product_id} not found"
+        )
+
+    return ProductSchema(**asdict(product_dto))
+
+
 async def get_filters_controller(
         catalog_service: CatalogServiceInterface,
         q: Optional[str] = None

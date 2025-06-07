@@ -3,6 +3,7 @@ from typing import Optional, Callable
 from apps.catalog.dto.catalog import CatalogDTO, PaginationDTO
 from apps.catalog.dto.category import CategoryMenuDTO
 from apps.catalog.dto.filters import FiltersDTO
+from apps.catalog.dto.products import ProductDTO
 from apps.catalog.interfaces.repositories import (
     ProductRepositoryInterface,
     CategoryRepositoryInterface
@@ -190,6 +191,18 @@ class CatalogService(CatalogServiceInterface):
                 total_pages=total_pages
             )
         )
+
+    async def get_product_by_id(self, product_id: int) -> Optional[ProductDTO]:
+        """
+        Get detailed information about a single product by its ID
+
+        Args:
+            product_id: The ID of the product to retrieve
+
+        Returns:
+            ProductDTO with detailed product information if found, None otherwise
+        """
+        return await self._product_repository.get_product_by_id(product_id)
 
     async def get_available_filters(self, q: Optional[str] = None) -> Optional[FiltersDTO]:
         """
