@@ -147,6 +147,43 @@ async def get_products_route(
 
 
 @router.get(
+    API_PATHS["products_suggestions"],
+    response_model=list[str],
+    summary="Get product name suggestions",
+    description="Get product name suggestions for autocomplete functionality"
+)
+async def get_product_suggestions_route(
+        q: str = Query(
+            ...,
+            description="Search query for product suggestions",
+            min_length=1,
+            max_length=50,
+            example="N"
+        ),
+        limit: int = Query(
+            10,
+            description="Maximum number of suggestions to return",
+            ge=1,
+            le=20,
+            example=10
+        ),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
+) -> list[str]:
+    """
+    Get product name suggestions for autocomplete.
+
+    Returns a list of product names that match the search query.
+    Useful for implementing search autocomplete functionality.
+    Searches from 1 character minimum.
+    """
+    return await get_product_suggestions_controller(
+        query=q,
+        limit=limit,
+        catalog_service=catalog_service
+    )
+
+
+@router.get(
     API_PATHS["product_by_id"],
     response_model=ProductSchema,
     status_code=200,
@@ -862,42 +899,5 @@ async def get_filters_by_article_type_route(
         master_category_id=master_category_id,
         sub_category_id=subcategory_id,
         article_type_id=article_type_id,
-        catalog_service=catalog_service
-    )
-
-
-@router.get(
-    API_PATHS["products_suggestions"],
-    response_model=list[str],
-    summary="Get product name suggestions",
-    description="Get product name suggestions for autocomplete functionality"
-)
-async def get_product_suggestions_route(
-        q: str = Query(
-            ...,
-            description="Search query for product suggestions",
-            min_length=1,
-            max_length=50,
-            example="N"
-        ),
-        limit: int = Query(
-            10,
-            description="Maximum number of suggestions to return",
-            ge=1,
-            le=20,
-            example=10
-        ),
-        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
-) -> list[str]:
-    """
-    Get product name suggestions for autocomplete.
-
-    Returns a list of product names that match the search query.
-    Useful for implementing search autocomplete functionality.
-    Searches from 1 character minimum.
-    """
-    return await get_product_suggestions_controller(
-        query=q,
-        limit=limit,
         catalog_service=catalog_service
     )
