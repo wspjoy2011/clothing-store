@@ -1,7 +1,9 @@
 import { useRouter } from 'vue-router'
+import { useLegalStore } from '@/stores/legal'
 
 export function useNavigation() {
   const router = useRouter()
+  const legalStore = useLegalStore()
 
   const goToLogin = () => {
     router.push({ name: 'home' })
@@ -16,11 +18,19 @@ export function useNavigation() {
   }
 
   const openTerms = () => {
-    console.log('Open terms of service')
+    legalStore.openTermsDialog()
   }
 
   const openPrivacy = () => {
-    console.log('Open privacy policy')
+    legalStore.openPrivacyDialog()
+  }
+
+  const handleTermsAccept = () => {
+    console.log('Terms accepted and tracked')
+  }
+
+  const handlePrivacyAcknowledge = () => {
+    console.log('Privacy policy acknowledged and tracked')
   }
 
   return {
@@ -28,6 +38,8 @@ export function useNavigation() {
     handleGoogleRegister,
     handleFacebookRegister,
     openTerms,
-    openPrivacy
+    openPrivacy,
+    handleTermsAccept,
+    handlePrivacyAcknowledge
   }
 }

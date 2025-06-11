@@ -51,6 +51,7 @@
                         :error="emailTouched && emailError"
                         :error-messages="emailTouched && emailError ? emailErrorMessage : ''"
                         @focus="emailTouched = true"
+                        autocomplete="email"
                     ></v-text-field>
                   </div>
 
@@ -72,6 +73,7 @@
                         :error="passwordTouched && passwordError"
                         :error-messages="passwordTouched && passwordError ? passwordErrorMessage : ''"
                         @focus="passwordTouched = true"
+                        autocomplete="new-password"
                     ></v-text-field>
                   </div>
 
@@ -93,6 +95,7 @@
                         :error="confirmPasswordTouched && confirmPasswordError"
                         :error-messages="confirmPasswordTouched && confirmPasswordError ? confirmPasswordErrorMessage : ''"
                         @focus="confirmPasswordTouched = true"
+                        autocomplete="new-password"
                     ></v-text-field>
                   </div>
 
@@ -103,16 +106,47 @@
                         color="primary"
                         :disabled="isLoading"
                         validate-on="input lazy"
+                        :readonly="!legalStore.hasReadBothDocuments"
+                        @click="handleCheckboxClick"
                     >
                       <template v-slot:label>
                         <span class="terms-text">
                           I agree to the
-                          <a href="#" class="terms-link" @click.prevent="openTerms">Terms of Service</a>
+                          <a href="#" class="terms-link" @click.prevent="openTerms">
+                            Terms of Service
+                            <v-chip
+                                v-if="legalStore.termsAccepted"
+                                size="x-small"
+                                color="success"
+                                variant="tonal"
+                                class="ml-1"
+                            >
+                              ✓
+                            </v-chip>
+                          </a>
                           and
-                          <a href="#" class="terms-link" @click.prevent="openPrivacy">Privacy Policy</a>
+                          <a href="#" class="terms-link" @click.prevent="openPrivacy">
+                            Privacy Policy
+                            <v-chip
+                                v-if="legalStore.privacyAcknowledged"
+                                size="x-small"
+                                color="success"
+                                variant="tonal"
+                                class="ml-1"
+                            >
+                              ✓
+                            </v-chip>
+                          </a>
                         </span>
                       </template>
                     </v-checkbox>
+
+                    <div v-if="!legalStore.hasReadBothDocuments" class="terms-requirement-hint">
+                      <v-chip size="small" color="info" variant="tonal">
+                        <v-icon start size="small">mdi-information</v-icon>
+                        Please read both documents first
+                      </v-chip>
+                    </div>
                   </div>
 
                   <div class="form-field-wrapper">
@@ -213,6 +247,16 @@
         </template>
       </v-snackbar>
     </v-container>
+
+    <TermsOfService
+        v-model="legalStore.showTermsDialog"
+        @accept="handleTermsAccept"
+    />
+
+    <PrivacyPolicy
+        v-model="legalStore.showPrivacyDialog"
+        @acknowledge="handlePrivacyAcknowledge"
+    />
   </div>
 </template>
 
@@ -222,9 +266,13 @@ import {useTheme} from 'vuetify'
 import {useRegistrationForm} from '@/composables/accounts/useRegistrationForm'
 import {useNotifications} from '@/composables/accounts/useNotifications'
 import {useNavigation} from '@/composables/accounts/useNavigation'
+import {useLegalStore} from '@/stores/legal'
+import TermsOfService from '@/components/modals/TermsOfService.vue'
+import PrivacyPolicy from '@/components/modals/PrivacyPolicy.vue'
 
 const theme = useTheme()
 const isDarkTheme = computed(() => theme.global.current.value.dark)
+const legalStore = useLegalStore()
 
 const {
   formRef,
@@ -270,8 +318,17 @@ const {
   handleGoogleRegister,
   handleFacebookRegister,
   openTerms,
-  openPrivacy
+  openPrivacy,
+  handleTermsAccept,
+  handlePrivacyAcknowledge
 } = useNavigation()
+
+const handleCheckboxClick = (event) => {
+  if (!legalStore.hasReadBothDocuments) {
+    event.preventDefault()
+    return false
+  }
+}
 
 const onRegister = async () => {
   const result = await handleRegister()
@@ -465,11 +522,19 @@ onMounted(() => {
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  pointer-events: auto;
 }
 
 .terms-link:hover {
   color: #764ba2;
   text-decoration: underline;
+}
+
+.terms-requirement-hint {
+  margin-top: 8px;
+  margin-left: 32px;
 }
 
 .register-btn {
@@ -605,5 +670,24 @@ onMounted(() => {
 
 :deep(.v-theme--dark .v-checkbox .v-selection-control__input) {
   color: #90caf9;
+}
+
+:deep(.v-checkbox .v-label a) {
+  pointer-events: auto !important;
+}
+
+:deep(.v-checkbox[readonly] .v-selection-control__input) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+:deep(.v-checkbox[readonly] .v-label) {
+  opacity: 0.8;
+}
+
+:deep(.v-checkbox[readonly] .v-label a) {
+  opacity: 1;
+  pointer-events: auto !important;
+  cursor: pointer !important;
 }
 </style>
