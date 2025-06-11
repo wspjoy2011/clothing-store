@@ -67,9 +67,46 @@
 
           <search-bar class="mr-2"/>
 
-          <v-btn icon class="mr-2">
-            <v-icon>mdi-account</v-icon>
-          </v-btn>
+          <!-- Account Menu -->
+          <v-menu location="bottom end" transition="slide-y-transition">
+            <template v-slot:activator="{ props }">
+              <v-btn icon class="mr-2" v-bind="props">
+                <v-icon>mdi-account</v-icon>
+              </v-btn>
+            </template>
+
+            <v-card min-width="200">
+              <v-list>
+                <v-list-item
+                    :to="{ name: 'register' }"
+                    prepend-icon="mdi-account-plus"
+                    title="Register"
+                    subtitle="Create new account"
+                ></v-list-item>
+
+                <v-list-item
+                    prepend-icon="mdi-login"
+                    title="Sign In"
+                    subtitle="Access your account"
+                    @click="goToLogin"
+                ></v-list-item>
+
+                <v-divider></v-divider>
+
+                <v-list-item
+                    prepend-icon="mdi-account-cog"
+                    title="Account Settings"
+                    @click="goToSettings"
+                ></v-list-item>
+
+                <v-list-item
+                    prepend-icon="mdi-heart"
+                    title="Wishlist"
+                    @click="goToWishlist"
+                ></v-list-item>
+              </v-list>
+            </v-card>
+          </v-menu>
 
           <v-btn icon>
             <v-badge
@@ -201,6 +238,23 @@
 
       <v-divider></v-divider>
 
+      <!-- Account Section -->
+      <v-list-subheader>Account</v-list-subheader>
+
+      <v-list-item
+          title="Register"
+          :to="{ name: 'register' }"
+          prepend-icon="mdi-account-plus"
+      ></v-list-item>
+
+      <v-list-item
+          title="Sign In"
+          prepend-icon="mdi-login"
+          @click="goToLogin"
+      ></v-list-item>
+
+      <v-divider></v-divider>
+
       <v-list-item
           title="New Arrivals"
           value="new"
@@ -225,6 +279,7 @@
           title="My Account"
           value="account"
           prepend-icon="mdi-account"
+          @click="goToSettings"
       ></v-list-item>
 
       <v-list-item
@@ -428,6 +483,21 @@ async function navigateToPathCategory(category, index) {
       params
     });
   }, 50);
+}
+
+function goToLogin() {
+  // TODO: Navigate to login page when it's created
+  console.log('Navigate to login page');
+}
+
+function goToSettings() {
+  // TODO: Navigate to account settings
+  console.log('Navigate to account settings');
+}
+
+function goToWishlist() {
+  // TODO: Navigate to wishlist
+  console.log('Navigate to wishlist');
 }
 
 onMounted(async () => {

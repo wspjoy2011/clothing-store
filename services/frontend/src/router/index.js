@@ -1,12 +1,13 @@
 import {createRouter, createWebHistory} from 'vue-router'
-import { useUserPreferencesStore } from '@/stores/userPreferences'
-import { useCatalogStore } from '@/stores/catalog'
-import { useCategoryStore } from '@/stores/categoryStore'
+import {useUserPreferencesStore} from '@/stores/userPreferences'
+import {useCatalogStore} from '@/stores/catalog'
+import {useCategoryStore} from '@/stores/categoryStore'
 
 import HomePage from '@/views/HomePage.vue'
 import CatalogPage from '@/views/CatalogPage.vue'
 import CategoryPage from '@/views/CategoryPage.vue'
 import ProductDetailPage from '@/views/ProductDetailPage.vue'
+import RegisterPage from '@/views/RegisterPage.vue'
 
 const processCatalogRouteProps = (route) => {
     const preferencesStore = useUserPreferencesStore();
@@ -106,6 +107,15 @@ const routes = [
         name: 'article-type',
         component: CategoryPage,
         props: processCategoryRouteProps
+    },
+    {
+        path: '/accounts/register',
+        name: 'register',
+        component: RegisterPage,
+        meta: {
+            title: 'Register - StyleShop',
+            requiresGuest: true
+        }
     }
 ]
 
@@ -140,7 +150,7 @@ router.beforeEach(async (to, from, next) => {
 
         if (!masterCategoryId) {
             console.error('Category not found:', to.params.masterCategory);
-            next({ name: 'home' });
+            next({name: 'home'});
             return;
         }
 
@@ -156,6 +166,8 @@ router.beforeEach(async (to, from, next) => {
         }
     } else if (to.name === 'product-detail') {
         document.title = 'StyleShop - Product Details';
+    } else if (to.name === 'register') {
+        document.title = 'StyleShop - Register';
     } else {
         document.title = to.name === 'catalog' ? 'StyleShop - Catalog' : 'StyleShop';
     }

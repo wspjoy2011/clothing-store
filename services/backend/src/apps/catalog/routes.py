@@ -34,10 +34,10 @@ from apps.catalog.schemas.responses import (
 API_PATHS: dict[str, str] = {
     # Products
     "products": "/products",
-    "product_by_id": "/products/{product_id}",
-    "product_by_slug": "/products/slug/{slug}",
     "products_filters": "/products/filters",
     "products_suggestions": "/products/suggestions",
+    "product_by_id": "/products/{product_id}",
+    "product_by_slug": "/products/slug/{slug}",
 
     # Categories
     "categories": "/categories",
@@ -144,6 +144,66 @@ async def get_products_route(
         q=q,
         catalog_service=catalog_service,
     )
+
+
+@router.get(
+    API_PATHS["products_filters"],
+    response_model=FiltersResponseSchema,
+    status_code=200,
+    summary="Get available product filters",
+    description=(
+            "<h3>This endpoint retrieves available filters for the product catalog based on the actual data. "
+            "It provides information about available filter options such as gender values and year ranges. "
+            "Clients can use this information to build dynamic filter UIs that adapt to the current catalog state. "
+            "The endpoint returns filter metadata including possible values for checkbox filters and min/max ranges for "
+            "numeric filters.</h3>"
+    ),
+    responses={
+        404: {
+            "description": "Catalog is empty, no filters available.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Catalog is empty. No filters available."}
+                }
+            },
+        }
+    },
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "full_filters": {
+                                "summary": "Complete filters",
+                                "description": "Example response with all filter types",
+                                "value": FILTERS_FULL_EXAMPLE
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def filters_route(
+        q: Optional[str] = Query(None, description="Optional search query to show only relevant filters"),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
+) -> FiltersResponseSchema:
+    """
+    Get available filters for products
+
+    Args:
+       catalog_service: Catalog service for data access
+       q: Optional search query to limit filters to relevant options
+
+    Returns:
+       Filters response schema
+
+    Raises:
+       HTTPException: If the catalog is empty
+    """
+    return await get_filters_controller(catalog_service, q)
 
 
 @router.get(
@@ -327,66 +387,6 @@ async def get_product_by_slug_route(
         slug=slug,
         catalog_service=catalog_service,
     )
-
-
-@router.get(
-    API_PATHS["products_filters"],
-    response_model=FiltersResponseSchema,
-    status_code=200,
-    summary="Get available product filters",
-    description=(
-            "<h3>This endpoint retrieves available filters for the product catalog based on the actual data. "
-            "It provides information about available filter options such as gender values and year ranges. "
-            "Clients can use this information to build dynamic filter UIs that adapt to the current catalog state. "
-            "The endpoint returns filter metadata including possible values for checkbox filters and min/max ranges for "
-            "numeric filters.</h3>"
-    ),
-    responses={
-        404: {
-            "description": "Catalog is empty, no filters available.",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Catalog is empty. No filters available."}
-                }
-            },
-        }
-    },
-    openapi_extra={
-        "responses": {
-            "200": {
-                "content": {
-                    "application/json": {
-                        "examples": {
-                            "full_filters": {
-                                "summary": "Complete filters",
-                                "description": "Example response with all filter types",
-                                "value": FILTERS_FULL_EXAMPLE
-                            },
-                        }
-                    }
-                }
-            }
-        }
-    }
-)
-async def filters_route(
-        q: Optional[str] = Query(None, description="Optional search query to show only relevant filters"),
-        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
-) -> FiltersResponseSchema:
-    """
-    Get available filters for products
-
-    Args:
-       catalog_service: Catalog service for data access
-       q: Optional search query to limit filters to relevant options
-
-    Returns:
-       Filters response schema
-
-    Raises:
-       HTTPException: If the catalog is empty
-    """
-    return await get_filters_controller(catalog_service, q)
 
 
 @router.get(
