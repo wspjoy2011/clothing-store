@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from settings.config import config
 from settings.logging_config import get_logger
 from apps.catalog.routes import router as catalog_router
+from apps.accounts.routes import router as accounts_router
 from search.dependencies import cleanup_autocomplete_client
 
 logger = get_logger(__name__, "main")
@@ -59,3 +60,4 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 API_VERSION_PREFIX = "/api/v1"
 
 app.include_router(catalog_router, prefix=f"{API_VERSION_PREFIX}")
+app.include_router(accounts_router, prefix=f"{API_VERSION_PREFIX}")

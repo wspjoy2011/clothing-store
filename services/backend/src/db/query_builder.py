@@ -9,6 +9,7 @@ class SQLQueryBuilder(SQLQueryBuilderInterface):
     def __init__(self, base_table: str):
         """Initialize with base table name"""
         self._base_table = base_table
+        self._from_table = None
         self._select_fields = []
         self._join_clauses = []
         self._where_conditions = []
@@ -20,6 +21,11 @@ class SQLQueryBuilder(SQLQueryBuilderInterface):
     def select(self, *fields) -> Self:
         """Add fields to SELECT clause"""
         self._select_fields.extend(fields)
+        return self
+
+    def from_table(self, table_name: str) -> Self:
+        """Set FROM table with optional alias"""
+        self._from_table = table_name
         return self
 
     def where(self, condition: str, *params) -> Self:
@@ -54,7 +60,8 @@ class SQLQueryBuilder(SQLQueryBuilderInterface):
 
     def build(self) -> Tuple[str, List[Any]]:
         """Build the final SQL query and params list"""
-        query = f"SELECT {', '.join(self._select_fields) or '*'} FROM {self._base_table}"
+        table_name = self._from_table or self._base_table
+        query = f"SELECT {', '.join(self._select_fields) or '*'} FROM {table_name}"
 
         if self._join_clauses:
             query += f" {' '.join(self._join_clauses)}"

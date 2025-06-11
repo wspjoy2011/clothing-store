@@ -43,6 +43,11 @@ class SQLQueryBuilderInterface(ABC):
         pass
 
     @abstractmethod
+    def from_table(self, table_name: str) -> Self:
+        """Set FROM table with optional alias"""
+        pass
+
+    @abstractmethod
     def where(self, condition: str, *params) -> Self:
         """Add condition to WHERE clause with params"""
         pass
@@ -82,3 +87,12 @@ class SQLQueryBuilderInterface(ABC):
         """Add JOIN clause to query"""
         pass
 
+    @abstractmethod
+    def get_where_conditions(self) -> List[str]:
+        """Get current WHERE conditions"""
+        pass
+
+    @abstractmethod
+    def get_params(self) -> List[Any]:
+        """Get current parameters"""
+        pass
