@@ -14,6 +14,8 @@ from apps.accounts.repositories.token import TokenRepository
 from apps.accounts.services.account import AccountService
 from db.dependencies import get_database_dao, get_query_builder
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
+from notifications.dependencies import get_email_sender_dependency
+from notifications.email.interfaces import EmailSenderInterface
 from security.dependencies import get_password_manager
 from security.interfaces import PasswordManagerInterface
 
@@ -89,7 +91,9 @@ async def get_token_repository(
 async def get_account_service(
         user_repository: UserRepositoryInterface = Depends(get_user_repository),
         user_group_repository: UserGroupRepositoryInterface = Depends(get_user_group_repository),
-        password_manager: PasswordManagerInterface = Depends(get_password_manager)
+        token_repository: TokenRepositoryInterface = Depends(get_token_repository),
+        password_manager: PasswordManagerInterface = Depends(get_password_manager),
+        email_sender: EmailSenderInterface = Depends(get_email_sender_dependency)
 ) -> AccountServiceInterface:
     """
     Dependency for getting account service.
@@ -97,7 +101,9 @@ async def get_account_service(
     Args:
         user_repository: Repository for user data operations
         user_group_repository: Repository for user group operations
+        token_repository: Repository for token operations
         password_manager: Manager for password hashing and verification
+        email_sender: Email sender for notifications
 
     Returns:
         Initialized account service
@@ -105,5 +111,7 @@ async def get_account_service(
     return AccountService(
         user_repository=user_repository,
         user_group_repository=user_group_repository,
-        password_manager=password_manager
+        token_repository=token_repository,
+        password_manager=password_manager,
+        email_sender=email_sender
     )

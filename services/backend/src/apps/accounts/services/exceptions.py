@@ -28,6 +28,7 @@ class InvalidGroupError(RegistrationError):
     """Raised when specified user group is invalid or doesn't exist"""
     pass
 
+
 class UserPasswordError(RegistrationError):
     """Raised when password-related operations fail during registration"""
     pass

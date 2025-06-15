@@ -124,6 +124,23 @@ services:
       retries: 5
       start_period: 60s
 
+  mailhog:
+    restart: always
+    build:
+      context: .
+      dockerfile: ./services/mailhog/Dockerfile
+    container_name: mailhog_clothing_store
+    command: [ "/bin/bash", "-c", "/commands/setup_mailhog_auth.sh && ~/go/bin/MailHog" ]
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    env_file:
+      - services/mailhog/.env
+    environment:
+      MH_AUTH_FILE: /mailhog.auth
+    networks:
+      - clothing_store_network
+
   elasticsearch-setup:
     image: curlimages/curl
     container_name: elasticsearch_setup_clothing_store

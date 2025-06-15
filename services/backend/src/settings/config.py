@@ -1,4 +1,6 @@
 from pathlib import Path
+from urllib.parse import urljoin
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Base directory for resolving the path to .env
@@ -36,6 +38,17 @@ class AppConfig(BaseSettings):
     ELASTICSEARCH_SCHEME: str
     ELASTICSEARCH_PRODUCTS_INDEX: str
 
+    # Email settings
+    EMAIL_HOST: str
+    EMAIL_PORT: int
+    EMAIL_HOST_USER: str
+    EMAIL_HOST_PASSWORD: str
+    EMAIL_USE_TLS: str
+    EMAIL_USE_SSL: str
+
+    # Token settings
+    ACTIVATION_TOKEN_VALID_DAYS: int = 7
+
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8"
@@ -57,6 +70,14 @@ class AppConfig(BaseSettings):
         return [origin.strip() for origin in self.FRONTEND_CORS_ORIGINS.split(",")]
 
     @property
+    def FRONTEND_BASE_URL(self) -> str:
+        """Get the first (primary) frontend URL for creating links"""
+        origins = self.CORS_ORIGINS
+        if origins:
+            return origins[0]
+        return "http://localhost:5000"
+
+    @property
     def ELASTICSEARCH_URL(self) -> str:
         """Full Elasticsearch URL for client connection"""
         return f"{self.ELASTICSEARCH_SCHEME}://{self.ELASTICSEARCH_HOST}:{self.ELASTICSEARCH_PORT}"
@@ -64,7 +85,7 @@ class AppConfig(BaseSettings):
     @property
     def ELASTICSEARCH_AUTH(self) -> tuple[str, str]:
         """Elasticsearch authentication tuple (username, password)"""
-        return (self.ELASTICSEARCH_USER, self.ELASTICSEARCH_PASSWORD)
+        return self.ELASTICSEARCH_USER, self.ELASTICSEARCH_PASSWORD
 
     @property
     def ELASTICSEARCH_CLIENT_CONFIG(self) -> dict:
@@ -78,6 +99,47 @@ class AppConfig(BaseSettings):
             "retry_on_timeout": True,
             "max_retries": 3
         }
+
+    @property
+    def EMAIL_CONFIG(self) -> dict:
+        """Complete configuration dictionary for email client"""
+        use_tls = self.EMAIL_USE_TLS.lower() == "true"
+        use_ssl = self.EMAIL_USE_SSL.lower() == "true"
+
+        return {
+            "host": self.EMAIL_HOST,
+            "port": self.EMAIL_PORT,
+            "username": self.EMAIL_HOST_USER,
+            "password": self.EMAIL_HOST_PASSWORD,
+            "use_tls": use_tls,
+            "use_ssl": use_ssl,
+            "timeout": 30
+        }
+
+    def build_frontend_url(self, path: str, **params) -> str:
+        """
+        Build a frontend URL with given path and query parameters
+
+        Args:
+            path: URL path (e.g., '/activate', '/login')
+            **params: Query parameters to add to URL
+
+        Returns:
+            Complete frontend URL with path and parameters
+        """
+        base_url = self.FRONTEND_BASE_URL
+
+        if not path.startswith('/'):
+            path = '/' + path
+
+        url = urljoin(base_url, path)
+
+        if params:
+            from urllib.parse import urlencode
+            query_string = urlencode(params)
+            url = f"{url}?{query_string}"
+
+        return url
 
 
 # Global config instance
