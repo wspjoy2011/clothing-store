@@ -262,6 +262,11 @@ class TokenRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_activation_token_by_email_and_token(self, email: str, token: str) -> Optional[ActivationTokenDTO]:
+        """Get activation token by email and token combination"""
+        pass
+
+    @abstractmethod
     async def create_activation_token(self, token_data: CreateTokenDTO) -> ActivationTokenDTO:
         """Create activation token"""
         pass

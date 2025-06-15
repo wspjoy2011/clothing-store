@@ -5,9 +5,19 @@ from dataclasses import asdict
 from fastapi import HTTPException
 
 from apps.accounts.dto.users import CreateUserDTO
+from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.interfaces.services import AccountServiceInterface
 from apps.accounts.schemas.user import CreateUserSchema, CreateUserResponseSchema, UserResponseSchema
-from apps.accounts.services.exceptions import EmailAlreadyExistsError, UserCreationError, UserPasswordError
+from apps.accounts.schemas.activation import ActivateAccountSchema, ActivateAccountResponseSchema
+from apps.accounts.services.exceptions import (
+    EmailAlreadyExistsError,
+    UserCreationError,
+    UserPasswordError,
+    UserNotFoundError,
+    UserAlreadyActivatedError,
+    InvalidActivationTokenError,
+    ExpiredActivationTokenError
+)
 
 
 async def create_user_controller(
@@ -54,4 +64,61 @@ async def create_user_controller(
         return CreateUserResponseSchema(
             user=user_response,
             message="User created successfully"
+        )
+
+
+async def activate_account_controller(
+        activation_data: ActivateAccountSchema,
+        account_service: AccountServiceInterface,
+) -> ActivateAccountResponseSchema:
+    """
+    Controller for account activation
+
+    Args:
+        activation_data: Account activation data from request
+        account_service: Account service for business logic
+
+    Returns:
+        ActivateAccountResponseSchema with activated user data and success message
+
+    Raises:
+        HTTPException: 404 if user not found, 400 for activation errors, 410 for expired token
+    """
+    activate_account_dto = ActivateAccountDTO(
+        email=str(activation_data.email),
+        token=activation_data.token
+    )
+
+    try:
+        activated_user = await account_service.activate_account(activate_account_dto)
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+    except UserAlreadyActivatedError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except InvalidActivationTokenError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except ExpiredActivationTokenError as e:
+        raise HTTPException(
+            status_code=410,
+            detail=str(e)
+        )
+    except (UserCreationError, Exception) as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error occurred during account activation"
+        )
+    else:
+        user_response = UserResponseSchema(**asdict(activated_user))
+        return ActivateAccountResponseSchema(
+            user=user_response,
+            message="Account activated successfully"
         )

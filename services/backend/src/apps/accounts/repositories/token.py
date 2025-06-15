@@ -42,6 +42,24 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         result = await self._execute_query_single("Get activation token by user ID")
         return self.map_to_activation_token_dto(result) if result else None
 
+    async def get_activation_token_by_email_and_token(self, email: str, token: str) -> Optional[ActivationTokenDTO]:
+        """Get activation token by email and token combination"""
+        query = f"""
+            SELECT at.id, at.token, at.expires_at, at.user_id
+            FROM {self.APP_NAME}_activation_tokens at
+            INNER JOIN {self.APP_NAME}_users u ON at.user_id = u.id
+            WHERE u.email = %s AND at.token = %s
+        """
+        params = [email, token]
+
+        try:
+            result = await self._execute_custom_query_single(query, params, "Get activation token by email and token")
+        except Exception as e:
+            logger.error(f"Error getting activation token by email and token: {e}")
+            return None
+
+        return self.map_to_activation_token_dto(result) if result else None
+
     async def create_activation_token(self, token_data: CreateTokenDTO) -> ActivationTokenDTO:
         """Create activation token"""
         query = f"""

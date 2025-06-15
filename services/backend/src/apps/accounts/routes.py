@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, status
 
-from apps.accounts.controllers import create_user_controller
+from apps.accounts.controllers import create_user_controller, activate_account_controller
 from apps.accounts.dependencies import get_account_service
 from apps.accounts.interfaces.services import AccountServiceInterface
 from apps.accounts.schemas.examples.errors import (
@@ -22,10 +22,21 @@ from apps.accounts.schemas.examples.errors import (
 from apps.accounts.schemas.examples.user import (
     CREATE_USER_SUCCESS_RESPONSE,
 )
+from apps.accounts.schemas.examples.activation import (
+    ACTIVATE_ACCOUNT_REQUEST_EXAMPLE,
+    ACTIVATE_ACCOUNT_SUCCESS_RESPONSE,
+    ACTIVATION_USER_NOT_FOUND_ERROR,
+    ACTIVATION_ALREADY_ACTIVE_ERROR,
+    ACTIVATION_INVALID_TOKEN_ERROR,
+    ACTIVATION_EXPIRED_TOKEN_ERROR,
+    ACTIVATION_VALIDATION_ERROR
+)
 from apps.accounts.schemas.user import CreateUserSchema, CreateUserResponseSchema
+from apps.accounts.schemas.activation import ActivateAccountSchema, ActivateAccountResponseSchema
 
 API_PATHS: dict[str, str] = {
     "register": "/register",
+    "activate": "/activate",
 }
 
 router = APIRouter(
@@ -40,11 +51,11 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
     summary="Register a new user",
     description=(
-        "<h3>This endpoint allows registration of a new user account. "
-        "The user will be automatically assigned to the 'user' group and will have "
-        "an inactive status until account activation. "
-        "Password must meet security requirements: minimum 8 characters with "
-        "uppercase, lowercase, digit, and special character.</h3>"
+            "<h3>This endpoint allows registration of a new user account. "
+            "The user will be automatically assigned to the 'user' group and will have "
+            "an inactive status until account activation. "
+            "Password must meet security requirements: minimum 8 characters with "
+            "uppercase, lowercase, digit, and special character.</h3>"
     ),
     responses={
         201: {
@@ -160,5 +171,144 @@ async def register_user_route(
     """
     return await create_user_controller(
         user_data=user_data,
+        account_service=account_service
+    )
+
+
+@router.post(
+    API_PATHS["activate"],
+    response_model=ActivateAccountResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Activate user account",
+    description=(
+            "<h3>This endpoint activates a user account using the activation token sent via email. "
+            "The token must be valid and not expired. After successful activation, "
+            "the user's status will be set to active and they will be able to log in. "
+            "The activation token will be automatically deleted after use.</h3>"
+    ),
+    responses={
+        200: {
+            "description": "Account activated successfully",
+            "content": {
+                "application/json": {
+                    "example": ACTIVATE_ACCOUNT_SUCCESS_RESPONSE
+                }
+            }
+        },
+        400: {
+            "description": "Activation error (already activated, invalid token)",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "already_activated": {
+                            "summary": "User already activated",
+                            "description": "User account is already in active status",
+                            "value": ACTIVATION_ALREADY_ACTIVE_ERROR
+                        },
+                        "invalid_token": {
+                            "summary": "Invalid activation token",
+                            "description": "Email and token combination is not valid",
+                            "value": ACTIVATION_INVALID_TOKEN_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "user_not_found": {
+                            "summary": "User not found",
+                            "description": "No user found with the provided email address",
+                            "value": ACTIVATION_USER_NOT_FOUND_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        410: {
+            "description": "Activation token expired",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "token_expired": {
+                            "summary": "Token expired",
+                            "description": "Activation token has expired and cannot be used",
+                            "value": ACTIVATION_EXPIRED_TOKEN_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_email": {
+                            "summary": "Invalid email format",
+                            "description": "Email address format validation failed",
+                            "value": EMAIL_VALIDATION_ERROR
+                        },
+                        "invalid_token": {
+                            "summary": "Invalid token format",
+                            "description": "Token format validation failed",
+                            "value": ACTIVATION_VALIDATION_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": INTERNAL_SERVER_ERROR
+                }
+            }
+        }
+    },
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "activation_request": {
+                            "summary": "Account activation request",
+                            "description": "Example of activation request with email and token",
+                            "value": ACTIVATE_ACCOUNT_REQUEST_EXAMPLE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def activate_account_route(
+        activation_data: ActivateAccountSchema,
+        account_service: AccountServiceInterface = Depends(get_account_service)
+) -> ActivateAccountResponseSchema:
+    """
+    Activate user account with email and token
+
+    Args:
+        activation_data: Account activation data (email and token)
+        account_service: Account service for business logic
+
+    Returns:
+        ActivateAccountResponseSchema: Activated user data with success message
+
+    Raises:
+        HTTPException:
+            - 400 if user already activated or token invalid
+            - 404 if user not found
+            - 410 if token expired
+            - 422 for validation errors
+            - 500 for internal server errors
+    """
+    return await activate_account_controller(
+        activation_data=activation_data,
         account_service=account_service
     )

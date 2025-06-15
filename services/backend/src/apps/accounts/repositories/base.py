@@ -105,6 +105,22 @@ class BaseRepository(AccountsRepositoryMixin):
         else:
             return result or []
 
+    async def _execute_custom_update_query(self, query: str, params: List, log_prefix: str) -> bool:
+        """Execute custom UPDATE/DELETE query and return number of affected rows"""
+        logger.info(f"{log_prefix} query: {query}")
+        logger.info(f"{log_prefix} params: {params}")
+
+        try:
+            cursor = await self._dao.execute(query, params)
+        except (psycopg.Error, psycopg.DatabaseError) as e:
+            logger.error(f"Database error in custom update query: {e}")
+            raise DatabaseQueryError(f"{log_prefix} failed", e)
+        except Exception as e:
+            logger.error(f"Unexpected error in custom update query: {e}")
+            raise DatabaseQueryError(f"{log_prefix} failed with unexpected error", e)
+        else:
+            return True
+
     def _build_delete_query(self, table_name: str) -> tuple[str, list]:
         """Build DELETE query using current WHERE conditions"""
         where_conditions = self._query_builder.get_where_conditions()
