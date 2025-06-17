@@ -33,6 +33,21 @@ class DAOInterface(ABC):
         """
         pass
 
+    @abstractmethod
+    async def begin_transaction(self):
+        """Begin database transaction"""
+        pass
+
+    @abstractmethod
+    async def commit_transaction(self):
+        """Commit database transaction"""
+        pass
+
+    @abstractmethod
+    async def rollback_transaction(self):
+        """Rollback database transaction"""
+        pass
+
 
 class SQLQueryBuilderInterface(ABC):
     """Interface for SQL query builder"""

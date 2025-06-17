@@ -29,6 +29,7 @@ from apps.accounts.repositories.exceptions import (
     TokenRepositoryError,
     UserUpdateError
 )
+from db.transaction_context import atomic
 from security.interfaces import PasswordManagerInterface
 from security.exceptions import EmptyPasswordError, PasswordTooLongError, HashingError
 from notifications.email.interfaces import EmailSenderInterface
@@ -66,6 +67,7 @@ class AccountService(AccountServiceInterface):
         self._password_manager = password_manager
         self._email_sender = email_sender
 
+    @atomic(['_user_repository', '_user_group_repository', '_token_repository'])
     async def register_user(self, user_data: CreateUserDTO) -> UserDTO:
         """
         Register a new user with default group assignment and create activation token
@@ -111,7 +113,8 @@ class AccountService(AccountServiceInterface):
         try:
             created_user = await self._user_repository.create_user(user_data_with_hash)
             logger.info(
-                f"User registration successful for email: {user_data.email}, user_id: {created_user.id}, group: {default_group.name}")
+                f"User registration successful for email: {user_data.email}, user_id: {created_user.id},"
+                f" group: {default_group.name}")
         except RepoUserCreationError as e:
             logger.error(f"Repository user creation failed for {user_data.email}: {e}")
             raise UserCreationError(f"Failed to create user: {e}", e)
@@ -128,6 +131,7 @@ class AccountService(AccountServiceInterface):
 
         return created_user
 
+    @atomic(['_user_repository', '_token_repository'])
     async def activate_account(self, activation_data: ActivateAccountDTO) -> UserDTO:
         """
         Activate user account using email and activation token
