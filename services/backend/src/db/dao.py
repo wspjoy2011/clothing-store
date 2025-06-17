@@ -10,6 +10,7 @@ from typing import (
 import traceback
 
 from psycopg.rows import dict_row, class_row
+from psycopg import IsolationLevel
 
 from db.connection import AsyncConnectionPool
 from db.interfaces import DAOInterface
@@ -17,6 +18,7 @@ from db.transaction_context import _current_transaction
 from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "db")
+
 T = TypeVar('T')
 
 
@@ -29,7 +31,7 @@ class PostgreSQLDAO(DAOInterface):
         self._current_transaction = None
         self._connection_context = None
 
-    async def begin_transaction(self):
+    async def begin_transaction(self, isolation_level: Optional[IsolationLevel] = None):
         """Begin database transaction"""
         try:
             logger.debug("Beginning database transaction...")
@@ -38,6 +40,11 @@ class PostgreSQLDAO(DAOInterface):
                 logger.debug("Getting connection from pool...")
                 self._connection_context = self._connection_pool.connection()
                 self._current_connection = await self._connection_context.__aenter__()
+
+                if isolation_level is not None:
+                    logger.debug(f"Setting isolation level to: {isolation_level.name}")
+                    self._current_connection.isolation_level = isolation_level
+
                 logger.debug("Connection obtained from pool")
 
             if self._current_transaction is None:

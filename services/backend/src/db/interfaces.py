@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, List, Optional, TypeVar, Type, Union, Dict, Self, Tuple
 
+from psycopg import IsolationLevel
+
 T = TypeVar('T')
 
 
@@ -34,7 +36,7 @@ class DAOInterface(ABC):
         pass
 
     @abstractmethod
-    async def begin_transaction(self):
+    async def begin_transaction(self, isolation_level: Optional[IsolationLevel] = None):
         """Begin database transaction"""
         pass
 

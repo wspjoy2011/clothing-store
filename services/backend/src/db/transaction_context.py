@@ -3,6 +3,8 @@ from typing import Optional, List
 from functools import wraps
 import traceback
 
+from psycopg import IsolationLevel
+
 from db.interfaces import DAOInterface
 from settings.logging_config import get_logger
 
@@ -14,8 +16,9 @@ _current_transaction: ContextVar[Optional['TransactionContext']] = ContextVar('c
 class TransactionContext:
     """Context for managing database transactions across multiple DAO calls"""
 
-    def __init__(self, dao: DAOInterface):
+    def __init__(self, dao: DAOInterface, isolation_level: Optional[IsolationLevel] = None):
         self._dao = dao
+        self._isolation_level = isolation_level
         self._connection = None
         self._transaction = None
         self._is_active = False
@@ -25,7 +28,7 @@ class TransactionContext:
         try:
             logger.debug("Starting transaction context...")
 
-            await self._dao.begin_transaction()
+            await self._dao.begin_transaction(self._isolation_level)
 
             self._connection = self._dao._current_connection
             self._transaction = self._dao._current_transaction
@@ -33,7 +36,11 @@ class TransactionContext:
 
             _current_transaction.set(self)
 
-            logger.info("Transaction context started successfully - BEGIN TRANSACTION executed")
+            if self._isolation_level:
+                logger.info(
+                    f"Transaction context started successfully with isolation level: {self._isolation_level.name}")
+            else:
+                logger.info("Transaction context started successfully - BEGIN TRANSACTION executed")
             return self
 
         except Exception as e:
@@ -64,19 +71,18 @@ class TransactionContext:
         return self._connection if self._is_active else None
 
 
-def atomic(repository_attrs: List[str], dao_attr_name: str = '_dao'):
+def atomic(
+        repository_attrs: List[str],
+        dao_attr_name: str = '_dao',
+        isolation_level: Optional[IsolationLevel] = None
+):
     """
     Decorator that wraps method execution in database transaction.
-    Validates that all repositories use the same DAO instance.
 
     Args:
-        repository_attrs: List of repository attribute names that participate in transaction
-        dao_attr_name: Name of DAO attribute in each repository (default: '_dao')
-
-    Example:
-        @atomic(['_user_repository', '_user_group_repository', '_token_repository'])
-        async def register_user(self, user_data):
-            # All repositories will use the same transaction
+        repository_attrs: List of repository attribute names
+        dao_attr_name: Name of DAO attribute in each repository
+        isolation_level: Transaction isolation level
     """
 
     def decorator(func):
@@ -85,6 +91,9 @@ def atomic(repository_attrs: List[str], dao_attr_name: str = '_dao'):
             try:
                 logger.debug(
                     f"@atomic decorator called for function: {func.__name__} with repositories: {repository_attrs}")
+
+                if isolation_level:
+                    logger.debug(f"Transaction isolation level: {isolation_level.name}")
 
                 current_tx = _current_transaction.get()
                 if current_tx and current_tx._is_active:
@@ -101,14 +110,16 @@ def atomic(repository_attrs: List[str], dao_attr_name: str = '_dao'):
                 for repo_attr in repository_attrs:
                     if not hasattr(service_instance, repo_attr):
                         logger.warning(
-                            f"Repository attribute '{repo_attr}' not found in {type(service_instance).__name__}, executing without transaction")
+                            f"Repository attribute '{repo_attr}' not found in {type(service_instance).__name__},"
+                            f" executing without transaction")
                         return await func(*args, **kwargs)
 
                     repository = getattr(service_instance, repo_attr)
 
                     if not hasattr(repository, dao_attr_name):
                         logger.warning(
-                            f"DAO attribute '{dao_attr_name}' not found in repository '{repo_attr}', executing without transaction")
+                            f"DAO attribute '{dao_attr_name}' not found in repository '{repo_attr}',"
+                            f" executing without transaction")
                         return await func(*args, **kwargs)
 
                     dao = getattr(repository, dao_attr_name)
@@ -131,7 +142,7 @@ def atomic(repository_attrs: List[str], dao_attr_name: str = '_dao'):
                 logger.info(f"All {len(daos)} repositories use the same DAO instance. Transaction integrity validated.")
 
                 logger.debug("Creating new transaction context with shared DAO")
-                async with TransactionContext(first_dao):
+                async with TransactionContext(first_dao, isolation_level):
                     logger.debug(f"Executing {func.__name__} within transaction")
                     result = await func(*args, **kwargs)
                     logger.debug(f"Function {func.__name__} completed successfully")
