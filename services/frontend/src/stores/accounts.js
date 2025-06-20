@@ -8,6 +8,10 @@ export const useAccountStore = defineStore('accounts', {
         registrationError: null,
         registrationSuccess: false,
 
+        activationLoading: false,
+        activationError: null,
+        activationSuccess: false,
+
         currentUser: null,
         isAuthenticated: false,
     }),
@@ -47,6 +51,38 @@ export const useAccountStore = defineStore('accounts', {
 
         isEmailAlreadyExists() {
             return this.registrationError?.status === 409;
+        },
+
+        isActivating() {
+            return this.activationLoading;
+        },
+
+        hasActivationError() {
+            return this.activationError !== null;
+        },
+
+        activationErrorMessage() {
+            if (!this.activationError) return '';
+
+            switch (this.activationError.status) {
+                case 404:
+                    return this.activationError.message || 'User not found. Please check your email address.';
+
+                case 400:
+                    return this.activationError.message || 'Invalid activation data or account already activated.';
+
+                case 410:
+                    return this.activationError.message || 'Activation token has expired. Please request a new activation email.';
+
+                case 422:
+                    return this.activationError.message || 'Invalid activation link format.';
+
+                case 500:
+                    return 'Server error. Please try again later.';
+
+                default:
+                    return this.activationError.message || 'Account activation failed. Please try again.';
+            }
         },
 
         userEmail() {
@@ -107,6 +143,57 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Activate user account
+         * @param {Object} activationData - Account activation data
+         * @param {string} activationData.email - User email
+         * @param {string} activationData.token - Activation token
+         * @returns {Promise<Object>} - Activation result
+         */
+        async activate(activationData) {
+            this.activationLoading = true;
+            this.activationError = null;
+            this.activationSuccess = false;
+
+            try {
+                const response = await accountService.activate({
+                    email: activationData.email,
+                    token: activationData.token
+                });
+
+                this.activationSuccess = true;
+
+                if (response.user) {
+                    this.currentUser = response.user;
+                    this.isAuthenticated = true;
+                }
+
+                return {
+                    success: true,
+                    data: response,
+                    message: response.message || 'Account activated successfully'
+                };
+
+            } catch (err) {
+                this.activationError = {
+                    status: err.status || 500,
+                    message: err.message || 'Account activation failed',
+                    field: err.field || null
+                };
+
+                this.activationSuccess = false;
+
+                return {
+                    success: false,
+                    error: this.activationError,
+                    message: this.activationErrorMessage
+                };
+
+            } finally {
+                this.activationLoading = false;
+            }
+        },
+
+        /**
          * Clear registration state
          */
         clearRegistrationState() {
@@ -116,12 +203,24 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Clear activation state
+         */
+        clearActivationState() {
+            this.activationError = null;
+            this.activationSuccess = false;
+            this.activationLoading = false;
+        },
+
+        /**
          * Clear all account state
          */
         resetState() {
             this.registrationLoading = false;
             this.registrationError = null;
             this.registrationSuccess = false;
+            this.activationLoading = false;
+            this.activationError = null;
+            this.activationSuccess = false;
             this.currentUser = null;
             this.isAuthenticated = false;
         },
@@ -133,6 +232,7 @@ export const useAccountStore = defineStore('accounts', {
             this.currentUser = null;
             this.isAuthenticated = false;
             this.clearRegistrationState();
+            this.clearActivationState();
         }
     }
 });

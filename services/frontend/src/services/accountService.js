@@ -16,5 +16,17 @@ export default {
     async register(userData) {
         const response = await api.post(`${BASE_URL}/register`, userData);
         return response.data;
+    },
+
+    /**
+     * Activate user account
+     * @param {Object} activationData - Account activation data
+     * @param {string} activationData.email - User email address
+     * @param {string} activationData.token - Activation token
+     * @returns {Promise<Object>} - Activation response data
+     */
+    async activate(activationData) {
+        const response = await api.post(`${BASE_URL}/activate`, activationData);
+        return response.data;
     }
 }

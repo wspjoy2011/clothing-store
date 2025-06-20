@@ -8,6 +8,7 @@ import CatalogPage from '@/views/CatalogPage.vue'
 import CategoryPage from '@/views/CategoryPage.vue'
 import ProductDetailPage from '@/views/ProductDetailPage.vue'
 import RegisterPage from '@/views/RegisterPage.vue'
+import ActivatePage from '@/views/ActivatePage.vue'
 
 const processCatalogRouteProps = (route) => {
     const preferencesStore = useUserPreferencesStore();
@@ -72,6 +73,13 @@ const processProductRouteProps = (route) => {
     }
 };
 
+const processActivationRouteProps = (route) => {
+    return {
+        email: route.query.email || '',
+        token: route.query.token || ''
+    }
+};
+
 const routes = [
     {
         path: '/',
@@ -114,6 +122,16 @@ const routes = [
         component: RegisterPage,
         meta: {
             title: 'Register - StyleShop',
+            requiresGuest: true
+        }
+    },
+    {
+        path: '/accounts/activate',
+        name: 'activate',
+        component: ActivatePage,
+        props: processActivationRouteProps,
+        meta: {
+            title: 'Activate Account - StyleShop',
             requiresGuest: true
         }
     }
@@ -168,6 +186,8 @@ router.beforeEach(async (to, from, next) => {
         document.title = 'StyleShop - Product Details';
     } else if (to.name === 'register') {
         document.title = 'StyleShop - Register';
+    } else if (to.name === 'activate') {
+        document.title = 'StyleShop - Activate Account';
     } else {
         document.title = to.name === 'catalog' ? 'StyleShop - Catalog' : 'StyleShop';
     }
