@@ -1,6 +1,8 @@
 """Interfaces for security components"""
 
 from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Dict, Any
 
 
 class PasswordManagerInterface(ABC):
@@ -86,5 +88,101 @@ class PasswordManagerInterface(ABC):
 
         Returns:
             True if hash is supported, False otherwise
+        """
+        pass
+
+
+class JWTManagerInterface(ABC):
+    """Interface for JWT token management operations."""
+
+    @abstractmethod
+    def create_access_token(self, data: Dict[str, Any]) -> str:
+        """
+        Create a new access token.
+
+        Args:
+            data: Dictionary containing the payload data
+
+        Returns:
+            The encoded JWT access token string
+
+        Raises:
+            TokenCreationError: If token creation fails
+        """
+        pass
+
+    @abstractmethod
+    def create_refresh_token(self, data: Dict[str, Any]) -> str:
+        """
+        Create a new refresh token.
+
+        Args:
+            data: Dictionary containing the payload data
+
+        Returns:
+            The encoded JWT refresh token string
+
+        Raises:
+            TokenCreationError: If token creation fails
+        """
+        pass
+
+    @abstractmethod
+    def verify_access_token(self, token: str) -> Dict[str, Any]:
+        """
+        Verify and decode an access token.
+
+        Args:
+            token: The JWT access token to verify
+
+        Returns:
+            The decoded payload
+
+        Raises:
+            EmptyTokenError: If token is empty or None
+            ExpiredTokenError: If token is expired
+            InvalidTokenError: If token is invalid or malformed
+            TokenSignatureError: If token signature is invalid
+            InvalidTokenTypeError: If token type is not 'access'
+            TokenVerificationError: If verification fails for other reasons
+        """
+        pass
+
+    @abstractmethod
+    def verify_refresh_token(self, token: str) -> Dict[str, Any]:
+        """
+        Verify and decode a refresh token.
+
+        Args:
+            token: The JWT refresh token to verify
+
+        Returns:
+            The decoded payload
+
+        Raises:
+            EmptyTokenError: If token is empty or None
+            ExpiredTokenError: If token is expired
+            InvalidTokenError: If token is invalid or malformed
+            TokenSignatureError: If token signature is invalid
+            InvalidTokenTypeError: If token type is not 'refresh'
+            TokenVerificationError: If verification fails for other reasons
+        """
+        pass
+
+    @abstractmethod
+    def get_token_expiration(self, token: str) -> datetime:
+        """
+        Get the expiration time of a token.
+
+        Args:
+            token: The JWT token
+
+        Returns:
+            The expiration datetime
+
+        Raises:
+            EmptyTokenError: If token is empty or None
+            InvalidTokenError: If token is invalid or malformed
+            TokenVerificationError: If token doesn't contain expiration
         """
         pass

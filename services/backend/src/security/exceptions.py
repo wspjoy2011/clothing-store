@@ -42,3 +42,43 @@ class VerificationError(PasswordError):
 class HashContextError(SecurityError):
     """Exception for password context configuration errors"""
     pass
+
+
+class TokenError(SecurityError):
+    """Base exception for token-related errors"""
+    pass
+
+
+class TokenCreationError(TokenError):
+    """Exception raised when token creation fails"""
+    pass
+
+
+class TokenVerificationError(TokenError):
+    """Exception raised when token verification fails"""
+    pass
+
+
+class InvalidTokenError(TokenError):
+    """Exception raised when token is invalid or malformed"""
+    pass
+
+
+class ExpiredTokenError(TokenError):
+    """Exception raised when token is expired"""
+    pass
+
+
+class InvalidTokenTypeError(TokenError):
+    """Exception raised when token type is invalid or unexpected"""
+    pass
+
+
+class EmptyTokenError(TokenError):
+    """Exception raised when token is empty or None"""
+    pass
+
+
+class TokenSignatureError(TokenError):
+    """Exception raised when token signature is invalid"""
+    pass

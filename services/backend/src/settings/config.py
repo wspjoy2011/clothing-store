@@ -46,6 +46,13 @@ class AppConfig(BaseSettings):
     EMAIL_USE_TLS: str
     EMAIL_USE_SSL: str
 
+    # JWT settings
+    JWT_SECRET_KEY_ACCESS: str
+    JWT_SECRET_KEY_REFRESH: str
+    JWT_SIGNING_ALGORITHM: str
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
+    JWT_REFRESH_TOKEN_EXPIRE_MINUTES: int
+
     # Token settings
     ACTIVATION_TOKEN_VALID_DAYS: int = 7
 
@@ -114,6 +121,17 @@ class AppConfig(BaseSettings):
             "use_tls": use_tls,
             "use_ssl": use_ssl,
             "timeout": 30
+        }
+
+    @property
+    def JWT_CONFIG(self) -> dict:
+        """Complete configuration dictionary for JWT tokens"""
+        return {
+            "access_secret": self.JWT_SECRET_KEY_ACCESS,
+            "refresh_secret": self.JWT_SECRET_KEY_REFRESH,
+            "algorithm": self.JWT_SIGNING_ALGORITHM,
+            "access_expire_minutes": self.JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
+            "refresh_expire_minutes": self.JWT_REFRESH_TOKEN_EXPIRE_MINUTES
         }
 
     def build_frontend_url(self, path: str, **params) -> str:

@@ -16,8 +16,8 @@ from db.dependencies import get_database_dao, get_query_builder
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
 from notifications.dependencies import get_email_sender_dependency
 from notifications.email.interfaces import EmailSenderInterface
-from security.dependencies import get_password_manager
-from security.interfaces import PasswordManagerInterface
+from security.dependencies import get_password_manager, get_jwt_manager
+from security.interfaces import PasswordManagerInterface, JWTManagerInterface
 
 
 async def get_user_repository(
@@ -93,6 +93,7 @@ async def get_account_service(
         user_group_repository: UserGroupRepositoryInterface = Depends(get_user_group_repository),
         token_repository: TokenRepositoryInterface = Depends(get_token_repository),
         password_manager: PasswordManagerInterface = Depends(get_password_manager),
+        jwt_manager: JWTManagerInterface = Depends(get_jwt_manager),
         email_sender: EmailSenderInterface = Depends(get_email_sender_dependency)
 ) -> AccountServiceInterface:
     """
@@ -103,6 +104,7 @@ async def get_account_service(
         user_group_repository: Repository for user group operations
         token_repository: Repository for token operations
         password_manager: Manager for password hashing and verification
+        jwt_manager: Manager for JWT token operations
         email_sender: Email sender for notifications
 
     Returns:
@@ -113,5 +115,6 @@ async def get_account_service(
         user_group_repository=user_group_repository,
         token_repository=token_repository,
         password_manager=password_manager,
+        jwt_manager=jwt_manager,
         email_sender=email_sender
     )

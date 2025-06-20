@@ -30,7 +30,7 @@ from apps.accounts.repositories.exceptions import (
     UserUpdateError
 )
 from db.transaction_context import atomic
-from security.interfaces import PasswordManagerInterface
+from security.interfaces import PasswordManagerInterface, JWTManagerInterface
 from security.exceptions import EmptyPasswordError, PasswordTooLongError, HashingError
 from notifications.email.interfaces import EmailSenderInterface
 from notifications.exceptions.email import BaseEmailError
@@ -49,6 +49,7 @@ class AccountService(AccountServiceInterface):
             user_group_repository: UserGroupRepositoryInterface,
             token_repository: TokenRepositoryInterface,
             password_manager: PasswordManagerInterface,
+            jwt_manager: JWTManagerInterface,
             email_sender: EmailSenderInterface
     ):
         """
@@ -65,6 +66,7 @@ class AccountService(AccountServiceInterface):
         self._user_group_repository = user_group_repository
         self._token_repository = token_repository
         self._password_manager = password_manager
+        self._jwt_manager = jwt_manager
         self._email_sender = email_sender
 
     @atomic(['_user_repository', '_user_group_repository', '_token_repository'])
