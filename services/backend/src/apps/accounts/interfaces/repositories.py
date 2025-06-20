@@ -277,6 +277,11 @@ class TokenRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def delete_activation_tokens_by_user_id(self, user_id: int) -> bool:
+        """Delete all activation tokens for user"""
+        pass
+
+    @abstractmethod
     async def get_password_reset_token_by_token(self, token: str) -> Optional[PasswordResetTokenDTO]:
         """Get password reset token by token string"""
         pass

@@ -27,6 +27,7 @@ class EmailSender(EmailSenderInterface):
             use_ssl: bool,
             template_dir: str,
             activation_email_template_name: str,
+            resend_activation_email_template_name: str,
             activation_complete_email_template_name: str,
             password_email_template_name: str,
             password_complete_email_template_name: str,
@@ -40,6 +41,7 @@ class EmailSender(EmailSenderInterface):
         self._use_ssl = use_ssl
         self._timeout = timeout
         self._activation_email_template_name = activation_email_template_name
+        self._resend_activation_email_template_name = resend_activation_email_template_name
         self._activation_complete_email_template_name = activation_complete_email_template_name
         self._password_email_template_name = password_email_template_name
         self._password_complete_email_template_name = password_complete_email_template_name
@@ -182,6 +184,31 @@ class EmailSender(EmailSenderInterface):
             raise
         except Exception as e:
             error_msg = f"Unexpected error sending activation email to {email}"
+            self._logger.error(f"{error_msg}: {e}")
+            raise BaseEmailError(error_msg, e)
+
+    async def send_resend_activation_email(self, email: str, activation_link: str) -> None:
+        """
+        Send a resend activation email asynchronously.
+
+        Args:
+            email (str): The recipient's email address.
+            activation_link (str): The activation link to be included in the email.
+        """
+        self._logger.info(f"Preparing resend activation email for {email}")
+
+        try:
+            html_content = self._render_template(
+                self._resend_activation_email_template_name,
+                email=email,
+                activation_link=activation_link
+            )
+            subject = "New Activation Link - Account Activation"
+            await self._send_email(email, subject, html_content)
+        except (EmailTemplateError, BaseEmailError):
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error sending resend activation email to {email}"
             self._logger.error(f"{error_msg}: {e}")
             raise BaseEmailError(error_msg, e)
 

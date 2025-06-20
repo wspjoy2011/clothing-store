@@ -8,7 +8,12 @@ from apps.accounts.dto.users import CreateUserDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.interfaces.services import AccountServiceInterface
 from apps.accounts.schemas.user import CreateUserSchema, CreateUserResponseSchema, UserResponseSchema
-from apps.accounts.schemas.activation import ActivateAccountSchema, ActivateAccountResponseSchema
+from apps.accounts.schemas.activation import (
+    ActivateAccountSchema,
+    ActivateAccountResponseSchema,
+    ResendActivationSchema,
+    ResendActivationResponseSchema
+)
 from apps.accounts.services.exceptions import (
     EmailAlreadyExistsError,
     UserCreationError,
@@ -121,4 +126,45 @@ async def activate_account_controller(
         return ActivateAccountResponseSchema(
             user=user_response,
             message="Account activated successfully"
+        )
+
+
+async def resend_activation_controller(
+        resend_data: ResendActivationSchema,
+        account_service: AccountServiceInterface,
+) -> ResendActivationResponseSchema:
+    """
+    Controller for resending activation email
+
+    Args:
+        resend_data: Resend activation data from request
+        account_service: Account service for business logic
+
+    Returns:
+        ResendActivationResponseSchema with success message and email
+
+    Raises:
+        HTTPException: 404 if user not found, 400 if user already activated, 500 for server errors
+    """
+    try:
+        await account_service.resend_activation_email(str(resend_data.email))
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+    except UserAlreadyActivatedError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error occurred during activation email resend"
+        )
+    else:
+        return ResendActivationResponseSchema(
+            message="Activation email sent successfully",
+            email=str(resend_data.email)
         )

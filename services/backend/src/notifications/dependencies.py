@@ -34,6 +34,7 @@ def get_email_sender() -> EmailSenderInterface:
         use_ssl=email_config["use_ssl"],
         template_dir=str(template_dir),
         activation_email_template_name="activation_request.html",
+        resend_activation_email_template_name="resend_activation_request.html",
         activation_complete_email_template_name="activation_complete.html",
         password_email_template_name="password_reset_request.html",
         password_complete_email_template_name="password_reset_complete.html",

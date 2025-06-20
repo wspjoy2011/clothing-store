@@ -100,6 +100,20 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
 
         return result is not None
 
+    async def delete_activation_tokens_by_user_id(self, user_id: int) -> bool:
+        """Delete all activation tokens for user"""
+        query = f"DELETE FROM {self.APP_NAME}_activation_tokens WHERE user_id = %s"
+        params = [user_id]
+
+        try:
+            result = await self._execute_custom_update_query(query, params, "Delete activation tokens by user ID")
+            logger.info(f"Deleted activation tokens for user {user_id}")
+            return result
+        except Exception as e:
+            if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
+                raise TokenDeletionError(f"Failed to delete activation tokens for user ID: {user_id}", e)
+            raise TokenDeletionError(f"Unexpected error deleting activation tokens for user ID: {user_id}", e)
+
     async def get_password_reset_token_by_token(self, token: str) -> Optional[PasswordResetTokenDTO]:
         """Get password reset token by token string"""
         self._build_password_reset_token_query()

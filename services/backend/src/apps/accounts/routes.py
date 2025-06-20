@@ -2,7 +2,11 @@
 
 from fastapi import APIRouter, Depends, status
 
-from apps.accounts.controllers import create_user_controller, activate_account_controller
+from apps.accounts.controllers import (
+    create_user_controller,
+    activate_account_controller,
+    resend_activation_controller
+)
 from apps.accounts.dependencies import get_account_service
 from apps.accounts.interfaces.services import AccountServiceInterface
 from apps.accounts.schemas.examples.errors import (
@@ -25,18 +29,29 @@ from apps.accounts.schemas.examples.user import (
 from apps.accounts.schemas.examples.activation import (
     ACTIVATE_ACCOUNT_REQUEST_EXAMPLE,
     ACTIVATE_ACCOUNT_SUCCESS_RESPONSE,
+    RESEND_ACTIVATION_REQUEST_EXAMPLE,
+    RESEND_ACTIVATION_SUCCESS_RESPONSE,
     ACTIVATION_USER_NOT_FOUND_ERROR,
     ACTIVATION_ALREADY_ACTIVE_ERROR,
     ACTIVATION_INVALID_TOKEN_ERROR,
     ACTIVATION_EXPIRED_TOKEN_ERROR,
-    ACTIVATION_VALIDATION_ERROR
+    ACTIVATION_VALIDATION_ERROR,
+    RESEND_ALREADY_ACTIVE_ERROR,
+    RESEND_USER_NOT_FOUND_ERROR,
+    RESEND_RATE_LIMIT_ERROR
 )
 from apps.accounts.schemas.user import CreateUserSchema, CreateUserResponseSchema
-from apps.accounts.schemas.activation import ActivateAccountSchema, ActivateAccountResponseSchema
+from apps.accounts.schemas.activation import (
+    ActivateAccountSchema,
+    ActivateAccountResponseSchema,
+    ResendActivationSchema,
+    ResendActivationResponseSchema
+)
 
 API_PATHS: dict[str, str] = {
     "register": "/register",
     "activate": "/activate",
+    "resend_activation": "/resend-activation",
 }
 
 router = APIRouter(
@@ -310,5 +325,124 @@ async def activate_account_route(
     """
     return await activate_account_controller(
         activation_data=activation_data,
+        account_service=account_service
+    )
+
+
+@router.post(
+    API_PATHS["resend_activation"],
+    response_model=ResendActivationResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Resend activation email",
+    description=(
+            "<h3>This endpoint resends the activation email to a user who has not yet activated their account. "
+            "A new activation token will be generated and the old one will be invalidated for security. "
+            "The endpoint will only work for users who are registered but not yet activated. "
+            "Rate limiting may apply to prevent abuse.</h3>"
+    ),
+    responses={
+        200: {
+            "description": "Activation email sent successfully",
+            "content": {
+                "application/json": {
+                    "example": RESEND_ACTIVATION_SUCCESS_RESPONSE
+                }
+            }
+        },
+        400: {
+            "description": "User already activated or other business logic error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "already_activated": {
+                            "summary": "User already activated",
+                            "description": "User account is already in active status and doesn't need reactivation",
+                            "value": RESEND_ALREADY_ACTIVE_ERROR
+                        },
+                        "rate_limit": {
+                            "summary": "Rate limit exceeded",
+                            "description": "Activation email was sent recently, please wait before requesting again",
+                            "value": RESEND_RATE_LIMIT_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "user_not_found": {
+                            "summary": "User not found",
+                            "description": "No user found with the provided email address",
+                            "value": RESEND_USER_NOT_FOUND_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_email": {
+                            "summary": "Invalid email format",
+                            "description": "Email address format validation failed",
+                            "value": EMAIL_VALIDATION_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": INTERNAL_SERVER_ERROR
+                }
+            }
+        }
+    },
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "resend_activation_request": {
+                            "summary": "Resend activation email request",
+                            "description": "Example of resend activation request with email only",
+                            "value": RESEND_ACTIVATION_REQUEST_EXAMPLE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def resend_activation_route(
+        resend_data: ResendActivationSchema,
+        account_service: AccountServiceInterface = Depends(get_account_service)
+) -> ResendActivationResponseSchema:
+    """
+    Resend activation email to user
+
+    Args:
+        resend_data: Resend activation data (email only)
+        account_service: Account service for business logic
+
+    Returns:
+        ResendActivationResponseSchema: Success message with email confirmation
+
+    Raises:
+        HTTPException:
+            - 400 if user already activated or rate limit exceeded
+            - 404 if user not found
+            - 422 for validation errors
+            - 500 for internal server errors
+    """
+    return await resend_activation_controller(
+        resend_data=resend_data,
         account_service=account_service
     )

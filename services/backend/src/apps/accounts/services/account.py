@@ -203,6 +203,55 @@ class AccountService(AccountServiceInterface):
         logger.info(f"Account activation completed successfully for email: {activation_data.email}")
         return updated_user
 
+    @atomic(['_user_repository', '_token_repository'])
+    async def resend_activation_email(self, email: str) -> bool:
+        """
+        Resend activation email for existing user
+
+        Deletes any existing activation tokens and creates a new one
+
+        Args:
+            email: User email address
+
+        Returns:
+            True if email was sent successfully
+
+        Raises:
+            UserNotFoundError: If user with given email is not found
+            UserAlreadyActivatedError: If user is already activated
+            TokenCreationError: If token creation fails
+            BaseEmailError: If email sending fails
+        """
+        logger.info(f"Starting resend activation email for: {email}")
+
+        user = await self._user_repository.get_user_by_email(email)
+        if not user:
+            logger.warning(f"Resend activation failed: User with email {email} not found")
+            raise UserNotFoundError(f"User with email '{email}' not found")
+
+        if user.is_active:
+            logger.warning(f"Resend activation failed: User with email {email} is already activated")
+            raise UserAlreadyActivatedError(f"User with email '{email}' is already activated")
+
+        try:
+            await self._token_repository.delete_activation_tokens_by_user_id(user.id)
+            logger.info(f"Deleted existing activation tokens for user {user.id}")
+
+            activation_token = await self._create_activation_token(user.id)
+            logger.info(f"New activation token created for user: {email}, user_id: {user.id}")
+
+            await self._send_resend_activation_email(email, activation_token)
+            logger.info(f"Resend activation email sent successfully to {email}")
+
+            return True
+
+        except TokenCreationError as e:
+            logger.error(f"Failed to create activation token for user {user.id}: {e}")
+            raise
+        except BaseEmailError as e:
+            logger.error(f"Failed to send resend activation email to {email}: {e}")
+            raise
+
     async def _create_activation_token(self, user_id: int) -> str:
         """
         Create activation token for user
@@ -256,6 +305,28 @@ class AccountService(AccountServiceInterface):
             logger.info(f"Activation email sent successfully to {email}")
         except BaseEmailError as e:
             logger.error(f"Failed to send activation email to {email}: {e}")
+            raise
+
+    async def _send_resend_activation_email(self, email: str, token: str) -> None:
+        """
+        Send resend activation email to user
+
+        Args:
+            email: User's email address
+            token: Activation token
+
+        Raises:
+            BaseEmailError: If email sending fails
+        """
+        activation_link = config.build_frontend_url('/accounts/activate', token=token, email=email)
+
+        logger.info(f"Sending resend activation email to {email}")
+
+        try:
+            await self._email_sender.send_resend_activation_email(email, activation_link)
+            logger.info(f"Resend activation email sent successfully to {email}")
+        except BaseEmailError as e:
+            logger.error(f"Failed to send resend activation email to {email}: {e}")
             raise
 
     async def _send_activation_complete_email(self, email: str) -> None:

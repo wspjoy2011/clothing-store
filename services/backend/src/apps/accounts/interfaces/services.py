@@ -45,3 +45,24 @@ class AccountServiceInterface(ABC):
             ExpiredActivationTokenError: If activation token has expired
         """
         pass
+
+    @abstractmethod
+    async def resend_activation_email(self, email: str) -> bool:
+        """
+        Resend activation email for existing user
+
+        Deletes any existing activation tokens and creates a new one
+
+        Args:
+            email: User email address
+
+        Returns:
+            True if email was sent successfully
+
+        Raises:
+            UserNotFoundError: If user with given email is not found
+            UserAlreadyActivatedError: If user is already activated
+            TokenCreationError: If token creation fails
+            BaseEmailError: If email sending fails
+        """
+        pass

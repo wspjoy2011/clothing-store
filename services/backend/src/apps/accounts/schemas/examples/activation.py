@@ -62,6 +62,18 @@ ACTIVATION_VALIDATION_ERROR = {
     "message": "Token is too short"
 }
 
+RESEND_ALREADY_ACTIVE_ERROR = {
+    "detail": "User with email 'john.doe@example.com' is already activated"
+}
+
+RESEND_USER_NOT_FOUND_ERROR = {
+    "detail": "User with email 'unknown@example.com' not found"
+}
+
+RESEND_RATE_LIMIT_ERROR = {
+    "detail": "Activation email was already sent recently. Please check your inbox or try again later."
+}
+
 ACTIVATION_TOKEN_EXAMPLES = [
     "AbCdEf123456789XyZ-_TokenExample123",
     "Xy9ZpQ8rM7nB6vC5xW4e3R2t1Y0uI9oP",
@@ -109,8 +121,4 @@ ACTIVATION_WORKFLOW_EXAMPLES = {
 
 ACTIVATION_RATE_LIMIT_ERROR = {
     "detail": "Too many activation attempts. Please try again later."
-}
-
-RESEND_RATE_LIMIT_ERROR = {
-    "detail": "Activation email was already sent recently. Please check your inbox or try again later."
 }
