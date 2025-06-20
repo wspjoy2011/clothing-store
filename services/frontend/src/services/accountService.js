@@ -28,5 +28,16 @@ export default {
     async activate(activationData) {
         const response = await api.post(`${BASE_URL}/activate`, activationData);
         return response.data;
+    },
+
+    /**
+     * Resend activation email
+     * @param {Object} resendData - Resend activation data
+     * @param {string} resendData.email - User email address
+     * @returns {Promise<Object>} - Resend response data
+     */
+    async resendActivation(resendData) {
+        const response = await api.post(`${BASE_URL}/resend-activation`, resendData);
+        return response.data;
     }
 }

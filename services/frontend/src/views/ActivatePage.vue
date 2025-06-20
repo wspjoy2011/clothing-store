@@ -92,13 +92,27 @@
                       Try Again
                     </v-btn>
 
+                    <!-- Show Resend Button if token expired (410) -->
+                    <v-btn
+                        color="warning"
+                        size="large"
+                        class="action-btn"
+                        :class="{ 'mt-3': canRetry }"
+                        @click="goToResendActivation"
+                        v-if="isTokenExpired"
+                    >
+                      <v-icon start icon="mdi-email-refresh"></v-icon>
+                      Resend Activation Email
+                    </v-btn>
+
+                    <!-- Show Register Button for other errors (404, etc.) -->
                     <v-btn
                         variant="outlined"
                         size="large"
                         class="action-btn"
-                        :class="{ 'mt-3': canRetry }"
+                        :class="{ 'mt-3': canRetry || isTokenExpired }"
                         @click="goToRegister"
-                        v-if="shouldShowRegister"
+                        v-if="shouldShowRegister && !isTokenExpired"
                     >
                       <v-icon start icon="mdi-account-plus"></v-icon>
                       Register New Account
@@ -108,7 +122,7 @@
                         variant="outlined"
                         size="large"
                         class="action-btn"
-                        :class="{ 'mt-3': canRetry || shouldShowRegister }"
+                        :class="{ 'mt-3': canRetry || shouldShowRegister || isTokenExpired }"
                         @click="goToHome"
                     >
                       <v-icon start icon="mdi-home"></v-icon>
@@ -192,6 +206,7 @@ const isLoading = computed(() => accountStore.isActivating)
 const activationSuccess = computed(() => accountStore.activationSuccess)
 const hasError = computed(() => accountStore.hasActivationError)
 const errorMessage = computed(() => accountStore.activationErrorMessage)
+const isTokenExpired = computed(() => accountStore.isTokenExpired)
 
 const hasValidParams = computed(() => {
   return props.email && props.token
@@ -232,7 +247,7 @@ const canRetry = computed(() => {
 
 const shouldShowRegister = computed(() => {
   const status = accountStore.activationError?.status
-  return status === 404 || status === 410
+  return status === 404
 })
 
 const activateAccount = async () => {
@@ -270,6 +285,13 @@ const goToHome = () => {
 
 const goToRegister = () => {
   router.push({name: 'register'})
+}
+
+const goToResendActivation = () => {
+  router.push({
+    name: 'resend-activation',
+    query: props.email ? {email: props.email} : {}
+  })
 }
 
 watch([() => props.email, () => props.token], ([newEmail, newToken]) => {

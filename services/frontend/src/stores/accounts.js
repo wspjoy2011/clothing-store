@@ -12,6 +12,10 @@ export const useAccountStore = defineStore('accounts', {
         activationError: null,
         activationSuccess: false,
 
+        resendLoading: false,
+        resendError: null,
+        resendSuccess: false,
+
         currentUser: null,
         isAuthenticated: false,
     }),
@@ -82,6 +86,39 @@ export const useAccountStore = defineStore('accounts', {
 
                 default:
                     return this.activationError.message || 'Account activation failed. Please try again.';
+            }
+        },
+
+        isTokenExpired() {
+            return this.activationError?.status === 410;
+        },
+
+        isResending() {
+            return this.resendLoading;
+        },
+
+        hasResendError() {
+            return this.resendError !== null;
+        },
+
+        resendErrorMessage() {
+            if (!this.resendError) return '';
+
+            switch (this.resendError.status) {
+                case 404:
+                    return this.resendError.message || 'User not found. Please check your email address.';
+
+                case 400:
+                    return this.resendError.message || 'This account is already activated or invalid request.';
+
+                case 422:
+                    return this.resendError.message || 'Please enter a valid email address.';
+
+                case 500:
+                    return 'Server error. Please try again later.';
+
+                default:
+                    return this.resendError.message || 'Failed to send activation email. Please try again.';
             }
         },
 
@@ -194,6 +231,50 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Resend activation email
+         * @param {Object} resendData - Resend activation data
+         * @param {string} resendData.email - User email
+         * @returns {Promise<Object>} - Resend result
+         */
+        async resendActivation(resendData) {
+            this.resendLoading = true;
+            this.resendError = null;
+            this.resendSuccess = false;
+
+            try {
+                const response = await accountService.resendActivation({
+                    email: resendData.email
+                });
+
+                this.resendSuccess = true;
+
+                return {
+                    success: true,
+                    data: response,
+                    message: response.message || 'Activation email sent successfully'
+                };
+
+            } catch (err) {
+                this.resendError = {
+                    status: err.status || 500,
+                    message: err.message || 'Failed to send activation email',
+                    field: err.field || null
+                };
+
+                this.resendSuccess = false;
+
+                return {
+                    success: false,
+                    error: this.resendError,
+                    message: this.resendErrorMessage
+                };
+
+            } finally {
+                this.resendLoading = false;
+            }
+        },
+
+        /**
          * Clear registration state
          */
         clearRegistrationState() {
@@ -212,6 +293,15 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Clear resend state
+         */
+        clearResendState() {
+            this.resendError = null;
+            this.resendSuccess = false;
+            this.resendLoading = false;
+        },
+
+        /**
          * Clear all account state
          */
         resetState() {
@@ -221,6 +311,9 @@ export const useAccountStore = defineStore('accounts', {
             this.activationLoading = false;
             this.activationError = null;
             this.activationSuccess = false;
+            this.resendLoading = false;
+            this.resendError = null;
+            this.resendSuccess = false;
             this.currentUser = null;
             this.isAuthenticated = false;
         },
@@ -233,6 +326,7 @@ export const useAccountStore = defineStore('accounts', {
             this.isAuthenticated = false;
             this.clearRegistrationState();
             this.clearActivationState();
+            this.clearResendState();
         }
     }
 });
