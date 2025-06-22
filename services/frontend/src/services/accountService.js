@@ -19,6 +19,18 @@ export default {
     },
 
     /**
+     * Login user
+     * @param {Object} loginData - User login data
+     * @param {string} loginData.email - User email address
+     * @param {string} loginData.password - User password
+     * @returns {Promise<Object>} - Login response data
+     */
+    async login(loginData) {
+        const response = await api.post(`${BASE_URL}/login`, loginData);
+        return response.data;
+    },
+
+    /**
      * Activate user account
      * @param {Object} activationData - Account activation data
      * @param {string} activationData.email - User email address

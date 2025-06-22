@@ -344,6 +344,7 @@ import {useTheme} from 'vuetify';
 import {useRouter, useRoute} from 'vue-router';
 import {useCatalogStore} from '@/stores/catalog';
 import {useCategoryStore} from '@/stores/categoryStore';
+import {useNavigation} from '@/composables/accounts/useNavigation';
 import ThemeToggle from '@/components/ui/theme/ThemeToggle.vue';
 import SearchBar from '@/components/ui/search/SearchBar.vue';
 import CategoryMenu from '@/components/catalog/CategoryMenu.vue';
@@ -360,6 +361,8 @@ const showMobileSearch = ref(false);
 const mobileSearchQuery = ref('');
 const isSearchLoading = ref(false);
 const categoryPathVisible = ref(false);
+
+const { goToLogin } = useNavigation();
 
 const isDarkTheme = computed(() => {
   return theme.global.current.value.dark;
@@ -483,11 +486,6 @@ async function navigateToPathCategory(category, index) {
       params
     });
   }, 50);
-}
-
-function goToLogin() {
-  // TODO: Navigate to login page when it's created
-  console.log('Navigate to login page');
 }
 
 function goToSettings() {

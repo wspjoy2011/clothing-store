@@ -8,6 +8,10 @@ export const useAccountStore = defineStore('accounts', {
         registrationError: null,
         registrationSuccess: false,
 
+        loginLoading: false,
+        loginError: null,
+        loginSuccess: false,
+
         activationLoading: false,
         activationError: null,
         activationSuccess: false,
@@ -18,6 +22,8 @@ export const useAccountStore = defineStore('accounts', {
 
         currentUser: null,
         isAuthenticated: false,
+        accessToken: localStorage.getItem('accessToken') || null,
+        refreshToken: localStorage.getItem('refreshToken') || null,
     }),
 
     getters: {
@@ -55,6 +61,49 @@ export const useAccountStore = defineStore('accounts', {
 
         isEmailAlreadyExists() {
             return this.registrationError?.status === 409;
+        },
+
+        isLoggingIn() {
+            return this.loginLoading;
+        },
+
+        hasLoginError() {
+            return this.loginError !== null;
+        },
+
+        loginErrorMessage() {
+            if (!this.loginError) return '';
+
+            switch (this.loginError.status) {
+                case 403:
+                    return this.loginError.message || 'Account not activated. Please check your email for activation instructions.';
+
+                case 404:
+                    return this.loginError.message || 'User not found. Please check your credentials or register a new account.';
+
+                case 400:
+                    return this.loginError.message || 'Invalid login credentials. Please check your email and password.';
+
+                case 422:
+                    if (this.loginError.field) {
+                        return `${this.loginError.field}: ${this.loginError.message}`;
+                    }
+                    return this.loginError.message || 'Please check your input data';
+
+                case 500:
+                    return 'Server error. Please try again later.';
+
+                default:
+                    return this.loginError.message || 'Login failed. Please try again.';
+            }
+        },
+
+        needsActivation() {
+            return this.loginError?.status === 403;
+        },
+
+        needsRegistration() {
+            return this.loginError?.status === 404;
         },
 
         isActivating() {
@@ -124,6 +173,10 @@ export const useAccountStore = defineStore('accounts', {
 
         userEmail() {
             return this.currentUser?.email || null;
+        },
+
+        hasTokens() {
+            return !!(this.accessToken && this.refreshToken);
         }
     },
 
@@ -176,6 +229,67 @@ export const useAccountStore = defineStore('accounts', {
 
             } finally {
                 this.registrationLoading = false;
+            }
+        },
+
+        /**
+         * Login user
+         * @param {Object} loginData - User login data
+         * @param {string} loginData.email - User email
+         * @param {string} loginData.password - User password
+         * @returns {Promise<Object>} - Login result
+         */
+        async login(loginData) {
+            this.loginLoading = true;
+            this.loginError = null;
+            this.loginSuccess = false;
+
+            try {
+                const response = await accountService.login({
+                    email: loginData.email,
+                    password: loginData.password
+                });
+
+                this.loginSuccess = true;
+
+                if (response.access_token) {
+                    this.accessToken = response.access_token;
+                    localStorage.setItem('accessToken', response.access_token);
+                }
+
+                if (response.refresh_token) {
+                    this.refreshToken = response.refresh_token;
+                    localStorage.setItem('refreshToken', response.refresh_token);
+                }
+
+                if (response.user) {
+                    this.currentUser = response.user;
+                    this.isAuthenticated = true;
+                }
+
+                return {
+                    success: true,
+                    data: response,
+                    message: response.message || 'Login successful'
+                };
+
+            } catch (err) {
+                this.loginError = {
+                    status: err.status || 500,
+                    message: err.message || 'Login failed',
+                    field: err.field || null
+                };
+
+                this.loginSuccess = false;
+
+                return {
+                    success: false,
+                    error: this.loginError,
+                    message: this.loginErrorMessage
+                };
+
+            } finally {
+                this.loginLoading = false;
             }
         },
 
@@ -284,6 +398,15 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Clear login state
+         */
+        clearLoginState() {
+            this.loginError = null;
+            this.loginSuccess = false;
+            this.loginLoading = false;
+        },
+
+        /**
          * Clear activation state
          */
         clearActivationState() {
@@ -308,6 +431,9 @@ export const useAccountStore = defineStore('accounts', {
             this.registrationLoading = false;
             this.registrationError = null;
             this.registrationSuccess = false;
+            this.loginLoading = false;
+            this.loginError = null;
+            this.loginSuccess = false;
             this.activationLoading = false;
             this.activationError = null;
             this.activationSuccess = false;
@@ -324,7 +450,14 @@ export const useAccountStore = defineStore('accounts', {
         logout() {
             this.currentUser = null;
             this.isAuthenticated = false;
+            this.accessToken = null;
+            this.refreshToken = null;
+
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+
             this.clearRegistrationState();
+            this.clearLoginState();
             this.clearActivationState();
             this.clearResendState();
         }

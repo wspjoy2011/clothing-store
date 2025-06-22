@@ -8,6 +8,7 @@ import CatalogPage from '@/views/CatalogPage.vue'
 import CategoryPage from '@/views/CategoryPage.vue'
 import ProductDetailPage from '@/views/ProductDetailPage.vue'
 import RegisterPage from '@/views/RegisterPage.vue'
+import LoginPage from '@/views/LoginPage.vue'
 import ActivatePage from '@/views/ActivatePage.vue'
 import ResendActivationPage from '@/views/ResendActivationPage.vue'
 
@@ -133,6 +134,15 @@ const routes = [
         }
     },
     {
+        path: '/accounts/login',
+        name: 'login',
+        component: LoginPage,
+        meta: {
+            title: 'Login - StyleShop',
+            requiresGuest: true
+        }
+    },
+    {
         path: '/accounts/activate',
         name: 'activate',
         component: ActivatePage,
@@ -181,7 +191,7 @@ router.beforeEach(async (to, from, next) => {
         const subCategoryId = to.params.subCategory ?
             categoryStore.getSubCategoryIdBySlug(masterCategoryId, to.params.subCategory) : null;
         const articleTypeId = to.params.articleType ?
-            categoryStore.getArticleTypeIdBySlug(masterCategoryId, subCategoryId, to.params.articleType) : null;
+            categoryStore.getArticleTypeIdBySlug(masterCategoryId, subCategoryId, route.params.articleType) : null;
 
         if (!masterCategoryId) {
             console.error('Category not found:', to.params.masterCategory);
@@ -203,6 +213,8 @@ router.beforeEach(async (to, from, next) => {
         document.title = 'StyleShop - Product Details';
     } else if (to.name === 'register') {
         document.title = 'StyleShop - Register';
+    } else if (to.name === 'login') {
+        document.title = 'StyleShop - Login';
     } else if (to.name === 'activate') {
         document.title = 'StyleShop - Activate Account';
     } else if (to.name === 'resend-activation') {

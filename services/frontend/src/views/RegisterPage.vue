@@ -353,18 +353,20 @@ onMounted(() => {
 
 <style scoped>
 .register-page {
-  width: 100%;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
 }
 
 .register-container {
-  min-height: calc(100vh - 64px);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
   position: relative;
+  z-index: 2;
+  padding: 2rem 1rem;
 }
 
 .min-height-screen {
-  min-height: calc(100vh - 104px);
+  min-height: 100vh;
 }
 
 .register-card-wrapper {
@@ -640,7 +642,7 @@ onMounted(() => {
 
 @media (max-width: 600px) {
   .register-container {
-    padding: 10px;
+    padding: 1rem 0.5rem;
   }
 
   .register-form-section {

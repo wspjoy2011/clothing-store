@@ -6,7 +6,7 @@ export function useNavigation() {
   const legalStore = useLegalStore()
 
   const goToLogin = () => {
-    router.push({ name: 'home' })
+    router.push({ name: 'login'})
   }
 
   const handleGoogleRegister = () => {

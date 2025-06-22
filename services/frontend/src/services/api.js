@@ -12,6 +12,13 @@ const api = axios.create({
 const handleApiError = (error) => {
     const {response} = error;
 
+    if (response && response.status === 403) {
+        return Promise.reject({
+            status: response.status,
+            message: response.data.detail || 'Access forbidden'
+        });
+    }
+
     if (response && response.status === 404) {
         return Promise.reject({
             status: response.status,
