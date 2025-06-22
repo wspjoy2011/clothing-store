@@ -31,6 +31,17 @@ export default {
     },
 
     /**
+     * Logout user
+     * @param {Object} logoutData - User logout data
+     * @param {string} logoutData.refresh_token - User refresh token
+     * @returns {Promise<Object>} - Logout response data
+     */
+    async logout(logoutData) {
+        const response = await api.post(`${BASE_URL}/logout`, logoutData);
+        return response.data;
+    },
+
+    /**
      * Activate user account
      * @param {Object} activationData - Account activation data
      * @param {string} activationData.email - User email address

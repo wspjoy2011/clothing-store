@@ -9,7 +9,7 @@
         <!-- Logo and Brand Name -->
         <div class="d-flex align-center">
           <v-icon icon="mdi-store" size="large" class="mr-2"></v-icon>
-          <span class="text-h5 font-weight-bold">StyleShop</span>
+          <span class="text-h5 font-weight-bold cursor-pointer" @click="goToHome">StyleShop</span>
 
           <!-- Category Path Indicator -->
           <v-btn
@@ -71,44 +71,98 @@
           <v-menu location="bottom end" transition="slide-y-transition">
             <template v-slot:activator="{ props }">
               <v-btn icon class="mr-2" v-bind="props">
-                <v-icon>mdi-account</v-icon>
+                <v-icon
+                    v-if="isAuthenticated"
+                    icon="mdi-account-check"
+                    color="success"
+                ></v-icon>
+                <v-icon v-else icon="mdi-account-outline"></v-icon>
               </v-btn>
             </template>
 
             <v-card min-width="200">
               <v-list>
-                <v-list-item
-                    :to="{ name: 'register' }"
-                    prepend-icon="mdi-account-plus"
-                    title="Register"
-                    subtitle="Create new account"
-                ></v-list-item>
+                <!-- Authenticated User Menu -->
+                <template v-if="isAuthenticated">
+                  <v-list-item
+                      v-if="currentUser"
+                      class="user-info-item"
+                  >
+                    <template v-slot:prepend>
+                      <v-avatar size="32" color="primary">
+                        <v-icon icon="mdi-account" size="18"></v-icon>
+                      </v-avatar>
+                    </template>
+                    <v-list-item-title class="text-subtitle-2 font-weight-medium">
+                      {{ userDisplayName }}
+                    </v-list-item-title>
+                    <v-list-item-subtitle class="text-caption">
+                      {{ userEmail }}
+                    </v-list-item-subtitle>
+                  </v-list-item>
 
-                <v-list-item
-                    prepend-icon="mdi-login"
-                    title="Sign In"
-                    subtitle="Access your account"
-                    @click="goToLogin"
-                ></v-list-item>
+                  <v-divider></v-divider>
 
-                <v-divider></v-divider>
+                  <v-list-item
+                      prepend-icon="mdi-account-cog"
+                      title="Account Settings"
+                      subtitle="Manage your account"
+                      @click="goToAccountSettings"
+                  ></v-list-item>
 
-                <v-list-item
-                    prepend-icon="mdi-account-cog"
-                    title="Account Settings"
-                    @click="goToSettings"
-                ></v-list-item>
+                  <v-list-item
+                      prepend-icon="mdi-account"
+                      title="Profile"
+                      subtitle="View your profile"
+                      @click="goToProfile"
+                  ></v-list-item>
 
-                <v-list-item
-                    prepend-icon="mdi-heart"
-                    title="Wishlist"
-                    @click="goToWishlist"
-                ></v-list-item>
+                  <v-list-item
+                      prepend-icon="mdi-heart"
+                      title="Wishlist"
+                      subtitle="Your saved items"
+                      @click="goToWishlist"
+                  ></v-list-item>
+
+                  <v-list-item
+                      prepend-icon="mdi-history"
+                      title="Order History"
+                      subtitle="View past orders"
+                      @click="goToOrderHistory"
+                  ></v-list-item>
+
+                  <v-divider></v-divider>
+
+                  <v-list-item
+                      prepend-icon="mdi-logout"
+                      title="Sign Out"
+                      subtitle="Logout from account"
+                      @click="handleLogout"
+                      class="logout-item"
+                  ></v-list-item>
+                </template>
+
+                <!-- Guest User Menu -->
+                <template v-else>
+                  <v-list-item
+                      :to="{ name: 'register' }"
+                      prepend-icon="mdi-account-plus"
+                      title="Register"
+                      subtitle="Create new account"
+                  ></v-list-item>
+
+                  <v-list-item
+                      prepend-icon="mdi-login"
+                      title="Sign In"
+                      subtitle="Access your account"
+                      @click="goToLogin"
+                  ></v-list-item>
+                </template>
               </v-list>
             </v-card>
           </v-menu>
 
-          <v-btn icon>
+          <v-btn icon @click="goToCart">
             <v-badge
                 color="error"
                 content="2"
@@ -241,17 +295,67 @@
       <!-- Account Section -->
       <v-list-subheader>Account</v-list-subheader>
 
-      <v-list-item
-          title="Register"
-          :to="{ name: 'register' }"
-          prepend-icon="mdi-account-plus"
-      ></v-list-item>
+      <template v-if="isAuthenticated">
+        <!-- Authenticated User Mobile Menu -->
+        <v-list-item
+            v-if="currentUser"
+            class="mobile-user-info"
+        >
+          <template v-slot:prepend>
+            <v-avatar size="24" color="primary">
+              <v-icon icon="mdi-account" size="14"></v-icon>
+            </v-avatar>
+          </template>
+          <v-list-item-title class="text-subtitle-2">
+            {{ userDisplayName }}
+          </v-list-item-title>
+        </v-list-item>
 
-      <v-list-item
-          title="Sign In"
-          prepend-icon="mdi-login"
-          @click="goToLogin"
-      ></v-list-item>
+        <v-list-item
+            title="Account Settings"
+            prepend-icon="mdi-account-cog"
+            @click="goToAccountSettings"
+        ></v-list-item>
+
+        <v-list-item
+            title="Profile"
+            prepend-icon="mdi-account"
+            @click="goToProfile"
+        ></v-list-item>
+
+        <v-list-item
+            title="Wishlist"
+            prepend-icon="mdi-heart"
+            @click="goToWishlist"
+        ></v-list-item>
+
+        <v-list-item
+            title="Order History"
+            prepend-icon="mdi-history"
+            @click="goToOrderHistory"
+        ></v-list-item>
+
+        <v-list-item
+            title="Sign Out"
+            prepend-icon="mdi-logout"
+            @click="handleLogout"
+        ></v-list-item>
+      </template>
+
+      <template v-else>
+        <!-- Guest User Mobile Menu -->
+        <v-list-item
+            title="Register"
+            :to="{ name: 'register' }"
+            prepend-icon="mdi-account-plus"
+        ></v-list-item>
+
+        <v-list-item
+            title="Sign In"
+            prepend-icon="mdi-login"
+            @click="goToLogin"
+        ></v-list-item>
+      </template>
 
       <v-divider></v-divider>
 
@@ -276,16 +380,10 @@
       ></v-list-item>
 
       <v-list-item
-          title="My Account"
-          value="account"
-          prepend-icon="mdi-account"
-          @click="goToSettings"
-      ></v-list-item>
-
-      <v-list-item
           title="Shopping Cart"
           value="cart"
           prepend-icon="mdi-cart"
+          @click="goToCart"
       ></v-list-item>
 
       <v-list-item
@@ -344,6 +442,7 @@ import {useTheme} from 'vuetify';
 import {useRouter, useRoute} from 'vue-router';
 import {useCatalogStore} from '@/stores/catalog';
 import {useCategoryStore} from '@/stores/categoryStore';
+import {useAccountStore} from '@/stores/accounts';
 import {useNavigation} from '@/composables/accounts/useNavigation';
 import ThemeToggle from '@/components/ui/theme/ThemeToggle.vue';
 import SearchBar from '@/components/ui/search/SearchBar.vue';
@@ -356,13 +455,34 @@ const router = useRouter();
 const route = useRoute();
 const catalogStore = useCatalogStore();
 const categoryStore = useCategoryStore();
+const accountStore = useAccountStore();
 const preferencesStore = useUserPreferencesStore();
 const showMobileSearch = ref(false);
 const mobileSearchQuery = ref('');
 const isSearchLoading = ref(false);
 const categoryPathVisible = ref(false);
 
-const { goToLogin } = useNavigation();
+const {
+  goToLogin,
+  goToAccountSettings,
+  goToWishlist,
+  goToProfile,
+  goToOrderHistory,
+  goToCart,
+  goToHome,
+  handleLogout
+} = useNavigation();
+
+const isAuthenticated = computed(() => accountStore.isAuthenticated);
+const currentUser = computed(() => accountStore.currentUser);
+const userEmail = computed(() => accountStore.userEmail);
+
+const userDisplayName = computed(() => {
+  if (currentUser.value) {
+    return currentUser.value.name || currentUser.value.first_name || 'User';
+  }
+  return userEmail.value || 'User';
+});
 
 const isDarkTheme = computed(() => {
   return theme.global.current.value.dark;
@@ -486,16 +606,6 @@ async function navigateToPathCategory(category, index) {
       params
     });
   }, 50);
-}
-
-function goToSettings() {
-  // TODO: Navigate to account settings
-  console.log('Navigate to account settings');
-}
-
-function goToWishlist() {
-  // TODO: Navigate to wishlist
-  console.log('Navigate to wishlist');
 }
 
 onMounted(async () => {
@@ -623,6 +733,10 @@ async function handleMobileSearch() {
 
 :deep(.v-app-bar.v-theme--dark) {
   background: linear-gradient(145deg, #1a1a1a 0%, #2c2c2c 100%);
+}
+
+.cursor-pointer {
+  cursor: pointer;
 }
 
 .nav-center {
@@ -806,6 +920,41 @@ async function handleMobileSearch() {
 
 .category-breadcrumbs::-webkit-scrollbar {
   display: none;
+}
+
+/* User info styles using Vuetify color variables */
+.user-info-item {
+  background-color: rgb(from rgb(25, 118, 210) r g b / 0.1);
+  margin-bottom: 4px;
+}
+
+.logout-item {
+  color: #FF5252;
+}
+
+.logout-item:hover {
+  background-color: rgb(from rgb(255, 82, 82) r g b / 0.1);
+}
+
+.mobile-user-info {
+  background-color: rgb(from rgb(25, 118, 210) r g b / 0.1);
+  margin-bottom: 8px;
+}
+
+:deep(.v-theme--dark) .user-info-item {
+  background-color: rgb(from rgb(144, 202, 249) r g b / 0.1);
+}
+
+:deep(.v-theme--dark) .logout-item {
+  color: #EF5350;
+}
+
+:deep(.v-theme--dark) .logout-item:hover {
+  background-color: rgb(from rgb(239, 83, 80) r g b / 0.1);
+}
+
+:deep(.v-theme--dark) .mobile-user-info {
+  background-color: rgb(from rgb(144, 202, 249) r g b / 0.1);
 }
 
 @media (max-width: 960px) {

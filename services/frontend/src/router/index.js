@@ -2,6 +2,7 @@ import {createRouter, createWebHistory} from 'vue-router'
 import {useUserPreferencesStore} from '@/stores/userPreferences'
 import {useCatalogStore} from '@/stores/catalog'
 import {useCategoryStore} from '@/stores/categoryStore'
+import {useAccountStore} from '@/stores/accounts'
 
 import HomePage from '@/views/HomePage.vue'
 import CatalogPage from '@/views/CatalogPage.vue'
@@ -11,6 +12,7 @@ import RegisterPage from '@/views/RegisterPage.vue'
 import LoginPage from '@/views/LoginPage.vue'
 import ActivatePage from '@/views/ActivatePage.vue'
 import ResendActivationPage from '@/views/ResendActivationPage.vue'
+import LogoutPage from '@/views/LogoutPage.vue'
 
 const processCatalogRouteProps = (route) => {
     const preferencesStore = useUserPreferencesStore();
@@ -143,6 +145,15 @@ const routes = [
         }
     },
     {
+        path: '/accounts/logout',
+        name: 'logout',
+        component: LogoutPage,
+        meta: {
+            title: 'Logout - StyleShop',
+            requiresAuth: true
+        }
+    },
+    {
         path: '/accounts/activate',
         name: 'activate',
         component: ActivatePage,
@@ -177,6 +188,26 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
     const categoryStore = useCategoryStore();
+    const accountStore = useAccountStore();
+
+    if (!accountStore.isInitialized) {
+        await accountStore.initializeAuth();
+    }
+
+    if (to.meta.requiresAuth && !accountStore.isAuthenticated) {
+        console.log('Access denied: authentication required');
+        next({
+            name: 'login',
+            query: { redirect: to.fullPath }
+        });
+        return;
+    }
+
+    if (to.meta.requiresGuest && accountStore.isAuthenticated) {
+        console.log('Access denied: already authenticated');
+        next({ name: 'home' });
+        return;
+    }
 
     if (to.params.masterCategory) {
         if (!categoryStore.categories || !categoryStore.categories.length) {
@@ -191,7 +222,7 @@ router.beforeEach(async (to, from, next) => {
         const subCategoryId = to.params.subCategory ?
             categoryStore.getSubCategoryIdBySlug(masterCategoryId, to.params.subCategory) : null;
         const articleTypeId = to.params.articleType ?
-            categoryStore.getArticleTypeIdBySlug(masterCategoryId, subCategoryId, route.params.articleType) : null;
+            categoryStore.getArticleTypeIdBySlug(masterCategoryId, subCategoryId, to.params.articleType) : null;
 
         if (!masterCategoryId) {
             console.error('Category not found:', to.params.masterCategory);
@@ -209,18 +240,22 @@ router.beforeEach(async (to, from, next) => {
             const masterName = categoryStore.getCategoryName(masterCategoryId);
             document.title = `StyleShop - ${masterName}`;
         }
-    } else if (to.name === 'product-detail') {
-        document.title = 'StyleShop - Product Details';
-    } else if (to.name === 'register') {
-        document.title = 'StyleShop - Register';
-    } else if (to.name === 'login') {
-        document.title = 'StyleShop - Login';
-    } else if (to.name === 'activate') {
-        document.title = 'StyleShop - Activate Account';
-    } else if (to.name === 'resend-activation') {
-        document.title = 'StyleShop - Resend Activation';
     } else {
-        document.title = to.name === 'catalog' ? 'StyleShop - Catalog' : 'StyleShop';
+        if (to.name === 'product-detail') {
+            document.title = 'StyleShop - Product Details';
+        } else if (to.name === 'register') {
+            document.title = 'StyleShop - Register';
+        } else if (to.name === 'login') {
+            document.title = 'StyleShop - Login';
+        } else if (to.name === 'logout') {
+            document.title = 'StyleShop - Logout';
+        } else if (to.name === 'activate') {
+            document.title = 'StyleShop - Activate Account';
+        } else if (to.name === 'resend-activation') {
+            document.title = 'StyleShop - Resend Activation';
+        } else {
+            document.title = to.name === 'catalog' ? 'StyleShop - Catalog' : 'StyleShop';
+        }
     }
 
     next();

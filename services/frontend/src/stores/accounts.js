@@ -20,10 +20,15 @@ export const useAccountStore = defineStore('accounts', {
         resendError: null,
         resendSuccess: false,
 
+        logoutLoading: false,
+        logoutError: null,
+
         currentUser: null,
         isAuthenticated: false,
         accessToken: localStorage.getItem('accessToken') || null,
         refreshToken: localStorage.getItem('refreshToken') || null,
+
+        isInitialized: false,
     }),
 
     getters: {
@@ -171,16 +176,80 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
+        isLoggingOut() {
+            return this.logoutLoading;
+        },
+
+        hasLogoutError() {
+            return this.logoutError !== null;
+        },
+
+        logoutErrorMessage() {
+            if (!this.logoutError) return '';
+
+            switch (this.logoutError.status) {
+                case 400:
+                    return this.logoutError.message || 'Invalid logout request.';
+
+                case 401:
+                    return this.logoutError.message || 'Unauthorized logout attempt.';
+
+                case 500:
+                    return 'Server error during logout. Please try again later.';
+
+                default:
+                    return this.logoutError.message || 'Logout failed. Please try again.';
+            }
+        },
+
         userEmail() {
             return this.currentUser?.email || null;
         },
 
         hasTokens() {
             return !!(this.accessToken && this.refreshToken);
+        },
+
+        authStatus() {
+            if (!this.isInitialized) {
+                return 'initializing';
+            }
+            return this.isAuthenticated ? 'authenticated' : 'unauthenticated';
         }
     },
 
     actions: {
+        async initializeAuth() {
+            if (this.isInitialized) {
+                return;
+            }
+
+            try {
+                const refreshToken = localStorage.getItem('refreshToken');
+
+                if (refreshToken) {
+                    this.refreshToken = refreshToken;
+                    this.accessToken = localStorage.getItem('accessToken');
+                    this.isAuthenticated = true;
+
+                    console.log('User initialized as authenticated (refresh token found)');
+
+                } else {
+                    this.isAuthenticated = false;
+                    this.currentUser = null;
+                    this.accessToken = null;
+
+                    console.log('User initialized as unauthenticated (no refresh token)');
+                }
+
+            } catch (error) {
+                console.error('Auth initialization error:', error);
+                this.clearLocalState();
+            } finally {
+                this.isInitialized = true;
+            }
+        },
+
         /**
          * Register a new user
          * @param {Object} userData - User registration data
@@ -264,8 +333,9 @@ export const useAccountStore = defineStore('accounts', {
 
                 if (response.user) {
                     this.currentUser = response.user;
-                    this.isAuthenticated = true;
                 }
+
+                this.isAuthenticated = true;
 
                 return {
                     success: true,
@@ -290,6 +360,52 @@ export const useAccountStore = defineStore('accounts', {
 
             } finally {
                 this.loginLoading = false;
+            }
+        },
+
+        /**
+         * Logout user
+         * @returns {Promise<Object>} - Logout result
+         */
+        async logout() {
+            this.logoutLoading = true;
+            this.logoutError = null;
+
+            try {
+                const refreshToken = this.refreshToken || localStorage.getItem('refreshToken');
+
+                if (refreshToken) {
+                    await accountService.logout({
+                        refresh_token: refreshToken
+                    });
+                }
+
+                this.clearLocalState();
+
+                return {
+                    success: true,
+                    message: 'Logout successful'
+                };
+
+            } catch (err) {
+                console.warn('Logout API call failed, but clearing local state anyway:', err);
+
+                this.logoutError = {
+                    status: err.status || 500,
+                    message: err.message || 'Logout failed on server',
+                    field: err.field || null
+                };
+
+                this.clearLocalState();
+
+                return {
+                    success: true,
+                    message: 'Logout completed (with server warning)',
+                    warning: this.logoutErrorMessage
+                };
+
+            } finally {
+                this.logoutLoading = false;
             }
         },
 
@@ -425,6 +541,14 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Clear logout state
+         */
+        clearLogoutState() {
+            this.logoutError = null;
+            this.logoutLoading = false;
+        },
+
+        /**
          * Clear all account state
          */
         resetState() {
@@ -440,14 +564,17 @@ export const useAccountStore = defineStore('accounts', {
             this.resendLoading = false;
             this.resendError = null;
             this.resendSuccess = false;
+            this.logoutLoading = false;
+            this.logoutError = null;
             this.currentUser = null;
             this.isAuthenticated = false;
         },
 
         /**
-         * Logout user
+         * Clear local authentication state
+         * (used internally by logout and initializeAuth)
          */
-        logout() {
+        clearLocalState() {
             this.currentUser = null;
             this.isAuthenticated = false;
             this.accessToken = null;
@@ -460,6 +587,7 @@ export const useAccountStore = defineStore('accounts', {
             this.clearLoginState();
             this.clearActivationState();
             this.clearResendState();
+            this.clearLogoutState();
         }
     }
 });
