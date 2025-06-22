@@ -4,7 +4,7 @@ import secrets
 import datetime as datetime_lib
 from datetime import datetime, timedelta
 
-from apps.accounts.dto.users import UserDTO, CreateUserDTO
+from apps.accounts.dto.users import UserDTO, CreateUserDTO, UserLoginDTO, LoginResponseDTO
 from apps.accounts.dto.tokens import CreateTokenDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.enums.user_groups import UserGroupEnum
@@ -21,7 +21,11 @@ from apps.accounts.services.exceptions import (
     UserNotFoundError,
     UserAlreadyActivatedError,
     InvalidActivationTokenError,
-    ExpiredActivationTokenError
+    ExpiredActivationTokenError,
+    InvalidCredentialsError,
+    UserInactiveError,
+    LoginError,
+    TokenGenerationError
 )
 from apps.accounts.repositories.exceptions import (
     UserCreationError as RepoUserCreationError,
@@ -31,7 +35,13 @@ from apps.accounts.repositories.exceptions import (
 )
 from db.transaction_context import atomic
 from security.interfaces import PasswordManagerInterface, JWTManagerInterface
-from security.exceptions import EmptyPasswordError, PasswordTooLongError, HashingError
+from security.exceptions import (
+    EmptyPasswordError,
+    PasswordTooLongError,
+    HashingError,
+    VerificationError,
+    TokenCreationError as SecurityTokenCreationError
+)
 from notifications.email.interfaces import EmailSenderInterface
 from notifications.exceptions.email import BaseEmailError
 from settings.config import config
@@ -60,6 +70,7 @@ class AccountService(AccountServiceInterface):
             user_group_repository: Repository for user group operations
             token_repository: Repository for token operations
             password_manager: Manager for password hashing and verification
+            jwt_manager: Manager for JWT token operations
             email_sender: Email sender for notifications
         """
         self._user_repository = user_repository
@@ -253,6 +264,102 @@ class AccountService(AccountServiceInterface):
         except BaseEmailError as e:
             logger.error(f"Failed to send resend activation email to {email}: {e}")
             raise
+
+    async def login_user(self, login_data: UserLoginDTO) -> LoginResponseDTO:
+        """
+        Authenticate user and generate JWT tokens
+
+        Args:
+            login_data: User login credentials (email and password)
+
+        Returns:
+            LoginResponseDTO with access and refresh tokens
+
+        Raises:
+            UserNotFoundError: If user with given email is not found
+            UserInactiveError: If user account is not activated
+            InvalidCredentialsError: If password is incorrect
+            TokenGenerationError: If JWT token generation fails
+            LoginError: If login fails for other reasons
+        """
+        logger.info(f"Starting login process for email: {login_data.email}")
+
+        user = await self._user_repository.get_user_by_email(login_data.email)
+        if not user:
+            logger.warning(f"Login failed: User with email {login_data.email} not found")
+            raise UserNotFoundError(f"User with email '{login_data.email}' not found")
+
+        if not user.is_active:
+            logger.warning(f"Login failed: User with email {login_data.email} is not activated")
+            raise UserInactiveError(f"User account with email '{login_data.email}' is not activated")
+
+        hashed_password = await self._user_repository.get_hashed_password_by_email(login_data.email)
+        if not hashed_password:
+            logger.error(f"Login failed: Could not retrieve password for email {login_data.email}")
+            raise InvalidCredentialsError("Invalid email or password")
+
+        try:
+            password_valid = self._password_manager.verify_password(login_data.password, hashed_password)
+            if not password_valid:
+                logger.warning(f"Login failed: Invalid password for email {login_data.email}")
+                raise InvalidCredentialsError("Invalid email or password")
+        except (EmptyPasswordError, VerificationError) as e:
+            logger.error(f"Password verification failed for user {login_data.email}: {e}")
+            raise InvalidCredentialsError("Invalid email or password")
+
+        token_payload = {
+            "user_id": user.id,
+            "email": user.email,
+            "group_id": user.group_id,
+            "group_name": user.group_name
+        }
+
+        try:
+            access_token = self._jwt_manager.create_access_token(token_payload)
+            refresh_token = self._jwt_manager.create_refresh_token(token_payload)
+
+            logger.info(f"JWT tokens generated successfully for user: {login_data.email}, user_id: {user.id}")
+
+            await self._store_refresh_token(user.id, refresh_token)
+
+        except SecurityTokenCreationError as e:
+            logger.error(f"JWT token generation failed for user {user.id}: {e}")
+            raise TokenGenerationError(f"Failed to generate authentication tokens: {e}", e)
+        except Exception as e:
+            logger.error(f"Unexpected error during login for user {user.id}: {e}")
+            raise LoginError(f"Login failed due to unexpected error: {e}", e)
+        else:
+            return LoginResponseDTO(
+                access_token=access_token,
+                refresh_token=refresh_token
+            )
+
+    async def _store_refresh_token(self, user_id: int, refresh_token: str) -> None:
+        """
+        Store refresh token in database
+
+        Args:
+            user_id: ID of the user
+            refresh_token: JWT refresh token to store
+
+        Raises:
+            TokenCreationError: If token storage fails
+        """
+        try:
+            expiration = self._jwt_manager.get_token_expiration(refresh_token)
+
+            token_data = CreateTokenDTO(
+                token=refresh_token,
+                expires_at=expiration,
+                user_id=user_id
+            )
+
+            await self._token_repository.create_refresh_token(token_data)
+            logger.debug(f"Refresh token stored successfully for user {user_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to store refresh token for user {user_id}: {e}")
+            raise TokenCreationError(f"Failed to store refresh token for user {user_id}", e)
 
     async def _create_activation_token(self, user_id: int) -> str:
         """

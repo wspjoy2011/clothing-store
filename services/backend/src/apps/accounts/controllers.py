@@ -4,10 +4,16 @@ from dataclasses import asdict
 
 from fastapi import HTTPException
 
-from apps.accounts.dto.users import CreateUserDTO
+from apps.accounts.dto.users import CreateUserDTO, UserLoginDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.interfaces.services import AccountServiceInterface
-from apps.accounts.schemas.user import CreateUserSchema, CreateUserResponseSchema, UserResponseSchema
+from apps.accounts.schemas.user import (
+    CreateUserSchema,
+    CreateUserResponseSchema,
+    UserResponseSchema,
+    UserLoginSchema,
+    LoginResponseSchema
+)
 from apps.accounts.schemas.activation import (
     ActivateAccountSchema,
     ActivateAccountResponseSchema,
@@ -21,7 +27,11 @@ from apps.accounts.services.exceptions import (
     UserNotFoundError,
     UserAlreadyActivatedError,
     InvalidActivationTokenError,
-    ExpiredActivationTokenError
+    ExpiredActivationTokenError,
+    UserInactiveError,
+    InvalidCredentialsError,
+    TokenGenerationError,
+    LoginError
 )
 
 
@@ -168,3 +178,61 @@ async def resend_activation_controller(
             message="Activation email sent successfully",
             email=str(resend_data.email)
         )
+
+
+async def login_user_controller(
+        login_data: UserLoginSchema,
+        account_service: AccountServiceInterface,
+) -> LoginResponseSchema:
+    """
+    Controller for user login
+
+    Args:
+        login_data: User login data from request
+        account_service: Account service for business logic
+
+    Returns:
+        LoginResponseSchema with JWT tokens
+
+    Raises:
+        HTTPException: 404 if user not found, 403 if user inactive, 401 for invalid credentials, 500 for server errors
+    """
+    user_login_dto = UserLoginDTO(
+        email=str(login_data.email),
+        password=login_data.password
+    )
+
+    try:
+        login_response = await account_service.login_user(user_login_dto)
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+    except UserInactiveError as e:
+        raise HTTPException(
+            status_code=403,
+            detail=str(e)
+        )
+    except InvalidCredentialsError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=str(e)
+        )
+    except TokenGenerationError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+    except LoginError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error occurred during user login"
+        )
+    else:
+        return LoginResponseSchema(**asdict(login_response))

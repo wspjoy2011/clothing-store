@@ -19,3 +19,14 @@ CREATE_USER_SUCCESS_RESPONSE = {
     "user": USER_RESPONSE_EXAMPLE,
     "message": "User created successfully"
 }
+
+LOGIN_RESPONSE_EXAMPLE = {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+    "refresh_token": "def50200e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855ae41e4649b934ca495991b7852b855",
+    "token_type": "bearer"
+}
+
+USER_LOGIN_REQUEST_EXAMPLE = {
+    "email": "john.doe@example.com",
+    "password": "SecurePass123!"
+}

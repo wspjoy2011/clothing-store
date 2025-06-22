@@ -38,6 +38,14 @@ class UserRepository(BaseRepository, UserRepositoryInterface):
         result = await self._execute_query_single("Get user by email")
         return self.map_to_user_dto(result) if result else None
 
+    async def get_hashed_password_by_email(self, email: str) -> Optional[str]:
+        """Get hashed password by email"""
+        self._query_builder.reset().select("hashed_password").from_table(f"{self.APP_NAME}_users")
+        self._query_builder.where("email = %s", email)
+
+        result = await self._execute_query_single("Get hashed password by email")
+        return result[0] if result else None
+
     async def get_user_with_profile_by_id(self, user_id: int) -> Optional[UserWithProfileDTO]:
         """Get a user with profile information by ID"""
         self._build_user_query(with_profile=True)

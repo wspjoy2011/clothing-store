@@ -53,3 +53,23 @@ PASSWORD_PROCESSING_ERROR = {
 INTERNAL_SERVER_ERROR = {
     "detail": "Internal server error occurred during user creation"
 }
+
+USER_NOT_FOUND_ERROR = {
+    "detail": "User with email 'john.doe@example.com' not found"
+}
+
+USER_INACTIVE_ERROR = {
+    "detail": "User account with email 'john.doe@example.com' is not activated"
+}
+
+INVALID_CREDENTIALS_ERROR = {
+    "detail": "Invalid email or password"
+}
+
+TOKEN_GENERATION_ERROR = {
+    "detail": "Failed to generate authentication tokens: Token creation failed"
+}
+
+LOGIN_ERROR = {
+    "detail": "Login failed due to unexpected error: Database connection lost"
+}

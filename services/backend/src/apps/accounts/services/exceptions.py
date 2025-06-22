@@ -57,3 +57,28 @@ class InvalidActivationTokenError(ActivationError):
 class ExpiredActivationTokenError(ActivationError):
     """Raised when activation token has expired"""
     pass
+
+
+class AuthenticationError(AccountServiceError):
+    """Base exception for authentication operations"""
+    pass
+
+
+class InvalidCredentialsError(AuthenticationError):
+    """Raised when login credentials are invalid"""
+    pass
+
+
+class UserInactiveError(AuthenticationError):
+    """Raised when user tries to login but account is not activated"""
+    pass
+
+
+class LoginError(AuthenticationError):
+    """Raised when login fails for general reasons"""
+    pass
+
+
+class TokenGenerationError(AuthenticationError):
+    """Raised when JWT token generation fails during login"""
+    pass

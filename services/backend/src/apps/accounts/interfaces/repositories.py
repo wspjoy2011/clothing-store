@@ -46,6 +46,19 @@ class UserRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_hashed_password_by_email(self, email: str) -> Optional[str]:
+        """
+        Get hashed password by email
+
+        Args:
+            email: The email of the user
+
+        Returns:
+            Hashed password string if found, None otherwise
+        """
+        pass
+
+    @abstractmethod
     async def get_user_with_profile_by_id(self, user_id: int) -> Optional[UserWithProfileDTO]:
         """
         Get a user with profile information by ID

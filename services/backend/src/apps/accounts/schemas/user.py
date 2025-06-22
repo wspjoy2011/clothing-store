@@ -49,3 +49,25 @@ class CreateUserResponseSchema(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+
+class UserLoginSchema(BaseModel):
+    """Schema for user login request"""
+    email: EmailStr
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value):
+        return value.lower()
+
+
+class LoginResponseSchema(BaseModel):
+    """Schema for login response with JWT tokens"""
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+    model_config = {
+        "from_attributes": True
+    }

@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, status
 from apps.accounts.controllers import (
     create_user_controller,
     activate_account_controller,
-    resend_activation_controller
+    resend_activation_controller,
+    login_user_controller
 )
 from apps.accounts.dependencies import get_account_service
 from apps.accounts.interfaces.services import AccountServiceInterface
@@ -21,10 +22,17 @@ from apps.accounts.schemas.examples.errors import (
     PASSWORD_NO_DIGIT_ERROR,
     PASSWORD_NO_SPECIAL_CHAR_ERROR,
     PASSWORD_TOO_LONG_ERROR,
-    INTERNAL_SERVER_ERROR
+    INTERNAL_SERVER_ERROR,
+    INVALID_CREDENTIALS_ERROR,
+    USER_INACTIVE_ERROR,
+    USER_NOT_FOUND_ERROR,
+    TOKEN_GENERATION_ERROR,
+    LOGIN_ERROR
 )
 from apps.accounts.schemas.examples.user import (
     CREATE_USER_SUCCESS_RESPONSE,
+    LOGIN_RESPONSE_EXAMPLE,
+    USER_LOGIN_REQUEST_EXAMPLE
 )
 from apps.accounts.schemas.examples.activation import (
     ACTIVATE_ACCOUNT_REQUEST_EXAMPLE,
@@ -40,7 +48,12 @@ from apps.accounts.schemas.examples.activation import (
     RESEND_USER_NOT_FOUND_ERROR,
     RESEND_RATE_LIMIT_ERROR
 )
-from apps.accounts.schemas.user import CreateUserSchema, CreateUserResponseSchema
+from apps.accounts.schemas.user import (
+    CreateUserSchema,
+    CreateUserResponseSchema,
+    LoginResponseSchema,
+    UserLoginSchema
+)
 from apps.accounts.schemas.activation import (
     ActivateAccountSchema,
     ActivateAccountResponseSchema,
@@ -50,6 +63,7 @@ from apps.accounts.schemas.activation import (
 
 API_PATHS: dict[str, str] = {
     "register": "/register",
+    "login": "/login",
     "activate": "/activate",
     "resend_activation": "/resend-activation",
 }
@@ -444,5 +458,155 @@ async def resend_activation_route(
     """
     return await resend_activation_controller(
         resend_data=resend_data,
+        account_service=account_service
+    )
+
+
+@router.post(
+    API_PATHS["login"],
+    response_model=LoginResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Login user",
+    description=(
+            "<h3>This endpoint authenticates a user and returns JWT tokens for API access. "
+            "The user account must be activated before login is allowed. "
+            "Returns access token for API requests and refresh token for token renewal. "
+            "Both tokens should be stored securely on the client side.</h3>"
+    ),
+    responses={
+        200: {
+            "description": "Login successful",
+            "content": {
+                "application/json": {
+                    "example": LOGIN_RESPONSE_EXAMPLE
+                }
+            }
+        },
+        401: {
+            "description": "Invalid credentials",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_credentials": {
+                            "summary": "Invalid email or password",
+                            "description": "The provided email and password combination is incorrect",
+                            "value": INVALID_CREDENTIALS_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "User account not activated",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "user_inactive": {
+                            "summary": "User account not activated",
+                            "description": "User account exists but is not activated via email",
+                            "value": USER_INACTIVE_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "user_not_found": {
+                            "summary": "User not found",
+                            "description": "No user found with the provided email address",
+                            "value": USER_NOT_FOUND_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_email": {
+                            "summary": "Invalid email format",
+                            "description": "Email address format validation failed",
+                            "value": EMAIL_VALIDATION_ERROR
+                        },
+                        "password_empty": {
+                            "summary": "Empty password",
+                            "description": "Password field is empty or missing",
+                            "value": PASSWORD_EMPTY_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "token_generation_error": {
+                            "summary": "Token generation failed",
+                            "description": "Failed to generate JWT tokens during login",
+                            "value": TOKEN_GENERATION_ERROR
+                        },
+                        "login_error": {
+                            "summary": "Login processing error",
+                            "description": "Unexpected error occurred during login process",
+                            "value": LOGIN_ERROR
+                        },
+                        "internal_server_error": {
+                            "summary": "General server error",
+                            "description": "Internal server error occurred during login",
+                            "value": INTERNAL_SERVER_ERROR
+                        }
+                    }
+                }
+            }
+        }
+    },
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "login_request": {
+                            "summary": "User login request",
+                            "description": "Example of login request with email and password",
+                            "value": USER_LOGIN_REQUEST_EXAMPLE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def login_user_route(
+        login_data: UserLoginSchema,
+        account_service: AccountServiceInterface = Depends(get_account_service)
+) -> LoginResponseSchema:
+    """
+    Authenticate user and return JWT tokens
+
+    Args:
+        login_data: User login credentials (email and password)
+        account_service: Account service for business logic
+
+    Returns:
+        LoginResponseSchema: JWT access and refresh tokens
+
+    Raises:
+        HTTPException:
+            - 401 for invalid credentials
+            - 403 if user account not activated
+            - 404 if user not found
+            - 422 for validation errors
+            - 500 for server errors
+    """
+    return await login_user_controller(
+        login_data=login_data,
         account_service=account_service
     )

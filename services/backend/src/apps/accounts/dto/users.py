@@ -59,3 +59,18 @@ class CreateUserDTO:
     email: str
     password: str
     group_id: Optional[int] = None
+
+
+@dataclass
+class UserLoginDTO:
+    """Data transfer object for user login"""
+    email: str
+    password: str
+
+
+@dataclass
+class LoginResponseDTO:
+    """Data transfer object for login response"""
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"

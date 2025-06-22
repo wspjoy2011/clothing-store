@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from apps.accounts.dto.users import UserDTO, CreateUserDTO
+from apps.accounts.dto.users import UserDTO, CreateUserDTO, UserLoginDTO, LoginResponseDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 
 
@@ -64,5 +64,25 @@ class AccountServiceInterface(ABC):
             UserAlreadyActivatedError: If user is already activated
             TokenCreationError: If token creation fails
             BaseEmailError: If email sending fails
+        """
+        pass
+
+    @abstractmethod
+    async def login_user(self, login_data: UserLoginDTO) -> LoginResponseDTO:
+        """
+        Authenticate user and generate JWT tokens
+
+        Args:
+            login_data: User login credentials (email and password)
+
+        Returns:
+            LoginResponseDTO with access and refresh tokens
+
+        Raises:
+            UserNotFoundError: If user with given email is not found
+            UserInactiveError: If user account is not activated
+            InvalidCredentialsError: If password is incorrect
+            TokenGenerationError: If JWT token generation fails
+            LoginError: If login fails for other reasons
         """
         pass
