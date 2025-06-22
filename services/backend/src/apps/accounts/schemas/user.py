@@ -71,3 +71,13 @@ class LoginResponseSchema(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+
+class LogoutSchema(BaseModel):
+    """Schema for user logout request"""
+    refresh_token: str
+
+
+class LogoutResponseSchema(BaseModel):
+    """Schema for logout response"""
+    message: str = "Logout successful"

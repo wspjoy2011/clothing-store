@@ -334,6 +334,26 @@ class AccountService(AccountServiceInterface):
                 refresh_token=refresh_token
             )
 
+    async def logout_user(self, refresh_token: str) -> None:
+        """
+        Logout user by removing refresh token from database
+
+        Args:
+            refresh_token: Refresh token to be removed
+
+        Returns:
+            None - always succeeds, no exceptions raised even if token doesn't exist
+        """
+        logger.info("Starting user logout process")
+
+        try:
+            await self._token_repository.delete_refresh_token(refresh_token)
+            logger.info("Logout completed successfully")
+        except Exception as e:
+            logger.warning(f"Error during logout (ignored): {e}")
+
+        return None
+
     async def _store_refresh_token(self, user_id: int, refresh_token: str) -> None:
         """
         Store refresh token in database

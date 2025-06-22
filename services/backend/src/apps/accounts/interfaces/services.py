@@ -86,3 +86,16 @@ class AccountServiceInterface(ABC):
             LoginError: If login fails for other reasons
         """
         pass
+
+    @abstractmethod
+    async def logout_user(self, refresh_token: str) -> None:
+        """
+        Logout user by removing refresh token from database
+
+        Args:
+            refresh_token: Refresh token to be removed
+
+        Returns:
+            None - always succeeds, no exceptions raised even if token doesn't exist
+        """
+        pass

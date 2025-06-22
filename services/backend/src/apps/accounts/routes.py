@@ -6,7 +6,8 @@ from apps.accounts.controllers import (
     create_user_controller,
     activate_account_controller,
     resend_activation_controller,
-    login_user_controller
+    login_user_controller,
+    logout_user_controller
 )
 from apps.accounts.dependencies import get_account_service
 from apps.accounts.interfaces.services import AccountServiceInterface
@@ -52,7 +53,7 @@ from apps.accounts.schemas.user import (
     CreateUserSchema,
     CreateUserResponseSchema,
     LoginResponseSchema,
-    UserLoginSchema
+    UserLoginSchema, LogoutResponseSchema, LogoutSchema
 )
 from apps.accounts.schemas.activation import (
     ActivateAccountSchema,
@@ -64,6 +65,7 @@ from apps.accounts.schemas.activation import (
 API_PATHS: dict[str, str] = {
     "register": "/register",
     "login": "/login",
+    "logout": "/logout",
     "activate": "/activate",
     "resend_activation": "/resend-activation",
 }
@@ -608,5 +610,68 @@ async def login_user_route(
     """
     return await login_user_controller(
         login_data=login_data,
+        account_service=account_service
+    )
+
+
+@router.post(
+    API_PATHS["logout"],
+    response_model=LogoutResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Logout user",
+    description=(
+            "<h3>This endpoint logs out a user by invalidating their refresh token. "
+            "After logout, the refresh token can no longer be used to generate new access tokens. "
+            "This endpoint always returns success, even if the token doesn't exist in the database.</h3>"
+    ),
+    responses={
+        200: {
+            "description": "Logout successful",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "Logout successful"
+                    }
+                }
+            }
+        }
+    },
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "logout_request": {
+                            "summary": "User logout request",
+                            "description": "Example of logout request with refresh token",
+                            "value": {
+                                "refresh_token": "def50200e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855ae41e4649b934ca495991b7852b855"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def logout_user_route(
+        logout_data: LogoutSchema,
+        account_service: AccountServiceInterface = Depends(get_account_service)
+) -> LogoutResponseSchema:
+    """
+    Logout user by invalidating refresh token
+
+    Args:
+        logout_data: User logout data (refresh token)
+        account_service: Account service for business logic
+
+    Returns:
+        LogoutResponseSchema: Success message
+
+    Note:
+        This endpoint never fails - always returns success
+    """
+    return await logout_user_controller(
+        logout_data=logout_data,
         account_service=account_service
     )

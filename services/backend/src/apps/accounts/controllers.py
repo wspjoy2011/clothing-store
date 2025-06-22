@@ -12,7 +12,9 @@ from apps.accounts.schemas.user import (
     CreateUserResponseSchema,
     UserResponseSchema,
     UserLoginSchema,
-    LoginResponseSchema
+    LoginResponseSchema,
+    LogoutSchema,
+    LogoutResponseSchema
 )
 from apps.accounts.schemas.activation import (
     ActivateAccountSchema,
@@ -236,3 +238,24 @@ async def login_user_controller(
         )
     else:
         return LoginResponseSchema(**asdict(login_response))
+
+
+async def logout_user_controller(
+        logout_data: LogoutSchema,
+        account_service: AccountServiceInterface,
+) -> LogoutResponseSchema:
+    """
+    Controller for user logout
+
+    Args:
+        logout_data: User logout data from request
+        account_service: Account service for business logic
+
+    Returns:
+        LogoutResponseSchema with success message
+
+    Note:
+        This controller never raises exceptions - logout always succeeds
+    """
+    await account_service.logout_user(logout_data.refresh_token)
+    return LogoutResponseSchema()
