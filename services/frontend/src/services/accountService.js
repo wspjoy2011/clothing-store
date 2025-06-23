@@ -42,6 +42,20 @@ export default {
     },
 
     /**
+     * Get current user by refresh token
+     * @param {string} refreshToken - User refresh token
+     * @returns {Promise<Object>} - User data response
+     */
+    async getCurrentUser(refreshToken) {
+        const response = await api.get(`${BASE_URL}/me`, {
+            headers: {
+                'Authorization': `Bearer ${refreshToken}`
+            }
+        });
+        return response.data;
+    },
+
+    /**
      * Activate user account
      * @param {Object} activationData - Account activation data
      * @param {string} activationData.email - User email address

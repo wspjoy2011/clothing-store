@@ -23,6 +23,9 @@ export const useAccountStore = defineStore('accounts', {
         logoutLoading: false,
         logoutError: null,
 
+        userLoading: false,
+        userError: null,
+
         currentUser: null,
         isAuthenticated: false,
         accessToken: localStorage.getItem('accessToken') || null,
@@ -202,12 +205,46 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
+        isLoadingUser() {
+            return this.userLoading;
+        },
+
+        hasUserError() {
+            return this.userError !== null;
+        },
+
+        userErrorMessage() {
+            if (!this.userError) return '';
+
+            switch (this.userError.status) {
+                case 401:
+                    return this.userError.message || 'Session expired. Please login again.';
+
+                case 404:
+                    return this.userError.message || 'User not found.';
+
+                case 500:
+                    return 'Server error. Please try again later.';
+
+                default:
+                    return this.userError.message || 'Failed to load user data.';
+            }
+        },
+
         userEmail() {
-            return this.currentUser?.email || null;
+            return this.currentUser?.email || localStorage.getItem('userEmail') || null;
+        },
+
+        userName() {
+            return this.currentUser?.email || localStorage.getItem('userName') || null;
         },
 
         hasTokens() {
             return !!(this.accessToken && this.refreshToken);
+        },
+
+        hasUserData() {
+            return !!this.currentUser;
         },
 
         authStatus() {
@@ -232,6 +269,15 @@ export const useAccountStore = defineStore('accounts', {
                     this.accessToken = localStorage.getItem('accessToken');
                     this.isAuthenticated = true;
 
+                    const userEmail = localStorage.getItem('userEmail');
+                    if (!userEmail) {
+                        await this.loadCurrentUser();
+                    } else {
+                        this.currentUser = {
+                            email: userEmail,
+                        };
+                    }
+
                     console.log('User initialized as authenticated (refresh token found)');
 
                 } else {
@@ -247,6 +293,63 @@ export const useAccountStore = defineStore('accounts', {
                 this.clearLocalState();
             } finally {
                 this.isInitialized = true;
+            }
+        },
+
+        /**
+         * Load current user data by refresh token
+         * @returns {Promise<Object>} - Load user result
+         */
+        async loadCurrentUser() {
+            if (!this.refreshToken) {
+                return {
+                    success: false,
+                    message: 'No refresh token available'
+                };
+            }
+
+            this.userLoading = true;
+            this.userError = null;
+
+            try {
+                const response = await accountService.getCurrentUser(this.refreshToken);
+
+                if (response.user) {
+                    this.currentUser = response.user;
+
+                    localStorage.setItem('userEmail', response.user.email);
+                    if (response.user.id) {
+                        localStorage.setItem('userId', response.user.id.toString());
+                    }
+                    if (response.user.group_name) {
+                        localStorage.setItem('userGroup', response.user.group_name);
+                    }
+                }
+
+                return {
+                    success: true,
+                    data: response,
+                    message: response.message || 'User data loaded successfully'
+                };
+
+            } catch (err) {
+                this.userError = {
+                    status: err.status || 500,
+                    message: err.message || 'Failed to load user data',
+                };
+
+                if (err.status === 401) {
+                    this.clearLocalState();
+                }
+
+                return {
+                    success: false,
+                    error: this.userError,
+                    message: this.userErrorMessage
+                };
+
+            } finally {
+                this.userLoading = false;
             }
         },
 
@@ -273,6 +376,11 @@ export const useAccountStore = defineStore('accounts', {
                 if (response.user) {
                     this.currentUser = response.user;
                     this.isAuthenticated = true;
+
+                    localStorage.setItem('userEmail', response.user.email);
+                    if (response.user.id) {
+                        localStorage.setItem('userId', response.user.id.toString());
+                    }
                 }
 
                 return {
@@ -331,11 +439,9 @@ export const useAccountStore = defineStore('accounts', {
                     localStorage.setItem('refreshToken', response.refresh_token);
                 }
 
-                if (response.user) {
-                    this.currentUser = response.user;
-                }
-
                 this.isAuthenticated = true;
+
+                await this.loadCurrentUser();
 
                 return {
                     success: true,
@@ -432,6 +538,11 @@ export const useAccountStore = defineStore('accounts', {
                 if (response.user) {
                     this.currentUser = response.user;
                     this.isAuthenticated = true;
+
+                    localStorage.setItem('userEmail', response.user.email);
+                    if (response.user.id) {
+                        localStorage.setItem('userId', response.user.id.toString());
+                    }
                 }
 
                 return {
@@ -549,6 +660,14 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Clear user data state
+         */
+        clearUserState() {
+            this.userError = null;
+            this.userLoading = false;
+        },
+
+        /**
          * Clear all account state
          */
         resetState() {
@@ -566,6 +685,8 @@ export const useAccountStore = defineStore('accounts', {
             this.resendSuccess = false;
             this.logoutLoading = false;
             this.logoutError = null;
+            this.userLoading = false;
+            this.userError = null;
             this.currentUser = null;
             this.isAuthenticated = false;
         },
@@ -582,12 +703,16 @@ export const useAccountStore = defineStore('accounts', {
 
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
+            localStorage.removeItem('userEmail');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('userGroup');
 
             this.clearRegistrationState();
             this.clearLoginState();
             this.clearActivationState();
             this.clearResendState();
             this.clearLogoutState();
+            this.clearUserState();
         }
     }
 });
