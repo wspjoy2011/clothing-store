@@ -25,7 +25,7 @@ from apps.accounts.services.exceptions import (
     InvalidCredentialsError,
     UserInactiveError,
     LoginError,
-    TokenGenerationError
+    TokenGenerationError, InvalidRefreshTokenError, TokenValidationError
 )
 from apps.accounts.repositories.exceptions import (
     UserCreationError as RepoUserCreationError,
@@ -353,6 +353,57 @@ class AccountService(AccountServiceInterface):
             logger.warning(f"Error during logout (ignored): {e}")
 
         return None
+
+    async def get_user_by_refresh_token(self, refresh_token: str) -> UserDTO:
+        """
+        Get user information by refresh token
+
+        Args:
+            refresh_token: Valid refresh token
+
+        Returns:
+            UserDTO with user information
+
+        Raises:
+            InvalidRefreshTokenError: If refresh token is invalid or expired
+            UserNotFoundError: If user associated with token is not found
+            TokenValidationError: If token validation fails
+        """
+        logger.info("Starting get user by refresh token process")
+
+        try:
+            token_payload = self._jwt_manager.verify_refresh_token(refresh_token)
+            logger.debug(f"Refresh token verified successfully for email: {token_payload.get('email')}")
+        except Exception as e:
+            logger.warning(f"Invalid refresh token provided: {e}")
+            raise InvalidRefreshTokenError("Invalid or expired refresh token")
+
+        stored_token = await self._token_repository.get_refresh_token_by_token(refresh_token)
+        if not stored_token:
+            logger.warning("Refresh token not found in database")
+            raise InvalidRefreshTokenError("Refresh token not found or has been revoked")
+
+        current_time = datetime.now(datetime_lib.UTC)
+        if stored_token.expires_at <= current_time:
+            logger.warning("Refresh token has expired")
+            try:
+                await self._token_repository.delete_refresh_token(refresh_token)
+            except Exception as e:
+                logger.warning(f"Failed to delete expired token: {e}")
+            raise InvalidRefreshTokenError("Refresh token has expired")
+
+        user_email = token_payload.get('email')
+        if not user_email:
+            logger.error("Email not found in refresh token payload")
+            raise TokenValidationError("Invalid token payload: missing email")
+
+        user = await self._user_repository.get_user_by_email(user_email)
+        if not user:
+            logger.warning(f"User with email {user_email} not found")
+            raise UserNotFoundError(f"User with email '{user_email}' not found")
+
+        logger.info(f"User retrieved successfully by refresh token for email: {user_email}")
+        return user
 
     async def _store_refresh_token(self, user_id: int, refresh_token: str) -> None:
         """

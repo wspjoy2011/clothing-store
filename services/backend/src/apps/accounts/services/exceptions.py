@@ -82,3 +82,13 @@ class LoginError(AuthenticationError):
 class TokenGenerationError(AuthenticationError):
     """Raised when JWT token generation fails during login"""
     pass
+
+
+class InvalidRefreshTokenError(AccountServiceError):
+    """Raised when refresh token is invalid or expired"""
+    pass
+
+
+class TokenValidationError(AccountServiceError):
+    """Raised when token validation fails"""
+    pass

@@ -30,3 +30,17 @@ USER_LOGIN_REQUEST_EXAMPLE = {
     "email": "john.doe@example.com",
     "password": "SecurePass123!"
 }
+
+REFRESH_TOKEN_REQUEST_EXAMPLE = {
+    "refresh_token": "def50200e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855ae41e4649b934ca495991b7852b855"
+}
+
+REFRESH_TOKEN_SUCCESS_RESPONSE = {
+    "user": USER_RESPONSE_EXAMPLE,
+    "message": "User retrieved successfully"
+}
+
+GET_USER_BY_TOKEN_SUCCESS_RESPONSE = {
+    "user": USER_RESPONSE_EXAMPLE,
+    "message": "User retrieved successfully"
+}

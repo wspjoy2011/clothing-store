@@ -7,7 +7,8 @@ from apps.accounts.controllers import (
     activate_account_controller,
     resend_activation_controller,
     login_user_controller,
-    logout_user_controller
+    logout_user_controller,
+    get_user_by_refresh_token_controller
 )
 from apps.accounts.dependencies import get_account_service
 from apps.accounts.interfaces.services import AccountServiceInterface
@@ -28,12 +29,19 @@ from apps.accounts.schemas.examples.errors import (
     USER_INACTIVE_ERROR,
     USER_NOT_FOUND_ERROR,
     TOKEN_GENERATION_ERROR,
-    LOGIN_ERROR
+    LOGIN_ERROR,
+    AUTHORIZATION_HEADER_MISSING_ERROR,
+    INVALID_AUTHORIZATION_HEADER_ERROR,
+    INVALID_REFRESH_TOKEN_ERROR,
+    REFRESH_TOKEN_NOT_FOUND_ERROR,
+    REFRESH_TOKEN_EXPIRED_ERROR,
+    TOKEN_VALIDATION_ERROR
 )
 from apps.accounts.schemas.examples.user import (
     CREATE_USER_SUCCESS_RESPONSE,
     LOGIN_RESPONSE_EXAMPLE,
-    USER_LOGIN_REQUEST_EXAMPLE
+    USER_LOGIN_REQUEST_EXAMPLE,
+    GET_USER_BY_TOKEN_SUCCESS_RESPONSE
 )
 from apps.accounts.schemas.examples.activation import (
     ACTIVATE_ACCOUNT_REQUEST_EXAMPLE,
@@ -53,7 +61,10 @@ from apps.accounts.schemas.user import (
     CreateUserSchema,
     CreateUserResponseSchema,
     LoginResponseSchema,
-    UserLoginSchema, LogoutResponseSchema, LogoutSchema
+    UserLoginSchema,
+    LogoutResponseSchema,
+    LogoutSchema,
+    RefreshTokenResponseSchema
 )
 from apps.accounts.schemas.activation import (
     ActivateAccountSchema,
@@ -61,6 +72,7 @@ from apps.accounts.schemas.activation import (
     ResendActivationSchema,
     ResendActivationResponseSchema
 )
+from security.http import JWTTokenDependency
 
 API_PATHS: dict[str, str] = {
     "register": "/register",
@@ -68,6 +80,7 @@ API_PATHS: dict[str, str] = {
     "logout": "/logout",
     "activate": "/activate",
     "resend_activation": "/resend-activation",
+    "me": "/me",
 }
 
 router = APIRouter(
@@ -673,5 +686,114 @@ async def logout_user_route(
     """
     return await logout_user_controller(
         logout_data=logout_data,
+        account_service=account_service
+    )
+
+
+@router.get(
+    API_PATHS["me"],
+    response_model=RefreshTokenResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Get current user by refresh token",
+    description=(
+            "<h3>This endpoint retrieves current user information using a refresh token from Authorization header. "
+            "The refresh token must be valid, not expired, and present in the database. "
+            "Use this endpoint to get user details when you have a refresh token but need user information. "
+            "The token must be provided in Authorization header as 'Bearer {refresh_token}'.</h3>"
+    ),
+    responses={
+        200: {
+            "description": "User retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": GET_USER_BY_TOKEN_SUCCESS_RESPONSE
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - Invalid or expired refresh token",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "missing_header": {
+                            "summary": "Authorization header missing",
+                            "description": "Authorization header is not provided in the request",
+                            "value": AUTHORIZATION_HEADER_MISSING_ERROR
+                        },
+                        "invalid_header_format": {
+                            "summary": "Invalid Authorization header format",
+                            "description": "Authorization header format is incorrect (should be 'Bearer <token>')",
+                            "value": INVALID_AUTHORIZATION_HEADER_ERROR
+                        },
+                        "invalid_refresh_token": {
+                            "summary": "Invalid or expired refresh token",
+                            "description": "Refresh token is invalid, malformed, or has expired",
+                            "value": INVALID_REFRESH_TOKEN_ERROR
+                        },
+                        "token_not_found": {
+                            "summary": "Refresh token not found",
+                            "description": "Refresh token not found in database or has been revoked",
+                            "value": REFRESH_TOKEN_NOT_FOUND_ERROR
+                        },
+                        "token_expired": {
+                            "summary": "Refresh token expired",
+                            "description": "Refresh token has expired and cannot be used",
+                            "value": REFRESH_TOKEN_EXPIRED_ERROR
+                        },
+                        "token_validation_error": {
+                            "summary": "Token validation error",
+                            "description": "Token payload is invalid or missing required fields",
+                            "value": TOKEN_VALIDATION_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "user_not_found": {
+                            "summary": "User not found",
+                            "description": "User associated with the refresh token no longer exists",
+                            "value": USER_NOT_FOUND_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": INTERNAL_SERVER_ERROR
+                }
+            }
+        }
+    }
+)
+async def get_user_by_refresh_token_route(
+        refresh_token: JWTTokenDependency,
+        account_service: AccountServiceInterface = Depends(get_account_service)
+) -> RefreshTokenResponseSchema:
+    """
+    Get current user information by refresh token
+
+    Args:
+        refresh_token: JWT refresh token from Authorization header
+        account_service: Account service for business logic
+
+    Returns:
+        RefreshTokenResponseSchema: User data with success message
+
+    Raises:
+        HTTPException:
+            - 401 for missing/invalid Authorization header or invalid/expired tokens
+            - 404 if user associated with token not found
+            - 500 for internal server errors
+    """
+    return await get_user_by_refresh_token_controller(
+        refresh_token=refresh_token,
         account_service=account_service
     )

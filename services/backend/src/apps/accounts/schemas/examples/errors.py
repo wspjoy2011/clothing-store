@@ -73,3 +73,32 @@ TOKEN_GENERATION_ERROR = {
 LOGIN_ERROR = {
     "detail": "Login failed due to unexpected error: Database connection lost"
 }
+
+AUTHORIZATION_HEADER_MISSING_ERROR = {
+    "detail": "Authorization header is missing"
+}
+
+INVALID_AUTHORIZATION_HEADER_ERROR = {
+    "detail": "Invalid Authorization header format. Expected 'Bearer <token>'"
+}
+
+INVALID_REFRESH_TOKEN_ERROR = {
+    "detail": "Invalid or expired refresh token"
+}
+
+REFRESH_TOKEN_NOT_FOUND_ERROR = {
+    "detail": "Refresh token not found or has been revoked"
+}
+
+REFRESH_TOKEN_EXPIRED_ERROR = {
+    "detail": "Refresh token has expired"
+}
+
+TOKEN_VALIDATION_ERROR = {
+    "detail": "Invalid token payload: missing email"
+}
+
+REFRESH_TOKEN_VALIDATION_ERROR = {
+    "field": "refresh_token",
+    "message": "ensure this value has at least 1 characters"
+}

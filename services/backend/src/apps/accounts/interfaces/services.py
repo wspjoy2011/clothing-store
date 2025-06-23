@@ -99,3 +99,21 @@ class AccountServiceInterface(ABC):
             None - always succeeds, no exceptions raised even if token doesn't exist
         """
         pass
+
+    @abstractmethod
+    async def get_user_by_refresh_token(self, refresh_token: str) -> UserDTO:
+        """
+        Get user information by refresh token
+
+        Args:
+            refresh_token: Valid refresh token
+
+        Returns:
+            UserDTO with user information
+
+        Raises:
+            InvalidRefreshTokenError: If refresh token is invalid or expired
+            UserNotFoundError: If user associated with token is not found
+            TokenValidationError: If token validation fails
+        """
+        pass

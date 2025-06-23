@@ -81,3 +81,18 @@ class LogoutSchema(BaseModel):
 class LogoutResponseSchema(BaseModel):
     """Schema for logout response"""
     message: str = "Logout successful"
+
+
+class RefreshTokenSchema(BaseModel):
+    """Schema for refresh token request"""
+    refresh_token: str
+
+
+class RefreshTokenResponseSchema(BaseModel):
+    """Schema for refresh token response"""
+    user: UserResponseSchema
+    message: str = "User retrieved successfully"
+
+    model_config = {
+        "from_attributes": True
+    }

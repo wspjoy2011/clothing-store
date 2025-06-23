@@ -262,12 +262,15 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
 
     def _build_activation_token_query(self) -> None:
         """Build base activation token query"""
-        self._query_builder.reset().select("id", "token", "expires_at", "user_id")
+        self._query_builder.reset().select("id", "token", "expires_at", "user_id").from_table(
+            f"{self.APP_NAME}_activation_tokens")
 
     def _build_password_reset_token_query(self) -> None:
         """Build base password reset token query"""
-        self._query_builder.reset().select("id", "token", "expires_at", "user_id")
+        self._query_builder.reset().select("id", "token", "expires_at", "user_id").from_table(
+            f"{self.APP_NAME}_password_reset_tokens")
 
     def _build_refresh_token_query(self) -> None:
         """Build base refresh token query"""
-        self._query_builder.reset().select("id", "token", "expires_at", "user_id")
+        self._query_builder.reset().select("id", "token", "expires_at", "user_id").from_table(
+            f"{self.APP_NAME}_refresh_tokens")

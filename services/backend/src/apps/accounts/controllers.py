@@ -14,7 +14,8 @@ from apps.accounts.schemas.user import (
     UserLoginSchema,
     LoginResponseSchema,
     LogoutSchema,
-    LogoutResponseSchema
+    LogoutResponseSchema,
+    RefreshTokenResponseSchema
 )
 from apps.accounts.schemas.activation import (
     ActivateAccountSchema,
@@ -33,7 +34,9 @@ from apps.accounts.services.exceptions import (
     UserInactiveError,
     InvalidCredentialsError,
     TokenGenerationError,
-    LoginError
+    LoginError,
+    InvalidRefreshTokenError,
+    TokenValidationError
 )
 
 
@@ -259,3 +262,50 @@ async def logout_user_controller(
     """
     await account_service.logout_user(logout_data.refresh_token)
     return LogoutResponseSchema()
+
+
+async def get_user_by_refresh_token_controller(
+        refresh_token: str,
+        account_service: AccountServiceInterface,
+) -> RefreshTokenResponseSchema:
+    """
+    Controller for getting user by refresh token
+
+    Args:
+        refresh_token: JWT refresh token from Authorization header
+        account_service: Account service for business logic
+
+    Returns:
+        RefreshTokenResponseSchema with user data and success message
+
+    Raises:
+        HTTPException: 401 for invalid/expired tokens, 404 if user not found, 500 for server errors
+    """
+    try:
+        user = await account_service.get_user_by_refresh_token(refresh_token)
+    except InvalidRefreshTokenError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=str(e)
+        )
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+    except TokenValidationError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error occurred during user retrieval"
+        )
+    else:
+        user_response = UserResponseSchema(**asdict(user))
+        return RefreshTokenResponseSchema(
+            user=user_response,
+            message="User retrieved successfully"
+        )
