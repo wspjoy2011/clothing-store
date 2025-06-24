@@ -74,7 +74,7 @@ async def get_user_profile_repository(
 async def get_token_repository(
         dao: DAOInterface = Depends(get_database_dao),
         query_builder: SQLQueryBuilderInterface = Depends(lambda: get_query_builder("accounts_users"))
-)  -> TokenRepositoryInterface:
+) -> TokenRepositoryInterface:
     """
     Dependency for getting token repository.
 

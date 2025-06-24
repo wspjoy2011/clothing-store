@@ -53,6 +53,10 @@ class AppConfig(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
     JWT_REFRESH_TOKEN_EXPIRE_MINUTES: int
 
+    # Google OAuth2 settings
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+
     # Token settings
     ACTIVATION_TOKEN_VALID_DAYS: int = 7
 
@@ -132,6 +136,14 @@ class AppConfig(BaseSettings):
             "algorithm": self.JWT_SIGNING_ALGORITHM,
             "access_expire_minutes": self.JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
             "refresh_expire_minutes": self.JWT_REFRESH_TOKEN_EXPIRE_MINUTES
+        }
+
+    @property
+    def GOOGLE_OAUTH_CONFIG(self) -> dict:
+        """Complete configuration dictionary for Google OAuth2"""
+        return {
+            "client_id": self.GOOGLE_CLIENT_ID,
+            "client_secret": self.GOOGLE_CLIENT_SECRET,
         }
 
     def build_frontend_url(self, path: str, **params) -> str:

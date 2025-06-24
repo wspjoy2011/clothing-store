@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, status
 
-from apps.accounts.controllers import (
+from apps.accounts.controllers.accounts import (
     create_user_controller,
     activate_account_controller,
     resend_activation_controller,
