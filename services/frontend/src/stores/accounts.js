@@ -1,6 +1,7 @@
 import {defineStore} from 'pinia'
 
 import accountService from '@/services/accountService'
+import socialAuthService from '@/services/socialAuthService'
 
 export const useAccountStore = defineStore('accounts', {
     state: () => ({
@@ -25,6 +26,11 @@ export const useAccountStore = defineStore('accounts', {
 
         userLoading: false,
         userError: null,
+
+        socialAuthLoading: false,
+        socialAuthError: null,
+        socialAuthSuccess: false,
+        socialAuthResult: null,
 
         currentUser: null,
         isAuthenticated: false,
@@ -231,6 +237,47 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
+        // Social auth getters
+        isSocialAuthenticating() {
+            return this.socialAuthLoading;
+        },
+
+        hasSocialAuthError() {
+            return this.socialAuthError !== null;
+        },
+
+        socialAuthErrorMessage() {
+            if (!this.socialAuthError) return '';
+
+            switch (this.socialAuthError.status) {
+                case 400:
+                    return this.socialAuthError.message || 'Invalid social authentication request';
+
+                case 401:
+                    return this.socialAuthError.message || 'Invalid access token from social provider';
+
+                case 422:
+                    return this.socialAuthError.message || 'Validation error during social authentication';
+
+                case 503:
+                    return this.socialAuthError.message || 'Social authentication service temporarily unavailable';
+
+                case 500:
+                    return 'Server error during social authentication. Please try again later.';
+
+                default:
+                    return this.socialAuthError.message || 'Social authentication failed. Please try again.';
+            }
+        },
+
+        socialAuthWasNewUser() {
+            return this.socialAuthResult?.is_new_user || false;
+        },
+
+        socialAuthMessage() {
+            return this.socialAuthResult?.message || '';
+        },
+
         userEmail() {
             return this.currentUser?.email || localStorage.getItem('userEmail') || null;
         },
@@ -240,7 +287,7 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         hasTokens() {
-            return !!(this.accessToken && this.refreshToken);
+            return !!this.refreshToken;
         },
 
         hasUserData() {
@@ -251,7 +298,7 @@ export const useAccountStore = defineStore('accounts', {
             if (!this.isInitialized) {
                 return 'initializing';
             }
-            return this.isAuthenticated ? 'authenticated' : 'unauthenticated';
+            return this.refreshToken ? 'authenticated' : 'unauthenticated';
         }
     },
 
@@ -267,29 +314,32 @@ export const useAccountStore = defineStore('accounts', {
                 if (refreshToken) {
                     this.refreshToken = refreshToken;
                     this.accessToken = localStorage.getItem('accessToken');
-                    this.isAuthenticated = true;
 
-                    const userEmail = localStorage.getItem('userEmail');
-                    if (!userEmail) {
-                        await this.loadCurrentUser();
+                    const userResult = await this.loadCurrentUser();
+
+                    if (userResult.success) {
+                        this.isAuthenticated = true;
                     } else {
-                        this.currentUser = {
-                            email: userEmail,
-                        };
+                        console.warn('Failed to load user with refresh token, clearing auth state');
+                        this.clearLocalState();
                     }
-
-                    console.log('User initialized as authenticated (refresh token found)');
-
                 } else {
                     this.isAuthenticated = false;
                     this.currentUser = null;
                     this.accessToken = null;
 
-                    console.log('User initialized as unauthenticated (no refresh token)');
+                    const userEmail = localStorage.getItem('userEmail');
+                    if (userEmail) {
+                        console.warn('Found userEmail in localStorage but no refresh token, clearing...');
+                        localStorage.removeItem('userEmail');
+                        localStorage.removeItem('userId');
+                        localStorage.removeItem('userGroup');
+                        localStorage.removeItem('userName');
+                    }
                 }
 
             } catch (error) {
-                console.error('Auth initialization error:', error);
+                console.error('Error during auth initialization:', error);
                 this.clearLocalState();
             } finally {
                 this.isInitialized = true;
@@ -339,6 +389,7 @@ export const useAccountStore = defineStore('accounts', {
                 };
 
                 if (err.status === 401) {
+                    console.warn('Refresh token expired or invalid, clearing auth state');
                     this.clearLocalState();
                 }
 
@@ -350,6 +401,89 @@ export const useAccountStore = defineStore('accounts', {
 
             } finally {
                 this.userLoading = false;
+            }
+        },
+
+        /**
+         * Authenticate with Google OAuth
+         * @param {string} accessToken - Google OAuth access token
+         * @returns {Promise<Object>} - Social authentication result
+         */
+        async authenticateWithGoogle(accessToken) {
+            return this.socialAuthenticate('google', accessToken);
+        },
+
+        /**
+         * Authenticate with social OAuth provider
+         * @param {string} provider - OAuth provider name
+         * @param {string} accessToken - OAuth access token
+         * @returns {Promise<Object>} - Social authentication result
+         */
+        async socialAuthenticate(provider, accessToken) {
+            this.socialAuthLoading = true;
+            this.socialAuthError = null;
+            this.socialAuthSuccess = false;
+            this.socialAuthResult = null;
+
+            try {
+                const response = await socialAuthService.authenticate({
+                    provider,
+                    access_token: accessToken
+                });
+
+                this.socialAuthSuccess = true;
+                this.socialAuthResult = response;
+
+                if (response.tokens) {
+                    if (response.tokens.access_token) {
+                        this.accessToken = response.tokens.access_token;
+                        localStorage.setItem('accessToken', response.tokens.access_token);
+                    }
+
+                    if (response.tokens.refresh_token) {
+                        this.refreshToken = response.tokens.refresh_token;
+                        localStorage.setItem('refreshToken', response.tokens.refresh_token);
+                    }
+                }
+
+                if (response.user_profile) {
+                    this.currentUser = {
+                        email: response.user_profile.email,
+                        name: response.user_profile.name
+                    };
+                    localStorage.setItem('userEmail', response.user_profile.email);
+                    if (response.user_profile.name) {
+                        localStorage.setItem('userName', response.user_profile.name);
+                    }
+                }
+
+                this.isAuthenticated = !!this.refreshToken;
+
+                return {
+                    success: true,
+                    data: response,
+                    message: response.message || `${provider} authentication successful`,
+                    isNewUser: response.is_new_user || false
+                };
+
+            } catch (err) {
+                this.socialAuthError = {
+                    status: err.status || 500,
+                    message: err.message || 'Social authentication failed',
+                    provider: provider
+                };
+
+                this.socialAuthSuccess = false;
+
+                return {
+                    success: false,
+                    error: this.socialAuthError,
+                    message: this.socialAuthErrorMessage,
+                    provider: provider
+                };
+
+            } finally {
+                this.socialAuthLoading = false;
             }
         },
 
@@ -374,13 +508,7 @@ export const useAccountStore = defineStore('accounts', {
                 this.registrationSuccess = true;
 
                 if (response.user) {
-                    this.currentUser = response.user;
-                    this.isAuthenticated = true;
-
                     localStorage.setItem('userEmail', response.user.email);
-                    if (response.user.id) {
-                        localStorage.setItem('userId', response.user.id.toString());
-                    }
                 }
 
                 return {
@@ -439,7 +567,7 @@ export const useAccountStore = defineStore('accounts', {
                     localStorage.setItem('refreshToken', response.refresh_token);
                 }
 
-                this.isAuthenticated = true;
+                this.isAuthenticated = !!this.refreshToken;
 
                 await this.loadCurrentUser();
 
@@ -494,8 +622,6 @@ export const useAccountStore = defineStore('accounts', {
                 };
 
             } catch (err) {
-                console.warn('Logout API call failed, but clearing local state anyway:', err);
-
                 this.logoutError = {
                     status: err.status || 500,
                     message: err.message || 'Logout failed on server',
@@ -536,9 +662,6 @@ export const useAccountStore = defineStore('accounts', {
                 this.activationSuccess = true;
 
                 if (response.user) {
-                    this.currentUser = response.user;
-                    this.isAuthenticated = true;
-
                     localStorage.setItem('userEmail', response.user.email);
                     if (response.user.id) {
                         localStorage.setItem('userId', response.user.id.toString());
@@ -668,6 +791,16 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Clear social auth state
+         */
+        clearSocialAuthState() {
+            this.socialAuthError = null;
+            this.socialAuthSuccess = false;
+            this.socialAuthLoading = false;
+            this.socialAuthResult = null;
+        },
+
+        /**
          * Clear all account state
          */
         resetState() {
@@ -687,6 +820,10 @@ export const useAccountStore = defineStore('accounts', {
             this.logoutError = null;
             this.userLoading = false;
             this.userError = null;
+            this.socialAuthLoading = false;
+            this.socialAuthError = null;
+            this.socialAuthSuccess = false;
+            this.socialAuthResult = null;
             this.currentUser = null;
             this.isAuthenticated = false;
         },
@@ -706,6 +843,7 @@ export const useAccountStore = defineStore('accounts', {
             localStorage.removeItem('userEmail');
             localStorage.removeItem('userId');
             localStorage.removeItem('userGroup');
+            localStorage.removeItem('userName');
 
             this.clearRegistrationState();
             this.clearLoginState();
@@ -713,6 +851,7 @@ export const useAccountStore = defineStore('accounts', {
             this.clearResendState();
             this.clearLogoutState();
             this.clearUserState();
+            this.clearSocialAuthState();
         }
     }
 });

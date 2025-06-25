@@ -180,9 +180,9 @@
 
 <script setup>
 import {computed, onMounted, ref, watch} from 'vue'
-import {useRouter} from 'vue-router'
 import {useTheme} from 'vuetify'
 import {useAccountStore} from '@/stores/accounts'
+import {useNavigation} from '@/composables/accounts/useNavigation'
 
 const props = defineProps({
   email: {
@@ -195,9 +195,15 @@ const props = defineProps({
   }
 })
 
-const router = useRouter()
 const theme = useTheme()
 const accountStore = useAccountStore()
+
+const {
+  goToLogin,
+  goToRegister,
+  goToHome,
+  goToResendActivation
+} = useNavigation()
 
 const activationAttempted = ref(false)
 
@@ -273,25 +279,6 @@ const retryActivation = async () => {
   activationAttempted.value = false
   accountStore.clearActivationState()
   await activateAccount()
-}
-
-const goToLogin = () => {
-  router.push({name: 'login'})
-}
-
-const goToHome = () => {
-  router.push({name: 'home'})
-}
-
-const goToRegister = () => {
-  router.push({name: 'register'})
-}
-
-const goToResendActivation = () => {
-  router.push({
-    name: 'resend-activation',
-    query: props.email ? {email: props.email} : {}
-  })
 }
 
 watch([() => props.email, () => props.token], ([newEmail, newToken]) => {

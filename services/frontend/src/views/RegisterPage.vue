@@ -27,6 +27,40 @@
               </div>
 
               <v-card-text class="register-form-section">
+                <!-- Social Login Section -->
+                <div class="social-login-section mb-6">
+                  <v-btn
+                      variant="outlined"
+                      block
+                      size="large"
+                      class="social-btn google-btn mb-2"
+                      :disabled="isLoading || isSocialAuthLoading"
+                      :loading="isSocialAuthLoading"
+                      @click="onGoogleRegister"
+                  >
+                    <v-icon start icon="mdi-google"></v-icon>
+                    {{ isSocialAuthLoading ? 'Connecting...' : 'Continue with Google' }}
+                  </v-btn>
+
+                  <v-btn
+                      variant="outlined"
+                      block
+                      size="large"
+                      class="social-btn facebook-btn"
+                      :disabled="isLoading || isSocialAuthLoading"
+                      @click="onFacebookRegister"
+                  >
+                    <v-icon start icon="mdi-facebook"></v-icon>
+                    Continue with Facebook
+                  </v-btn>
+                </div>
+
+                <div class="divider-section">
+                  <v-divider class="my-4"></v-divider>
+                  <span class="divider-text">or create with email</span>
+                </div>
+
+                <!-- Local Registration Form -->
                 <v-form
                     ref="formRef"
                     v-model="isFormValid"
@@ -44,7 +78,7 @@
                         prepend-inner-icon="mdi-email-outline"
                         class="animated-field"
                         :loading="isLoading"
-                        :disabled="isLoading"
+                        :disabled="isLoading || isSocialAuthLoading"
                         color="primary"
                         clearable
                         validate-on="input lazy"
@@ -67,7 +101,7 @@
                         @click:append-inner="showPassword = !showPassword"
                         class="animated-field"
                         :loading="isLoading"
-                        :disabled="isLoading"
+                        :disabled="isLoading || isSocialAuthLoading"
                         color="primary"
                         validate-on="input lazy"
                         :error="passwordTouched && passwordError"
@@ -89,7 +123,7 @@
                         @click:append-inner="showConfirmPassword = !showConfirmPassword"
                         class="animated-field"
                         :loading="isLoading"
-                        :disabled="isLoading"
+                        :disabled="isLoading || isSocialAuthLoading"
                         color="primary"
                         validate-on="input lazy"
                         :error="confirmPasswordTouched && confirmPasswordError"
@@ -104,7 +138,7 @@
                         v-model="acceptTerms"
                         :rules="termsRules"
                         color="primary"
-                        :disabled="isLoading"
+                        :disabled="isLoading || isSocialAuthLoading"
                         validate-on="input lazy"
                         :readonly="!legalStore.hasReadBothDocuments"
                         @click="handleCheckboxClick"
@@ -157,42 +191,11 @@
                         color="primary"
                         class="register-btn"
                         :loading="isLoading"
-                        :disabled="!isFormReady || isLoading"
+                        :disabled="!isFormReady || isLoading || isSocialAuthLoading"
                         elevation="2"
                     >
                       <v-icon start icon="mdi-account-plus"></v-icon>
                       {{ isLoading ? 'Creating Account...' : 'Create Account' }}
-                    </v-btn>
-                  </div>
-
-                  <div class="divider-section">
-                    <v-divider class="my-4"></v-divider>
-                    <span class="divider-text">or</span>
-                  </div>
-
-                  <div class="social-login-section">
-                    <v-btn
-                        variant="outlined"
-                        block
-                        size="large"
-                        class="social-btn google-btn mb-2"
-                        :disabled="isLoading"
-                        @click="handleGoogleRegister"
-                    >
-                      <v-icon start icon="mdi-google"></v-icon>
-                      Continue with Google
-                    </v-btn>
-
-                    <v-btn
-                        variant="outlined"
-                        block
-                        size="large"
-                        class="social-btn facebook-btn"
-                        :disabled="isLoading"
-                        @click="handleFacebookRegister"
-                    >
-                      <v-icon start icon="mdi-facebook"></v-icon>
-                      Continue with Facebook
                     </v-btn>
                   </div>
                 </v-form>
@@ -205,7 +208,7 @@
                       variant="text"
                       color="primary"
                       class="login-link"
-                      :disabled="isLoading"
+                      :disabled="isLoading || isSocialAuthLoading"
                       @click="goToLogin"
                   >
                     Sign In
@@ -217,14 +220,15 @@
         </v-col>
       </v-row>
 
+      <!-- Success Messages -->
       <v-snackbar
           v-model="showSuccessMessage"
           color="success"
-          timeout="5000"
+          timeout="6000"
           location="top"
       >
         <v-icon start icon="mdi-check-circle"></v-icon>
-        Account created successfully! Please check your email for verification.
+        {{ successMessage }}
         <template v-slot:actions>
           <v-btn variant="text" @click="hideSuccess">
             Close
@@ -232,16 +236,33 @@
         </template>
       </v-snackbar>
 
+      <!-- Error Messages -->
       <v-snackbar
           v-model="showErrorMessage"
           color="error"
-          timeout="5000"
+          timeout="7000"
           location="top"
       >
         <v-icon start icon="mdi-alert-circle"></v-icon>
         {{ errorMessage }}
         <template v-slot:actions>
           <v-btn variant="text" @click="hideError">
+            Close
+          </v-btn>
+        </template>
+      </v-snackbar>
+
+      <!-- Social Auth Success -->
+      <v-snackbar
+          v-model="showSocialSuccessMessage"
+          color="success"
+          timeout="6000"
+          location="top"
+      >
+        <v-icon start icon="mdi-google"></v-icon>
+        {{ socialSuccessMessage }}
+        <template v-slot:actions>
+          <v-btn variant="text" @click="hideSocialSuccess">
             Close
           </v-btn>
         </template>
@@ -261,7 +282,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted} from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import {useTheme} from 'vuetify'
 import {useRegistrationForm} from '@/composables/accounts/useRegistrationForm'
 import {useNotifications} from '@/composables/accounts/useNotifications'
@@ -273,6 +294,10 @@ import PrivacyPolicy from '@/components/modals/PrivacyPolicy.vue'
 const theme = useTheme()
 const isDarkTheme = computed(() => theme.global.current.value.dark)
 const legalStore = useLegalStore()
+
+const isSocialAuthLoading = ref(false)
+const showSocialSuccessMessage = ref(false)
+const socialSuccessMessage = ref('')
 
 const {
   formRef,
@@ -307,6 +332,7 @@ const {
   showSuccessMessage,
   showErrorMessage,
   errorMessage,
+  successMessage,
   showSuccess,
   showError,
   hideSuccess,
@@ -315,12 +341,13 @@ const {
 
 const {
   goToLogin,
-  handleGoogleRegister,
-  handleFacebookRegister,
+  handleGoogleAuth,
+  handleFacebookAuth,
   openTerms,
   openPrivacy,
   handleTermsAccept,
-  handlePrivacyAcknowledge
+  handlePrivacyAcknowledge,
+  goToHome
 } = useNavigation()
 
 const handleCheckboxClick = (event) => {
@@ -330,15 +357,61 @@ const handleCheckboxClick = (event) => {
   }
 }
 
+const hideSocialSuccess = () => {
+  showSocialSuccessMessage.value = false
+  socialSuccessMessage.value = ''
+}
+
+const onGoogleRegister = async () => {
+  isSocialAuthLoading.value = true
+
+  try {
+    const result = await handleGoogleAuth(false)
+
+    if (result && result.success) {
+      if (result.isNewUser) {
+        socialSuccessMessage.value = 'Welcome! Your Google account has been successfully registered.'
+      } else {
+        socialSuccessMessage.value = 'Welcome back! You have been signed in with your existing Google account.'
+      }
+
+      showSocialSuccessMessage.value = true
+
+      setTimeout(() => {
+        hideSocialSuccess()
+        goToHome()
+      }, 4000)
+
+    } else if (result && result.error) {
+      showError(result.message || 'Google registration failed. Please try again.')
+    } else {
+      showError('Google registration failed. Please try again.')
+    }
+
+  } catch (error) {
+    console.error('Google registration error:', error)
+    showError('An unexpected error occurred during Google registration.')
+  } finally {
+    isSocialAuthLoading.value = false
+  }
+}
+
+const onFacebookRegister = async () => {
+  handleFacebookAuth(false)
+}
+
 const onRegister = async () => {
   const result = await handleRegister()
 
   if (result && result.success) {
-    showSuccess()
+    showSuccess('Account created successfully! Please check your email for verification.')
     resetForm()
+
     setTimeout(() => {
+      hideSuccess()
       goToLogin()
-    }, 2000)
+    }, 4000)
+
   } else if (result && result.error) {
     showError(result.error)
   } else {
@@ -486,51 +559,48 @@ onMounted(() => {
 }
 
 .register-title {
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: 2rem;
+  font-weight: 700;
   margin: 0;
-  letter-spacing: -0.025em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .register-subtitle {
-  font-size: 0.95rem;
+  font-size: 1rem;
   opacity: 0.9;
   margin: 8px 0 0;
 }
 
 .register-form-section {
-  padding: 32px 24px 16px;
+  padding: 32px;
 }
 
 .form-field-wrapper {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .animated-field {
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.animated-field:hover {
+.animated-field:focus-within {
   transform: translateY(-2px);
 }
 
 .terms-text {
   font-size: 0.875rem;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .terms-link {
-  color: #667eea;
+  color: #1976D2;
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  pointer-events: auto;
+  transition: opacity 0.2s ease;
 }
 
 .terms-link:hover {
-  color: #764ba2;
+  opacity: 0.8;
   text-decoration: underline;
 }
 
@@ -540,27 +610,27 @@ onMounted(() => {
 }
 
 .register-btn {
-  border-radius: 12px;
+  height: 56px;
   font-weight: 600;
   text-transform: none;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.5px;
+  border-radius: 12px;
   transition: all 0.3s ease;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-.register-btn:hover:not(:disabled) {
+.register-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 24px rgba(25, 118, 210, 0.3) !important;
 }
 
 .register-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  transform: none;
 }
 
 .divider-section {
   position: relative;
-  margin: 24px 0;
+  text-align: center;
+  margin: 32px 0;
 }
 
 .divider-text {
@@ -568,76 +638,82 @@ onMounted(() => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
   padding: 0 16px;
-  color: #666;
   font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: 500;
 }
 
 .dark-theme .divider-text {
-  background: #1e1e1e;
-  color: #ccc;
+  background: rgba(30, 30, 30, 0.95);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .social-login-section {
-  margin-bottom: 8px;
+  margin-bottom: 24px;
 }
 
 .social-btn {
-  border-radius: 12px;
-  text-transform: none;
+  height: 48px;
   font-weight: 500;
+  text-transform: none;
+  border-radius: 12px;
   transition: all 0.3s ease;
-  border: 2px solid #e0e0e0;
+  border: 2px solid rgba(0, 0, 0, 0.12);
 }
 
 .social-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.google-btn {
+  color: #4285f4;
+  border-color: #4285f4;
 }
 
 .google-btn:hover {
+  background-color: rgba(66, 133, 244, 0.04);
   border-color: #4285f4;
-  color: #4285f4;
+}
+
+.facebook-btn {
+  color: #1877f2;
+  border-color: #1877f2;
 }
 
 .facebook-btn:hover {
+  background-color: rgba(24, 119, 242, 0.04);
   border-color: #1877f2;
-  color: #1877f2;
 }
 
 .register-footer {
-  padding: 16px 24px 24px;
-  background: rgba(248, 249, 250, 0.8);
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.dark-theme .register-footer {
-  background: rgba(40, 40, 40, 0.8);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 16px 32px 32px;
+  justify-content: center;
 }
 
 .footer-content {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  width: 100%;
 }
 
 .login-text {
   font-size: 0.875rem;
-  color: #666;
+  color: rgba(0, 0, 0, 0.6);
 }
 
 .dark-theme .login-text {
-  color: #ccc;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .login-link {
-  text-transform: none;
   font-weight: 600;
+  text-transform: none;
   padding: 4px 8px;
+  min-width: auto;
+  height: auto;
 }
 
 @media (max-width: 600px) {
@@ -646,50 +722,71 @@ onMounted(() => {
   }
 
   .register-form-section {
-    padding: 24px 16px 16px;
+    padding: 24px 16px;
   }
 
-  .register-header {
-    padding: 24px 16px 16px;
+  .register-footer {
+    padding: 16px;
   }
 
   .register-title {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
+  }
+
+  .register-subtitle {
+    font-size: 0.875rem;
   }
 
   .form-field-wrapper {
-    margin-bottom: 16px;
+    margin-bottom: 20px;
+  }
+
+  .floating-shapes {
+    display: none;
   }
 }
 
-:deep(.v-theme--dark .register-container) {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-}
-
-:deep(.v-theme--dark .v-text-field .v-field) {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-:deep(.v-theme--dark .v-checkbox .v-selection-control__input) {
-  color: #90caf9;
-}
-
-:deep(.v-checkbox .v-label a) {
-  pointer-events: auto !important;
-}
-
-:deep(.v-checkbox[readonly] .v-selection-control__input) {
+.social-btn:disabled {
   opacity: 0.6;
-  cursor: not-allowed;
+  transform: none;
 }
 
-:deep(.v-checkbox[readonly] .v-label) {
-  opacity: 0.8;
+.social-btn .v-btn__loader {
+  color: inherit;
 }
 
-:deep(.v-checkbox[readonly] .v-label a) {
-  opacity: 1;
-  pointer-events: auto !important;
-  cursor: pointer !important;
+.v-field--error {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+@media (max-width: 768px) {
+  .register-page {
+    overflow-y: auto;
+  }
+
+  .register-page::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .register-page::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .register-page::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+  }
 }
 </style>
