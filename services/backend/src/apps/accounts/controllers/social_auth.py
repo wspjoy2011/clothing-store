@@ -3,6 +3,7 @@ Controllers for social authentication module.
 """
 
 import logging
+from dataclasses import asdict
 from datetime import datetime, UTC
 
 from fastapi import HTTPException
@@ -54,10 +55,13 @@ async def social_auth_controller(
 
         auth_response = await social_auth_service.authenticate(auth_request)
 
+        tokens_dict = asdict(auth_response.tokens) if auth_response.tokens else None
+        user_profile_dict = asdict(auth_response.user_profile) if auth_response.user_profile else None
+
         return SocialAuthResponseSchema(
             success=auth_response.success,
-            tokens=auth_response.tokens,
-            user_profile=auth_response.user_profile,
+            tokens=tokens_dict,
+            user_profile=user_profile_dict,
             is_new_user=auth_response.is_new_user,
             message=auth_response.message,
             provider=auth_response.provider

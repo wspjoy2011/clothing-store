@@ -3,6 +3,7 @@ Pydantic schemas for social authentication API.
 """
 
 from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator
 from email_validator import validate_email, EmailNotValidError
 

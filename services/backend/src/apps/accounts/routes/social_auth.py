@@ -8,10 +8,8 @@ from apps.accounts.controllers.social_auth import (
     social_auth_controller,
     get_supported_providers_controller
 )
-from apps.accounts.services.social_auth.dependencies import (
-    get_social_auth_service,
-    get_oauth_provider_registry
-)
+from apps.accounts.services.social_auth.dependencies import get_google_social_auth_service
+from oauth.dependencies import get_oauth_registry
 from apps.accounts.schemas.social_auth import (
     SocialAuthRequestSchema,
     SocialAuthResponseSchema,
@@ -222,7 +220,7 @@ router = APIRouter(prefix="/auth", tags=["Social Authentication"])
 )
 async def social_auth_route(
         request_data: SocialAuthRequestSchema,
-        social_auth_service: SocialAuthServiceInterface = Depends(lambda: get_social_auth_service("google"))
+        social_auth_service: SocialAuthServiceInterface = Depends(get_google_social_auth_service)
 ) -> SocialAuthResponseSchema:
     """
     Authenticate user via social OAuth provider
@@ -276,7 +274,7 @@ async def social_auth_route(
     }
 )
 async def get_supported_providers_route(
-        registry: OAuthProviderRegistry = Depends(get_oauth_provider_registry)
+        registry: OAuthProviderRegistry = Depends(get_oauth_registry)
 ) -> SupportedProvidersSchema:
     """
     Get list of supported OAuth providers

@@ -4,30 +4,38 @@ Dependencies for social authentication service.
 
 from fastapi import Depends
 
-from oauth.factories import OAuthProviderFactory, OAuthProviderRegistry
+from oauth.dependencies import get_oauth_registry
+from oauth.factories import OAuthProviderRegistry
 from oauth.exceptions import ProviderNotSupportedError
 from settings.config import config
 from apps.accounts.services.social_auth.service import GoogleSocialAuthService
 from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
 
 
-def get_oauth_provider_registry() -> OAuthProviderRegistry:
+def get_google_social_auth_service(
+        registry: OAuthProviderRegistry = Depends(get_oauth_registry)
+) -> SocialAuthServiceInterface:
     """
-    Get OAuth provider registry instance.
+    Get Google social authentication service.
+
+    Args:
+        registry: OAuth provider registry
 
     Returns:
-        OAuth provider registry with factory
+        Google social auth service instance
     """
-    factory = OAuthProviderFactory()
-    return OAuthProviderRegistry(factory)
+    provider_config = config.GOOGLE_OAUTH_CONFIG
+    oauth_provider = registry.get_provider("google", provider_config)
+    return GoogleSocialAuthService(oauth_provider)
 
 
 def get_social_auth_service(
-        provider_name: str = "google",
-        registry: OAuthProviderRegistry = Depends(get_oauth_provider_registry)
+        provider_name: str,
+        registry: OAuthProviderRegistry
 ) -> SocialAuthServiceInterface:
     """
     Get social authentication service by provider name.
+    NOTE: This function is NOT for FastAPI Depends - use specific provider functions instead.
 
     Args:
         provider_name: Name of the OAuth provider
