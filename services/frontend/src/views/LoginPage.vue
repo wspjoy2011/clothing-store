@@ -27,6 +27,40 @@
               </div>
 
               <v-card-text class="login-form-section">
+                <!-- Social Login Section -->
+                <div class="social-login-section mb-6">
+                  <v-btn
+                      variant="outlined"
+                      block
+                      size="large"
+                      class="social-btn google-btn mb-2"
+                      :disabled="isLoading || isSocialAuthLoading"
+                      :loading="isSocialAuthLoading"
+                      @click="onGoogleLogin"
+                  >
+                    <v-icon start icon="mdi-google"></v-icon>
+                    {{ isSocialAuthLoading ? 'Connecting...' : 'Continue with Google' }}
+                  </v-btn>
+
+                  <v-btn
+                      variant="outlined"
+                      block
+                      size="large"
+                      class="social-btn facebook-btn"
+                      :disabled="isLoading || isSocialAuthLoading"
+                      @click="onFacebookLogin"
+                  >
+                    <v-icon start icon="mdi-facebook"></v-icon>
+                    Continue with Facebook
+                  </v-btn>
+                </div>
+
+                <div class="divider-section">
+                  <v-divider class="my-4"></v-divider>
+                  <span class="divider-text">or sign in with email</span>
+                </div>
+
+                <!-- Email Login Form -->
                 <v-form
                     ref="formRef"
                     v-model="isFormValid"
@@ -44,7 +78,7 @@
                         prepend-inner-icon="mdi-email-outline"
                         class="animated-field"
                         :loading="isLoading"
-                        :disabled="isLoading"
+                        :disabled="isLoading || isSocialAuthLoading"
                         color="primary"
                         clearable
                         validate-on="input lazy"
@@ -67,7 +101,7 @@
                         @click:append-inner="showPassword = !showPassword"
                         class="animated-field"
                         :loading="isLoading"
-                        :disabled="isLoading"
+                        :disabled="isLoading || isSocialAuthLoading"
                         color="primary"
                         validate-on="input lazy"
                         :error="passwordTouched && passwordError"
@@ -85,7 +119,7 @@
                         color="primary"
                         class="login-btn"
                         :loading="isLoading"
-                        :disabled="!isFormReady || isLoading"
+                        :disabled="!isFormReady || isLoading || isSocialAuthLoading"
                         elevation="2"
                     >
                       <v-icon start icon="mdi-login"></v-icon>
@@ -104,8 +138,8 @@
                         size="large"
                         color="warning"
                         class="action-btn mb-2"
-                        :disabled="isLoading"
-                        @click="goToActivation"
+                        :disabled="isLoading || isSocialAuthLoading"
+                        @click="goToActivationPage"
                     >
                       <v-icon start icon="mdi-email-check"></v-icon>
                       Activate Account
@@ -118,42 +152,11 @@
                         size="large"
                         color="success"
                         class="action-btn"
-                        :disabled="isLoading"
+                        :disabled="isLoading || isSocialAuthLoading"
                         @click="goToRegistration"
                     >
                       <v-icon start icon="mdi-account-plus"></v-icon>
                       Create Account
-                    </v-btn>
-                  </div>
-
-                  <div class="divider-section">
-                    <v-divider class="my-4"></v-divider>
-                    <span class="divider-text">or</span>
-                  </div>
-
-                  <div class="social-login-section">
-                    <v-btn
-                        variant="outlined"
-                        block
-                        size="large"
-                        class="social-btn google-btn mb-2"
-                        :disabled="isLoading"
-                        @click="handleGoogleLogin"
-                    >
-                      <v-icon start icon="mdi-google"></v-icon>
-                      Continue with Google
-                    </v-btn>
-
-                    <v-btn
-                        variant="outlined"
-                        block
-                        size="large"
-                        class="social-btn facebook-btn"
-                        :disabled="isLoading"
-                        @click="handleFacebookLogin"
-                    >
-                      <v-icon start icon="mdi-facebook"></v-icon>
-                      Continue with Facebook
                     </v-btn>
                   </div>
                 </v-form>
@@ -166,7 +169,7 @@
                       variant="text"
                       color="primary"
                       class="register-link"
-                      :disabled="isLoading"
+                      :disabled="isLoading || isSocialAuthLoading"
                       @click="goToRegister"
                   >
                     Sign Up
@@ -178,6 +181,7 @@
         </v-col>
       </v-row>
 
+      <!-- Notifications -->
       <v-snackbar
           v-model="showSuccessMessage"
           color="success"
@@ -185,7 +189,7 @@
           location="top"
       >
         <v-icon start icon="mdi-check-circle"></v-icon>
-        Login successful! Welcome back.
+        {{ successMessage }}
         <template v-slot:actions>
           <v-btn variant="text" @click="hideSuccess">
             Close
@@ -207,6 +211,21 @@
           </v-btn>
         </template>
       </v-snackbar>
+
+      <v-snackbar
+          v-model="showWarningMessage"
+          color="warning"
+          timeout="6000"
+          location="top"
+      >
+        <v-icon start icon="mdi-alert"></v-icon>
+        {{ warningMessage }}
+        <template v-slot:actions>
+          <v-btn variant="text" @click="hideWarning">
+            Close
+          </v-btn>
+        </template>
+      </v-snackbar>
     </v-container>
   </div>
 </template>
@@ -214,12 +233,35 @@
 <script setup>
 import {computed, ref, watch} from 'vue'
 import {useTheme} from 'vuetify'
-import {useRouter} from 'vue-router'
 import {useAccountStore} from '@/stores/accounts'
+import {useNavigation} from '@/composables/accounts/useNavigation'
+import {useNotifications} from '@/composables/accounts/useNotifications'
 
 const theme = useTheme()
-const router = useRouter()
 const accountStore = useAccountStore()
+
+const {
+  goToRegister,
+  goToActivation,
+  handleGoogleAuth,
+  handleFacebookAuth,
+  goToHome
+} = useNavigation()
+
+const {
+  showSuccessMessage,
+  showErrorMessage,
+  showWarningMessage,
+  successMessage,
+  errorMessage,
+  warningMessage,
+  showSuccess,
+  showError,
+  showWarning,
+  hideSuccess,
+  hideError,
+  hideWarning
+} = useNotifications()
 
 const isDarkTheme = computed(() => theme.global.current.value.dark)
 
@@ -232,11 +274,9 @@ const showPassword = ref(false)
 const emailTouched = ref(false)
 const passwordTouched = ref(false)
 
-const showSuccessMessage = ref(false)
-const showErrorMessage = ref(false)
+const isSocialAuthLoading = ref(false)
 
 const isLoading = computed(() => accountStore.isLoggingIn)
-const errorMessage = computed(() => accountStore.loginErrorMessage)
 const needsActivation = computed(() => accountStore.needsActivation)
 const needsRegistration = computed(() => accountStore.needsRegistration)
 
@@ -254,7 +294,6 @@ const passwordRules = [
   v => v.length >= 8 || 'Password must be at least 8 characters'
 ]
 
-// Field validation
 const emailError = computed(() => {
   if (!emailTouched.value || !email.value) return false
   return !emailRules.every(rule => rule(email.value) === true)
@@ -286,16 +325,17 @@ const isFormReady = computed(() => {
 })
 
 watch(() => accountStore.hasLoginError, (hasError) => {
-  if (hasError) {
-    showErrorMessage.value = true
+  if (hasError && accountStore.loginErrorMessage) {
+    showError(accountStore.loginErrorMessage)
   }
 })
 
 watch(() => accountStore.loginSuccess, (success) => {
   if (success) {
-    showSuccessMessage.value = true
+    showSuccess('Login successful! Welcome back.')
     setTimeout(() => {
-      router.push({name: 'home'})
+      hideSuccess()
+      goToHome()
     }, 1500)
   }
 })
@@ -315,36 +355,49 @@ const onLogin = async () => {
   }
 }
 
-const goToActivation = () => {
-  router.push({
-    name: 'activate',
-    query: {email: email.value}
-  })
+const goToActivationPage = () => {
+  goToActivation(email.value)
 }
 
 const goToRegistration = () => {
-  router.push({name: 'register'})
+  goToRegister()
 }
 
-const goToRegister = () => {
-  router.push({name: 'register'})
+const onGoogleLogin = async () => {
+  isSocialAuthLoading.value = true
+
+  try {
+    const result = await handleGoogleAuth(true)
+
+    if (result && result.success) {
+      if (result.isNewUser) {
+        showSuccess('Welcome! Your Google account has been successfully registered and signed in.')
+      } else {
+        showSuccess('Welcome back! You have been signed in with your Google account.')
+      }
+
+      setTimeout(() => {
+        hideSuccess()
+        goToHome()
+      }, 3000)
+
+    } else if (result && result.error) {
+      showError(result.message || 'Google login failed. Please try again.')
+    } else {
+      showError('Google login failed. Please try again.')
+    }
+
+  } catch (error) {
+    console.error('Google login error:', error)
+    showError('An unexpected error occurred during Google login.')
+  } finally {
+    isSocialAuthLoading.value = false
+  }
 }
 
-const hideSuccess = () => {
-  showSuccessMessage.value = false
-}
-
-const hideError = () => {
-  showErrorMessage.value = false
-  accountStore.clearLoginState()
-}
-
-const handleGoogleLogin = () => {
-  console.log('Google login clicked')
-}
-
-const handleFacebookLogin = () => {
-  console.log('Facebook login clicked')
+const onFacebookLogin = async () => {
+  showWarning('Facebook login is not implemented yet.')
+  handleFacebookAuth(true)
 }
 </script>
 
@@ -499,7 +552,7 @@ const handleFacebookLogin = () => {
 }
 
 .login-form-section {
-  padding: 1rem 2rem;
+  padding: 32px;
 }
 
 .form-field-wrapper {
@@ -508,11 +561,11 @@ const handleFacebookLogin = () => {
 }
 
 .animated-field {
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.animated-field:hover {
-  transform: translateY(-1px);
+.animated-field:focus-within {
+  transform: translateY(-2px);
 }
 
 .login-btn {
@@ -549,7 +602,7 @@ const handleFacebookLogin = () => {
 .divider-section {
   position: relative;
   text-align: center;
-  margin: 2rem 0;
+  margin: 32px 0;
 }
 
 .divider-text {
@@ -558,18 +611,19 @@ const handleFacebookLogin = () => {
   left: 50%;
   transform: translate(-50%, -50%);
   background: rgba(255, 255, 255, 0.95);
-  padding: 0 1rem;
-  color: #666;
-  font-size: 0.9rem;
+  padding: 0 16px;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: 500;
 }
 
 .dark-theme .divider-text {
   background: rgba(30, 30, 30, 0.95);
-  color: #ccc;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .social-login-section {
-  margin: 1rem 0;
+  margin-bottom: 24px;
 }
 
 .social-btn {

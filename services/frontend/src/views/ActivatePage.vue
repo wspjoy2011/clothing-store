@@ -98,7 +98,7 @@
                         size="large"
                         class="action-btn"
                         :class="{ 'mt-3': canRetry }"
-                        @click="goToResendActivation"
+                        @click="handleResendActivation"
                         v-if="isTokenExpired"
                     >
                       <v-icon start icon="mdi-email-refresh"></v-icon>
@@ -279,6 +279,10 @@ const retryActivation = async () => {
   activationAttempted.value = false
   accountStore.clearActivationState()
   await activateAccount()
+}
+
+const handleResendActivation = () => {
+  goToResendActivation(props.email)
 }
 
 watch([() => props.email, () => props.token], ([newEmail, newToken]) => {
