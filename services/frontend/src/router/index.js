@@ -94,44 +94,62 @@ const routes = [
     {
         path: '/',
         name: 'home',
-        component: HomePage
+        component: HomePage,
+        meta: {
+            title: 'StyleShop - Fashion & Style'
+        }
     },
     {
         path: '/catalog',
         name: 'catalog',
         component: CatalogPage,
-        props: processCatalogRouteProps
+        props: processCatalogRouteProps,
+        meta: {
+            title: 'StyleShop - Catalog'
+        }
     },
     {
         path: '/product/:productSlug',
         name: 'product-detail',
         component: ProductDetailPage,
-        props: processProductRouteProps
+        props: processProductRouteProps,
+        meta: {
+            title: 'StyleShop - Product Details'
+        }
     },
     {
         path: '/category/:masterCategory',
         name: 'master-category',
         component: CategoryPage,
-        props: processCategoryRouteProps
+        props: processCategoryRouteProps,
+        meta: {
+            title: 'StyleShop - Category'
+        }
     },
     {
         path: '/category/:masterCategory/:subCategory',
         name: 'sub-category',
         component: CategoryPage,
-        props: processCategoryRouteProps
+        props: processCategoryRouteProps,
+        meta: {
+            title: 'StyleShop - Category'
+        }
     },
     {
         path: '/category/:masterCategory/:subCategory/:articleType',
         name: 'article-type',
         component: CategoryPage,
-        props: processCategoryRouteProps
+        props: processCategoryRouteProps,
+        meta: {
+            title: 'StyleShop - Category'
+        }
     },
     {
         path: '/accounts/register',
         name: 'register',
         component: RegisterPage,
         meta: {
-            title: 'Register - StyleShop',
+            title: 'StyleShop - Register',
             requiresGuest: true
         }
     },
@@ -140,7 +158,7 @@ const routes = [
         name: 'login',
         component: LoginPage,
         meta: {
-            title: 'Login - StyleShop',
+            title: 'StyleShop - Login',
             requiresGuest: true
         }
     },
@@ -149,7 +167,7 @@ const routes = [
         name: 'logout',
         component: LogoutPage,
         meta: {
-            title: 'Logout - StyleShop',
+            title: 'StyleShop - Logout',
             requiresAuth: true
         }
     },
@@ -159,7 +177,7 @@ const routes = [
         component: ActivatePage,
         props: processActivationRouteProps,
         meta: {
-            title: 'Activate Account - StyleShop',
+            title: 'StyleShop - Activate Account',
             requiresGuest: true
         }
     },
@@ -169,7 +187,7 @@ const routes = [
         component: ResendActivationPage,
         props: processResendActivationRouteProps,
         meta: {
-            title: 'Resend Activation - StyleShop',
+            title: 'StyleShop - Resend Activation',
             requiresGuest: true
         }
     }
@@ -209,6 +227,10 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
 
+    if (to.meta.title) {
+        document.title = to.meta.title;
+    }
+
     if (to.params.masterCategory) {
         if (!categoryStore.categories || !categoryStore.categories.length) {
             try {
@@ -239,22 +261,6 @@ router.beforeEach(async (to, from, next) => {
         } else {
             const masterName = categoryStore.getCategoryName(masterCategoryId);
             document.title = `StyleShop - ${masterName}`;
-        }
-    } else {
-        if (to.name === 'product-detail') {
-            document.title = 'StyleShop - Product Details';
-        } else if (to.name === 'register') {
-            document.title = 'StyleShop - Register';
-        } else if (to.name === 'login') {
-            document.title = 'StyleShop - Login';
-        } else if (to.name === 'logout') {
-            document.title = 'StyleShop - Logout';
-        } else if (to.name === 'activate') {
-            document.title = 'StyleShop - Activate Account';
-        } else if (to.name === 'resend-activation') {
-            document.title = 'StyleShop - Resend Activation';
-        } else {
-            document.title = to.name === 'catalog' ? 'StyleShop - Catalog' : 'StyleShop';
         }
     }
 
