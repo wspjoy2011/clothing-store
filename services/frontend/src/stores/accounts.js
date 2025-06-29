@@ -414,6 +414,15 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Authenticate with Facebook OAuth
+         * @param {string} accessToken - Facebook OAuth access token
+         * @returns {Promise<Object>} - Social authentication result
+         */
+        async authenticateWithFacebook(accessToken) {
+            return this.socialAuthenticate('facebook', accessToken);
+        },
+
+        /**
          * Authenticate with social OAuth provider
          * @param {string} provider - OAuth provider name
          * @param {string} accessToken - OAuth access token

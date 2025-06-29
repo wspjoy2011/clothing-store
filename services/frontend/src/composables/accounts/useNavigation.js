@@ -3,11 +3,14 @@ import {googleTokenLogin} from 'vue3-google-login'
 
 import {useLegalStore} from '@/stores/legal'
 import {useAccountStore} from '@/stores/accounts'
+import {useFacebookAuth} from '@/composables/accounts/useFacebookAuth'
+
 
 export function useNavigation() {
     const router = useRouter()
     const legalStore = useLegalStore()
     const accountStore = useAccountStore()
+    const { handleFacebookSuccess, handleFacebookError, HFaceBookLogin } = useFacebookAuth()
 
     const goToLogin = () => {
         router.push({name: 'login'})
@@ -109,12 +112,6 @@ export function useNavigation() {
         }
     }
 
-    const handleFacebookAuth = (isLogin = true) => {
-        const action = isLogin ? 'login' : 'register'
-        console.log(`Facebook ${action} clicked`)
-        alert(`Facebook ${action} is not implemented yet`)
-    }
-
     const openTerms = () => {
         legalStore.openTermsDialog()
     }
@@ -157,7 +154,9 @@ export function useNavigation() {
 
         // Social auth
         handleGoogleAuth,
-        handleFacebookAuth,
+        handleFacebookSuccess,
+        handleFacebookError,
+        HFaceBookLogin,
 
         // Legal
         openTerms,

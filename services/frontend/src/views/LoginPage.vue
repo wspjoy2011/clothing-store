@@ -35,24 +35,40 @@
                       size="large"
                       class="social-btn google-btn mb-2"
                       :disabled="isLoading || isSocialAuthLoading"
-                      :loading="isSocialAuthLoading"
+                      :loading="isSocialAuthLoading && socialAuthType === 'google'"
                       @click="onGoogleLogin"
                   >
                     <v-icon start icon="mdi-google"></v-icon>
-                    {{ isSocialAuthLoading ? 'Connecting...' : 'Continue with Google' }}
+                    {{
+                      (isSocialAuthLoading && socialAuthType === 'google') ? 'Connecting...' : 'Continue with Google'
+                    }}
                   </v-btn>
 
-                  <v-btn
-                      variant="outlined"
-                      block
-                      size="large"
-                      class="social-btn facebook-btn"
-                      :disabled="isLoading || isSocialAuthLoading"
-                      @click="onFacebookLogin"
+                  <!-- Facebook Login Component -->
+                  <HFaceBookLogin
+                      :app-id="facebookAppId"
+                      scope="email,public_profile"
+                      fields="id,name,email,first_name,last_name,birthday"
+                      @onSuccess="onFacebookSuccess"
+                      @onFailure="onFacebookError"
+                      class="facebook-login-wrapper"
+                      v-slot="fbLogin"
                   >
-                    <v-icon start icon="mdi-facebook"></v-icon>
-                    Continue with Facebook
-                  </v-btn>
+                    <v-btn
+                        variant="outlined"
+                        block
+                        size="large"
+                        class="social-btn facebook-btn"
+                        :disabled="isLoading || isSocialAuthLoading"
+                        :loading="isSocialAuthLoading && socialAuthType === 'facebook'"
+                        @click="fbLogin.initFBLogin"
+                    >
+                      <v-icon start icon="mdi-facebook"></v-icon>
+                      {{
+                        (isSocialAuthLoading && socialAuthType === 'facebook') ? 'Connecting...' : 'Continue with Facebook'
+                      }}
+                    </v-btn>
+                  </HFaceBookLogin>
                 </div>
 
                 <div class="divider-section">
@@ -226,12 +242,28 @@
           </v-btn>
         </template>
       </v-snackbar>
+
+      <!-- Social Auth Success -->
+      <v-snackbar
+          v-model="showSocialSuccessMessage"
+          color="success"
+          timeout="6000"
+          location="top"
+      >
+        <v-icon start :icon="socialAuthType === 'google' ? 'mdi-google' : 'mdi-facebook'"></v-icon>
+        {{ socialSuccessMessage }}
+        <template v-slot:actions>
+          <v-btn variant="text" @click="hideSocialSuccess">
+            Close
+          </v-btn>
+        </template>
+      </v-snackbar>
     </v-container>
   </div>
 </template>
 
 <script setup>
-import {computed, ref, watch} from 'vue'
+import {computed, onMounted, ref, watch} from 'vue'
 import {useTheme} from 'vuetify'
 import {useAccountStore} from '@/stores/accounts'
 import {useNavigation} from '@/composables/accounts/useNavigation'
@@ -244,7 +276,9 @@ const {
   goToRegister,
   goToActivation,
   handleGoogleAuth,
-  handleFacebookAuth,
+  handleFacebookSuccess,
+  handleFacebookError,
+  HFaceBookLogin,
   goToHome
 } = useNavigation()
 
@@ -257,13 +291,14 @@ const {
   warningMessage,
   showSuccess,
   showError,
-  showWarning,
   hideSuccess,
   hideError,
   hideWarning
 } = useNotifications()
 
 const isDarkTheme = computed(() => theme.global.current.value.dark)
+
+const facebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID || ''
 
 const formRef = ref(null)
 const isFormValid = ref(false)
@@ -275,6 +310,9 @@ const emailTouched = ref(false)
 const passwordTouched = ref(false)
 
 const isSocialAuthLoading = ref(false)
+const socialAuthType = ref('')
+const showSocialSuccessMessage = ref(false)
+const socialSuccessMessage = ref('')
 
 const isLoading = computed(() => accountStore.isLoggingIn)
 const needsActivation = computed(() => accountStore.needsActivation)
@@ -324,6 +362,12 @@ const isFormReady = computed(() => {
       !passwordError.value
 })
 
+const hideSocialSuccess = () => {
+  showSocialSuccessMessage.value = false
+  socialSuccessMessage.value = ''
+  socialAuthType.value = ''
+}
+
 watch(() => accountStore.hasLoginError, (hasError) => {
   if (hasError && accountStore.loginErrorMessage) {
     showError(accountStore.loginErrorMessage)
@@ -365,19 +409,22 @@ const goToRegistration = () => {
 
 const onGoogleLogin = async () => {
   isSocialAuthLoading.value = true
+  socialAuthType.value = 'google'
 
   try {
     const result = await handleGoogleAuth(true)
 
     if (result && result.success) {
       if (result.isNewUser) {
-        showSuccess('Welcome! Your Google account has been successfully registered and signed in.')
+        socialSuccessMessage.value = 'Welcome! Your Google account has been successfully registered and signed in.'
       } else {
-        showSuccess('Welcome back! You have been signed in with your Google account.')
+        socialSuccessMessage.value = 'Welcome back! You have been signed in with your Google account.'
       }
 
+      showSocialSuccessMessage.value = true
+
       setTimeout(() => {
-        hideSuccess()
+        hideSocialSuccess()
         goToHome()
       }, 3000)
 
@@ -392,13 +439,59 @@ const onGoogleLogin = async () => {
     showError('An unexpected error occurred during Google login.')
   } finally {
     isSocialAuthLoading.value = false
+    socialAuthType.value = ''
   }
 }
 
-const onFacebookLogin = async () => {
-  showWarning('Facebook login is not implemented yet.')
-  handleFacebookAuth(true)
+const onFacebookSuccess = async (response) => {
+  isSocialAuthLoading.value = true
+  socialAuthType.value = 'facebook'
+
+  try {
+    const result = await handleFacebookSuccess(response)
+
+    if (result && result.success) {
+      if (result.isNewUser) {
+        socialSuccessMessage.value = 'Welcome! Your Facebook account has been successfully registered and signed in.'
+      } else {
+        socialSuccessMessage.value = 'Welcome back! You have been signed in with your Facebook account.'
+      }
+
+      showSocialSuccessMessage.value = true
+
+      setTimeout(() => {
+        hideSocialSuccess()
+        goToHome()
+      }, 3000)
+
+    } else if (result && result.error) {
+      showError(result.message || 'Facebook login failed. Please try again.')
+    } else {
+      showError('Facebook login failed. Please try again.')
+    }
+
+  } catch (error) {
+    console.error('Facebook login error:', error)
+    showError('An unexpected error occurred during Facebook login.')
+  } finally {
+    isSocialAuthLoading.value = false
+    socialAuthType.value = ''
+  }
 }
+
+const onFacebookError = (error) => {
+  const result = handleFacebookError(error)
+
+  if (result && result.error) {
+    showError(result.message || 'Facebook login failed. Please try again.')
+  } else {
+    showError('Facebook login failed. Please try again.')
+  }
+}
+
+onMounted(() => {
+  document.title = 'StyleShop - Login'
+})
 </script>
 
 <style scoped>
@@ -500,6 +593,7 @@ const onFacebookLogin = async () => {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
   overflow: hidden;
+  animation: fadeInUp 0.6s ease-out;
 }
 
 .login-card:hover {
@@ -510,6 +604,17 @@ const onFacebookLogin = async () => {
 .login-card.dark-theme {
   background: rgba(30, 30, 30, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .login-header {
@@ -583,6 +688,10 @@ const onFacebookLogin = async () => {
   box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
 }
 
+.login-btn:disabled {
+  transform: none;
+}
+
 .action-buttons-section {
   margin: 1rem 0;
 }
@@ -632,20 +741,45 @@ const onFacebookLogin = async () => {
   font-weight: 600;
   text-transform: none;
   transition: all 0.3s ease;
+  border: 2px solid rgba(0, 0, 0, 0.12);
 }
 
 .social-btn:hover {
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.google-btn:hover {
-  background-color: rgba(66, 133, 244, 0.1);
+.social-btn:disabled {
+  opacity: 0.6;
+  transform: none;
+}
+
+.social-btn .v-btn__loader {
+  color: inherit;
+}
+
+.google-btn {
+  color: #4285f4;
   border-color: #4285f4;
 }
 
-.facebook-btn:hover {
-  background-color: rgba(24, 119, 242, 0.1);
+.google-btn:hover {
+  background-color: rgba(66, 133, 244, 0.04);
+  border-color: #4285f4;
+}
+
+.facebook-btn {
+  color: #1877f2;
   border-color: #1877f2;
+}
+
+.facebook-btn:hover {
+  background-color: rgba(24, 119, 242, 0.04);
+  border-color: #1877f2;
+}
+
+.facebook-login-wrapper {
+  width: 100%;
 }
 
 .login-footer {
@@ -673,6 +807,22 @@ const onFacebookLogin = async () => {
   text-transform: none;
 }
 
+.v-field--error {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
 @media (max-width: 600px) {
   .login-container {
     padding: 1rem 0.5rem;
@@ -687,30 +837,38 @@ const onFacebookLogin = async () => {
   }
 
   .login-form-section {
-    padding: 0.5rem 1rem;
+    padding: 24px 16px;
   }
 
   .login-footer {
-    padding: 0.5rem 1rem 1.5rem;
+    padding: 16px;
   }
 
   .form-field-wrapper {
-    margin-bottom: 1rem;
+    margin-bottom: 20px;
+  }
+
+  .floating-shapes {
+    display: none;
   }
 }
 
-.login-card {
-  animation: fadeInUp 0.6s ease-out;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
+@media (max-width: 768px) {
+  .login-page {
+    overflow-y: auto;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .login-page::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .login-page::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .login-page::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
   }
 }
 </style>

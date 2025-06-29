@@ -35,24 +35,40 @@
                       size="large"
                       class="social-btn google-btn mb-2"
                       :disabled="isLoading || isSocialAuthLoading"
-                      :loading="isSocialAuthLoading"
+                      :loading="isSocialAuthLoading && socialAuthType === 'google'"
                       @click="onGoogleRegister"
                   >
                     <v-icon start icon="mdi-google"></v-icon>
-                    {{ isSocialAuthLoading ? 'Connecting...' : 'Continue with Google' }}
+                    {{
+                      (isSocialAuthLoading && socialAuthType === 'google') ? 'Connecting...' : 'Continue with Google'
+                    }}
                   </v-btn>
 
-                  <v-btn
-                      variant="outlined"
-                      block
-                      size="large"
-                      class="social-btn facebook-btn"
-                      :disabled="isLoading || isSocialAuthLoading"
-                      @click="onFacebookRegister"
+                  <!-- Facebook Login Component -->
+                  <HFaceBookLogin
+                      :app-id="facebookAppId"
+                      scope="email,public_profile"
+                      fields="id,name,email,first_name,last_name,birthday"
+                      @onSuccess="onFacebookSuccess"
+                      @onFailure="onFacebookError"
+                      class="facebook-login-wrapper"
+                      v-slot="fbLogin"
                   >
-                    <v-icon start icon="mdi-facebook"></v-icon>
-                    Continue with Facebook
-                  </v-btn>
+                    <v-btn
+                        variant="outlined"
+                        block
+                        size="large"
+                        class="social-btn facebook-btn"
+                        :disabled="isLoading || isSocialAuthLoading"
+                        :loading="isSocialAuthLoading && socialAuthType === 'facebook'"
+                        @click="fbLogin.initFBLogin"
+                    >
+                      <v-icon start icon="mdi-facebook"></v-icon>
+                      {{
+                        (isSocialAuthLoading && socialAuthType === 'facebook') ? 'Connecting...' : 'Continue with Facebook'
+                      }}
+                    </v-btn>
+                  </HFaceBookLogin>
                 </div>
 
                 <div class="divider-section">
@@ -259,7 +275,7 @@
           timeout="6000"
           location="top"
       >
-        <v-icon start icon="mdi-google"></v-icon>
+        <v-icon start :icon="socialAuthType === 'google' ? 'mdi-google' : 'mdi-facebook'"></v-icon>
         {{ socialSuccessMessage }}
         <template v-slot:actions>
           <v-btn variant="text" @click="hideSocialSuccess">
@@ -295,7 +311,10 @@ const theme = useTheme()
 const isDarkTheme = computed(() => theme.global.current.value.dark)
 const legalStore = useLegalStore()
 
+const facebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID || ''
+
 const isSocialAuthLoading = ref(false)
+const socialAuthType = ref('')
 const showSocialSuccessMessage = ref(false)
 const socialSuccessMessage = ref('')
 
@@ -342,7 +361,9 @@ const {
 const {
   goToLogin,
   handleGoogleAuth,
-  handleFacebookAuth,
+  handleFacebookSuccess,
+  handleFacebookError,
+  HFaceBookLogin,
   openTerms,
   openPrivacy,
   handleTermsAccept,
@@ -360,10 +381,12 @@ const handleCheckboxClick = (event) => {
 const hideSocialSuccess = () => {
   showSocialSuccessMessage.value = false
   socialSuccessMessage.value = ''
+  socialAuthType.value = ''
 }
 
 const onGoogleRegister = async () => {
   isSocialAuthLoading.value = true
+  socialAuthType.value = 'google'
 
   try {
     const result = await handleGoogleAuth(false)
@@ -393,11 +416,54 @@ const onGoogleRegister = async () => {
     showError('An unexpected error occurred during Google registration.')
   } finally {
     isSocialAuthLoading.value = false
+    socialAuthType.value = ''
   }
 }
 
-const onFacebookRegister = async () => {
-  handleFacebookAuth(false)
+const onFacebookSuccess = async (response) => {
+  isSocialAuthLoading.value = true
+  socialAuthType.value = 'facebook'
+
+  try {
+    const result = await handleFacebookSuccess(response)
+
+    if (result && result.success) {
+      if (result.isNewUser) {
+        socialSuccessMessage.value = 'Welcome! Your Facebook account has been successfully registered.'
+      } else {
+        socialSuccessMessage.value = 'Welcome back! You have been signed in with your existing Facebook account.'
+      }
+
+      showSocialSuccessMessage.value = true
+
+      setTimeout(() => {
+        hideSocialSuccess()
+        goToHome()
+      }, 4000)
+
+    } else if (result && result.error) {
+      showError(result.message || 'Facebook registration failed. Please try again.')
+    } else {
+      showError('Facebook registration failed. Please try again.')
+    }
+
+  } catch (error) {
+    console.error('Facebook registration error:', error)
+    showError('An unexpected error occurred during Facebook registration.')
+  } finally {
+    isSocialAuthLoading.value = false
+    socialAuthType.value = ''
+  }
+}
+
+const onFacebookError = (error) => {
+  const result = handleFacebookError(error)
+
+  if (result && result.error) {
+    showError(result.message || 'Facebook registration failed. Please try again.')
+  } else {
+    showError('Facebook registration failed. Please try again.')
+  }
 }
 
 const onRegister = async () => {
@@ -686,6 +752,10 @@ onMounted(() => {
 .facebook-btn:hover {
   background-color: rgba(24, 119, 242, 0.04);
   border-color: #1877f2;
+}
+
+.facebook-login-wrapper {
+  width: 100%;
 }
 
 .register-footer {
