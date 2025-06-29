@@ -1,5 +1,5 @@
 """
-Google social authentication service.
+Universal social authentication service.
 """
 
 import secrets
@@ -49,10 +49,10 @@ from settings.logging_config import get_logger
 logger = get_logger(__name__, "social_auth")
 
 
-class GoogleSocialAuthService(SocialAuthServiceInterface):
+class SocialAuthService(SocialAuthServiceInterface):
     """
-    Google social authentication service.
-    Uses injected OAuth provider for authentication and handles business logic.
+    Universal social authentication service.
+    Uses injected OAuth provider for authentication and handles business logic for any provider.
     """
 
     def __init__(
@@ -66,7 +66,7 @@ class GoogleSocialAuthService(SocialAuthServiceInterface):
             email_sender: EmailSenderInterface
     ):
         """
-        Initialize Google social auth service.
+        Initialize universal social auth service.
 
         Args:
             oauth_provider: OAuth provider instance (injected)
@@ -180,7 +180,7 @@ class GoogleSocialAuthService(SocialAuthServiceInterface):
 
     def _validate_profile(self, profile: SocialUserProfile) -> None:
         """
-        Validate social user profile.
+        Validate social user profile with provider-specific rules.
 
         Args:
             profile: Social user profile
@@ -232,7 +232,7 @@ class GoogleSocialAuthService(SocialAuthServiceInterface):
         Raises:
             SocialUserLookupError: If user operations fail
         """
-        logger.info(f"Looking up user for email: {profile.email}")
+        logger.info(f"Looking up user for email: {profile.email} (provider: {profile.provider})")
 
         existing_user = await self._user_repository.get_user_by_email(profile.email)
 
@@ -242,7 +242,7 @@ class GoogleSocialAuthService(SocialAuthServiceInterface):
             if not existing_user.is_active:
                 try:
                     await self._user_repository.update_user_status(existing_user.id, True)
-                    logger.info(f"User {existing_user.id} activated through social auth")
+                    logger.info(f"User {existing_user.id} activated through {profile.provider} auth")
                 except Exception as e:
                     logger.error(f"Failed to activate user {existing_user.id}: {e}")
                     raise SocialUserLookupError(
@@ -260,7 +260,7 @@ class GoogleSocialAuthService(SocialAuthServiceInterface):
                 provider=profile.provider
             )
 
-        logger.info(f"Creating new user for email: {profile.email}")
+        logger.info(f"Creating new user for email: {profile.email} (provider: {profile.provider})")
 
         default_group_name = UserGroupEnum.get_default_group()
         default_group = await self._user_group_repository.get_group_by_name(default_group_name)
@@ -301,8 +301,8 @@ class GoogleSocialAuthService(SocialAuthServiceInterface):
         logger.info(f"New user created and activated: {profile.email}, user_id: {created_user.id}")
 
         try:
-            await self._send_social_registration_email(profile.email)
-            logger.info(f"Welcome email sent to new social user: {profile.email}")
+            await self._send_social_registration_email(profile.email, profile.provider)
+            logger.info(f"Welcome email sent to new {profile.provider} user: {profile.email}")
         except BaseEmailError as e:
             logger.warning(f"Failed to send welcome email to {profile.email}: {e}")
 
@@ -402,19 +402,20 @@ class GoogleSocialAuthService(SocialAuthServiceInterface):
                 e
             )
 
-    async def _send_social_registration_email(self, email: str) -> None:
+    async def _send_social_registration_email(self, email: str, provider: str) -> None:
         """
         Send welcome email for new social registration.
 
         Args:
             email: User's email address
+            provider: OAuth provider name
 
         Raises:
             BaseEmailError: If email sending fails
         """
         login_link = config.build_frontend_url('/accounts/login')
 
-        logger.info(f"Sending social registration welcome email to {email}")
+        logger.info(f"Sending social registration welcome email to {email} (provider: {provider})")
 
         try:
             await self._email_sender.send_activation_complete_email(email, login_link)

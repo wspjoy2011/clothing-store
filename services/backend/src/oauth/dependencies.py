@@ -27,11 +27,11 @@ def get_oauth_provider(provider_name: str) -> OAuthProviderInterface:
     Get OAuth provider by name with default configuration.
     
     Args:
-        provider_name: Name of the OAuth provider ('google', etc.)
-        
+        provider_name: Name of the OAuth provider ('google', 'facebook', etc.)
+
     Returns:
         OAuth provider instance
-        
+
     Raises:
         ProviderNotSupportedError: If provider is not supported
         ConfigurationError: If configuration is invalid
@@ -40,6 +40,7 @@ def get_oauth_provider(provider_name: str) -> OAuthProviderInterface:
 
     provider_configs = {
         "google": config.GOOGLE_OAUTH_CONFIG,
+        "facebook": config.FACEBOOK_OAUTH_CONFIG,
     }
 
     if provider_name.lower() not in provider_configs:

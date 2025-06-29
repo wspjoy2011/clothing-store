@@ -50,26 +50,4 @@ export default {
             access_token: accessToken
         });
     },
-
-    /**
-     * Test connection to social auth endpoints
-     * @returns {Promise<Object>} - Test result with provider information
-     */
-    async testConnection() {
-        try {
-            const providersResult = await this.getSupportedProviders();
-            return {
-                success: true,
-                message: 'Social auth service is available',
-                providers: providersResult.providers,
-                total_providers: providersResult.total_count
-            };
-        } catch (error) {
-            return {
-                success: false,
-                message: 'Social auth service is unavailable',
-                error: error.message || 'Unknown error'
-            };
-        }
-    }
 }

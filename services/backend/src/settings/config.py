@@ -57,6 +57,10 @@ class AppConfig(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
 
+    # Facebook OAuth2 settings
+    FACEBOOK_CLIENT_ID: str
+    FACEBOOK_CLIENT_SECRET: str
+
     # Token settings
     ACTIVATION_TOKEN_VALID_DAYS: int = 7
 
@@ -144,6 +148,14 @@ class AppConfig(BaseSettings):
         return {
             "client_id": self.GOOGLE_CLIENT_ID,
             "client_secret": self.GOOGLE_CLIENT_SECRET,
+        }
+
+    @property
+    def FACEBOOK_OAUTH_CONFIG(self) -> dict:
+        """Complete configuration dictionary for Facebook OAuth2"""
+        return {
+            "client_id": self.FACEBOOK_CLIENT_ID,
+            "client_secret": self.FACEBOOK_CLIENT_SECRET,
         }
 
     def build_frontend_url(self, path: str, **params) -> str:

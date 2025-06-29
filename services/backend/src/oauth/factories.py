@@ -3,9 +3,11 @@ OAuth provider factory implementation.
 """
 
 from typing import Dict, Any, Callable
+
 from oauth.interfaces import OAuthProviderInterface, OAuthProviderFactoryInterface
 from oauth.exceptions import ProviderNotSupportedError, ConfigurationError
 from oauth.providers.google import GoogleOAuthProvider
+from oauth.providers.facebook import FacebookOAuthProvider
 
 
 class OAuthProviderFactory(OAuthProviderFactoryInterface):
@@ -17,6 +19,7 @@ class OAuthProviderFactory(OAuthProviderFactoryInterface):
         """Initialize factory with provider strategies."""
         self._providers: Dict[str, Callable[[Dict[str, Any]], OAuthProviderInterface]] = {
             "google": self._create_google_provider,
+            "facebook": self._create_facebook_provider,
         }
 
     def create_provider(self, provider_name: str, config: Dict[str, Any]) -> OAuthProviderInterface:
@@ -109,6 +112,33 @@ class OAuthProviderFactory(OAuthProviderFactoryInterface):
             )
 
         return GoogleOAuthProvider(
+            client_id=config["client_id"],
+            client_secret=config["client_secret"]
+        )
+
+    def _create_facebook_provider(self, config: Dict[str, Any]) -> FacebookOAuthProvider:
+        """
+        Create Facebook OAuth provider instance.
+
+        Args:
+            config: Facebook OAuth configuration
+
+        Returns:
+            FacebookOAuthProvider instance
+
+        Raises:
+            ConfigurationError: If required config keys are missing
+        """
+        required_keys = ["client_id", "client_secret"]
+        missing_keys = [key for key in required_keys if key not in config]
+
+        if missing_keys:
+            raise ConfigurationError(
+                "facebook",
+                f"Missing required configuration keys: {', '.join(missing_keys)}"
+            )
+
+        return FacebookOAuthProvider(
             client_id=config["client_id"],
             client_secret=config["client_secret"]
         )

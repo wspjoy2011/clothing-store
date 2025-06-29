@@ -2,13 +2,14 @@
 Routes for social authentication API.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 
 from apps.accounts.controllers.social_auth import (
     social_auth_controller,
     get_supported_providers_controller
 )
-from apps.accounts.services.social_auth.dependencies import get_google_social_auth_service
+from apps.accounts.services.social_auth.dependencies import get_google_social_auth_service, \
+    get_facebook_social_auth_service
 from oauth.dependencies import get_oauth_registry
 from apps.accounts.schemas.social_auth import (
     SocialAuthRequestSchema,
@@ -220,15 +221,16 @@ router = APIRouter(prefix="/auth", tags=["Social Authentication"])
 )
 async def social_auth_route(
         request_data: SocialAuthRequestSchema,
-        social_auth_service: SocialAuthServiceInterface = Depends(get_google_social_auth_service)
+        google_service: SocialAuthServiceInterface = Depends(get_google_social_auth_service),
+        facebook_service: SocialAuthServiceInterface = Depends(get_facebook_social_auth_service)
 ) -> SocialAuthResponseSchema:
     """
     Authenticate user via social OAuth provider
 
     Args:
         request_data: Social authentication request data (provider and access token)
-        social_auth_service: Social authentication service for business logic
-
+        google_service: Google social authentication service for business logic
+        facebook_service: Facebook social authentication service for business logic
     Returns:
         SocialAuthResponseSchema: Authentication result with JWT tokens and user profile
 
@@ -240,6 +242,24 @@ async def social_auth_route(
             - 503 for OAuth provider service unavailability
             - 500 for internal server errors (configuration, database, token generation)
     """
+    if request_data.provider == "google":
+        social_auth_service = google_service
+    elif request_data.provider == "facebook":
+        social_auth_service = facebook_service
+    else:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "success": False,
+                "error_type": "ProviderNotSupportedError",
+                "error_message": f"Provider '{request_data.provider}' is not supported",
+                "provider": request_data.provider,
+                "details": {
+                    "supported_providers": ["google", "facebook"]
+                }
+            }
+        )
+
     return await social_auth_controller(
         request_data=request_data,
         social_auth_service=social_auth_service
