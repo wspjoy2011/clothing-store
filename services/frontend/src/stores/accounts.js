@@ -2,6 +2,14 @@ import {defineStore} from 'pinia'
 
 import accountService from '@/services/accountService'
 import socialAuthService from '@/services/socialAuthService'
+import {
+    parseApiError,
+    checkErrorCondition,
+    createErrorObject,
+    createSuccessResult,
+    createErrorResult,
+    storage
+} from './helpers'
 
 export const useAccountStore = defineStore('accounts', {
     state: () => ({
@@ -34,8 +42,8 @@ export const useAccountStore = defineStore('accounts', {
 
         currentUser: null,
         isAuthenticated: false,
-        accessToken: localStorage.getItem('accessToken') || null,
-        refreshToken: localStorage.getItem('refreshToken') || null,
+        accessToken: storage.get('accessToken') || null,
+        refreshToken: storage.get('refreshToken') || null,
 
         isInitialized: false,
     }),
@@ -50,31 +58,11 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         registrationErrorMessage() {
-            if (!this.registrationError) return '';
-
-            switch (this.registrationError.status) {
-                case 422:
-                    if (this.registrationError.field) {
-                        return `${this.registrationError.field}: ${this.registrationError.message}`;
-                    }
-                    return this.registrationError.message || 'Please check your input data';
-
-                case 409:
-                    return this.registrationError.message || 'This email address is already registered. Please use a different email or try signing in.';
-
-                case 400:
-                    return this.registrationError.message || 'Invalid registration data. Please check your information and try again.';
-
-                case 500:
-                    return 'Server error. Please try again later.';
-
-                default:
-                    return this.registrationError.message || 'Registration failed. Please try again.';
-            }
+            return parseApiError(this.registrationError, 'registration');
         },
 
         isEmailAlreadyExists() {
-            return this.registrationError?.status === 409;
+            return checkErrorCondition(this.registrationError, 'emailAlreadyExists');
         },
 
         isLoggingIn() {
@@ -86,38 +74,15 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         loginErrorMessage() {
-            if (!this.loginError) return '';
-
-            switch (this.loginError.status) {
-                case 403:
-                    return this.loginError.message || 'Account not activated. Please check your email for activation instructions.';
-
-                case 404:
-                    return this.loginError.message || 'User not found. Please check your credentials or register a new account.';
-
-                case 400:
-                    return this.loginError.message || 'Invalid login credentials. Please check your email and password.';
-
-                case 422:
-                    if (this.loginError.field) {
-                        return `${this.loginError.field}: ${this.loginError.message}`;
-                    }
-                    return this.loginError.message || 'Please check your input data';
-
-                case 500:
-                    return 'Server error. Please try again later.';
-
-                default:
-                    return this.loginError.message || 'Login failed. Please try again.';
-            }
+            return parseApiError(this.loginError, 'login');
         },
 
         needsActivation() {
-            return this.loginError?.status === 403;
+            return checkErrorCondition(this.loginError, 'needsActivation');
         },
 
         needsRegistration() {
-            return this.loginError?.status === 404;
+            return checkErrorCondition(this.loginError, 'needsRegistration');
         },
 
         isActivating() {
@@ -129,31 +94,11 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         activationErrorMessage() {
-            if (!this.activationError) return '';
-
-            switch (this.activationError.status) {
-                case 404:
-                    return this.activationError.message || 'User not found. Please check your email address.';
-
-                case 400:
-                    return this.activationError.message || 'Invalid activation data or account already activated.';
-
-                case 410:
-                    return this.activationError.message || 'Activation token has expired. Please request a new activation email.';
-
-                case 422:
-                    return this.activationError.message || 'Invalid activation link format.';
-
-                case 500:
-                    return 'Server error. Please try again later.';
-
-                default:
-                    return this.activationError.message || 'Account activation failed. Please try again.';
-            }
+            return parseApiError(this.activationError, 'activation');
         },
 
         isTokenExpired() {
-            return this.activationError?.status === 410;
+            return checkErrorCondition(this.activationError, 'tokenExpired');
         },
 
         isResending() {
@@ -165,24 +110,7 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         resendErrorMessage() {
-            if (!this.resendError) return '';
-
-            switch (this.resendError.status) {
-                case 404:
-                    return this.resendError.message || 'User not found. Please check your email address.';
-
-                case 400:
-                    return this.resendError.message || 'This account is already activated or invalid request.';
-
-                case 422:
-                    return this.resendError.message || 'Please enter a valid email address.';
-
-                case 500:
-                    return 'Server error. Please try again later.';
-
-                default:
-                    return this.resendError.message || 'Failed to send activation email. Please try again.';
-            }
+            return parseApiError(this.resendError, 'resend');
         },
 
         isLoggingOut() {
@@ -194,21 +122,7 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         logoutErrorMessage() {
-            if (!this.logoutError) return '';
-
-            switch (this.logoutError.status) {
-                case 400:
-                    return this.logoutError.message || 'Invalid logout request.';
-
-                case 401:
-                    return this.logoutError.message || 'Unauthorized logout attempt.';
-
-                case 500:
-                    return 'Server error during logout. Please try again later.';
-
-                default:
-                    return this.logoutError.message || 'Logout failed. Please try again.';
-            }
+            return parseApiError(this.logoutError, 'logout');
         },
 
         isLoadingUser() {
@@ -220,24 +134,9 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         userErrorMessage() {
-            if (!this.userError) return '';
-
-            switch (this.userError.status) {
-                case 401:
-                    return this.userError.message || 'Session expired. Please login again.';
-
-                case 404:
-                    return this.userError.message || 'User not found.';
-
-                case 500:
-                    return 'Server error. Please try again later.';
-
-                default:
-                    return this.userError.message || 'Failed to load user data.';
-            }
+            return parseApiError(this.userError, 'user');
         },
 
-        // Social auth getters
         isSocialAuthenticating() {
             return this.socialAuthLoading;
         },
@@ -247,27 +146,7 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         socialAuthErrorMessage() {
-            if (!this.socialAuthError) return '';
-
-            switch (this.socialAuthError.status) {
-                case 400:
-                    return this.socialAuthError.message || 'Invalid social authentication request';
-
-                case 401:
-                    return this.socialAuthError.message || 'Invalid access token from social provider';
-
-                case 422:
-                    return this.socialAuthError.message || 'Validation error during social authentication';
-
-                case 503:
-                    return this.socialAuthError.message || 'Social authentication service temporarily unavailable';
-
-                case 500:
-                    return 'Server error during social authentication. Please try again later.';
-
-                default:
-                    return this.socialAuthError.message || 'Social authentication failed. Please try again.';
-            }
+            return parseApiError(this.socialAuthError, 'social');
         },
 
         socialAuthWasNewUser() {
@@ -279,11 +158,11 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         userEmail() {
-            return this.currentUser?.email || localStorage.getItem('userEmail') || null;
+            return this.currentUser?.email || storage.get('userEmail') || null;
         },
 
         userName() {
-            return this.currentUser?.email || localStorage.getItem('userName') || null;
+            return this.currentUser?.email || storage.get('userName') || null;
         },
 
         hasTokens() {
@@ -303,17 +182,78 @@ export const useAccountStore = defineStore('accounts', {
     },
 
     actions: {
+        /**
+         * Set authentication tokens
+         * @param {Object} tokens - Token object
+         * @param {string} tokens.access_token - Access token
+         * @param {string} tokens.refresh_token - Refresh token
+         */
+        setTokens(tokens) {
+            if (tokens.access_token) {
+                this.accessToken = tokens.access_token;
+                storage.set('accessToken', tokens.access_token);
+            }
+            if (tokens.refresh_token) {
+                this.refreshToken = tokens.refresh_token;
+                storage.set('refreshToken', tokens.refresh_token);
+            }
+            this.isAuthenticated = !!this.refreshToken;
+        },
+
+        /**
+         * Set user data
+         * @param {Object} user - User object
+         * @param {string} user.email - User email
+         * @param {string} user.name - User name
+         * @param {number} user.id - User ID
+         * @param {string} user.group_name - User group
+         */
+        setUser(user) {
+            this.currentUser = user;
+
+            if (user.email) {
+                storage.set('userEmail', user.email);
+            }
+            if (user.name) {
+                storage.set('userName', user.name);
+            }
+            if (user.id) {
+                storage.set('userId', user.id.toString());
+            }
+            if (user.group_name) {
+                storage.set('userGroup', user.group_name);
+            }
+        },
+
+        /**
+         * Clear authentication tokens
+         */
+        clearTokens() {
+            this.accessToken = null;
+            this.refreshToken = null;
+            this.isAuthenticated = false;
+            storage.remove('accessToken', 'refreshToken');
+        },
+
+        /**
+         * Clear user data
+         */
+        clearUser() {
+            this.currentUser = null;
+            storage.remove('userEmail', 'userId', 'userGroup', 'userName');
+        },
+
         async initializeAuth() {
             if (this.isInitialized) {
                 return;
             }
 
             try {
-                const refreshToken = localStorage.getItem('refreshToken');
+                const refreshToken = storage.get('refreshToken');
 
                 if (refreshToken) {
                     this.refreshToken = refreshToken;
-                    this.accessToken = localStorage.getItem('accessToken');
+                    this.accessToken = storage.get('accessToken');
 
                     const userResult = await this.loadCurrentUser();
 
@@ -328,13 +268,10 @@ export const useAccountStore = defineStore('accounts', {
                     this.currentUser = null;
                     this.accessToken = null;
 
-                    const userEmail = localStorage.getItem('userEmail');
+                    const userEmail = storage.get('userEmail');
                     if (userEmail) {
                         console.warn('Found userEmail in localStorage but no refresh token, clearing...');
-                        localStorage.removeItem('userEmail');
-                        localStorage.removeItem('userId');
-                        localStorage.removeItem('userGroup');
-                        localStorage.removeItem('userName');
+                        this.clearUser();
                     }
                 }
 
@@ -352,10 +289,10 @@ export const useAccountStore = defineStore('accounts', {
          */
         async loadCurrentUser() {
             if (!this.refreshToken) {
-                return {
-                    success: false,
-                    message: 'No refresh token available'
-                };
+                return createErrorResult(
+                    createErrorObject(null, 'No refresh token available'),
+                    'user'
+                );
             }
 
             this.userLoading = true;
@@ -365,39 +302,20 @@ export const useAccountStore = defineStore('accounts', {
                 const response = await accountService.getCurrentUser(this.refreshToken);
 
                 if (response.user) {
-                    this.currentUser = response.user;
-
-                    localStorage.setItem('userEmail', response.user.email);
-                    if (response.user.id) {
-                        localStorage.setItem('userId', response.user.id.toString());
-                    }
-                    if (response.user.group_name) {
-                        localStorage.setItem('userGroup', response.user.group_name);
-                    }
+                    this.setUser(response.user);
                 }
 
-                return {
-                    success: true,
-                    data: response,
-                    message: response.message || 'User data loaded successfully'
-                };
+                return createSuccessResult(response, 'User data loaded successfully');
 
             } catch (err) {
-                this.userError = {
-                    status: err.status || 500,
-                    message: err.message || 'Failed to load user data',
-                };
+                this.userError = createErrorObject(err, 'Failed to load user data');
 
                 if (err.status === 401) {
                     console.warn('Refresh token expired or invalid, clearing auth state');
                     this.clearLocalState();
                 }
 
-                return {
-                    success: false,
-                    error: this.userError,
-                    message: this.userErrorMessage
-                };
+                return createErrorResult(this.userError, 'user');
 
             } finally {
                 this.userLoading = false;
@@ -444,29 +362,15 @@ export const useAccountStore = defineStore('accounts', {
                 this.socialAuthResult = response;
 
                 if (response.tokens) {
-                    if (response.tokens.access_token) {
-                        this.accessToken = response.tokens.access_token;
-                        localStorage.setItem('accessToken', response.tokens.access_token);
-                    }
-
-                    if (response.tokens.refresh_token) {
-                        this.refreshToken = response.tokens.refresh_token;
-                        localStorage.setItem('refreshToken', response.tokens.refresh_token);
-                    }
+                    this.setTokens(response.tokens);
                 }
 
                 if (response.user_profile) {
-                    this.currentUser = {
+                    this.setUser({
                         email: response.user_profile.email,
                         name: response.user_profile.name
-                    };
-                    localStorage.setItem('userEmail', response.user_profile.email);
-                    if (response.user_profile.name) {
-                        localStorage.setItem('userName', response.user_profile.name);
-                    }
+                    });
                 }
-
-                this.isAuthenticated = !!this.refreshToken;
 
                 return {
                     success: true,
@@ -476,18 +380,14 @@ export const useAccountStore = defineStore('accounts', {
                 };
 
             } catch (err) {
-                this.socialAuthError = {
-                    status: err.status || 500,
-                    message: err.message || 'Social authentication failed',
-                    provider: provider
-                };
-
+                this.socialAuthError = createErrorObject(err, 'Social authentication failed');
+                this.socialAuthError.provider = provider;
                 this.socialAuthSuccess = false;
 
                 return {
                     success: false,
                     error: this.socialAuthError,
-                    message: this.socialAuthErrorMessage,
+                    message: parseApiError(this.socialAuthError, 'social'),
                     provider: provider
                 };
 
@@ -517,29 +417,16 @@ export const useAccountStore = defineStore('accounts', {
                 this.registrationSuccess = true;
 
                 if (response.user) {
-                    localStorage.setItem('userEmail', response.user.email);
+                    storage.set('userEmail', response.user.email);
                 }
 
-                return {
-                    success: true,
-                    data: response,
-                    message: response.message || 'Registration successful'
-                };
+                return createSuccessResult(response, 'Registration successful');
 
             } catch (err) {
-                this.registrationError = {
-                    status: err.status || 500,
-                    message: err.message || 'Registration failed',
-                    field: err.field || null
-                };
-
+                this.registrationError = createErrorObject(err, 'Registration failed');
                 this.registrationSuccess = false;
 
-                return {
-                    success: false,
-                    error: this.registrationError,
-                    message: this.registrationErrorMessage
-                };
+                return createErrorResult(this.registrationError, 'registration');
 
             } finally {
                 this.registrationLoading = false;
@@ -566,40 +453,20 @@ export const useAccountStore = defineStore('accounts', {
 
                 this.loginSuccess = true;
 
-                if (response.access_token) {
-                    this.accessToken = response.access_token;
-                    localStorage.setItem('accessToken', response.access_token);
-                }
-
-                if (response.refresh_token) {
-                    this.refreshToken = response.refresh_token;
-                    localStorage.setItem('refreshToken', response.refresh_token);
-                }
-
-                this.isAuthenticated = !!this.refreshToken;
+                this.setTokens({
+                    access_token: response.access_token,
+                    refresh_token: response.refresh_token
+                });
 
                 await this.loadCurrentUser();
 
-                return {
-                    success: true,
-                    data: response,
-                    message: response.message || 'Login successful'
-                };
+                return createSuccessResult(response, 'Login successful');
 
             } catch (err) {
-                this.loginError = {
-                    status: err.status || 500,
-                    message: err.message || 'Login failed',
-                    field: err.field || null
-                };
-
+                this.loginError = createErrorObject(err, 'Login failed');
                 this.loginSuccess = false;
 
-                return {
-                    success: false,
-                    error: this.loginError,
-                    message: this.loginErrorMessage
-                };
+                return createErrorResult(this.loginError, 'login');
 
             } finally {
                 this.loginLoading = false;
@@ -615,7 +482,7 @@ export const useAccountStore = defineStore('accounts', {
             this.logoutError = null;
 
             try {
-                const refreshToken = this.refreshToken || localStorage.getItem('refreshToken');
+                const refreshToken = this.refreshToken || storage.get('refreshToken');
 
                 if (refreshToken) {
                     await accountService.logout({
@@ -625,24 +492,16 @@ export const useAccountStore = defineStore('accounts', {
 
                 this.clearLocalState();
 
-                return {
-                    success: true,
-                    message: 'Logout successful'
-                };
+                return createSuccessResult(null, 'Logout successful');
 
             } catch (err) {
-                this.logoutError = {
-                    status: err.status || 500,
-                    message: err.message || 'Logout failed on server',
-                    field: err.field || null
-                };
-
+                this.logoutError = createErrorObject(err, 'Logout failed on server');
                 this.clearLocalState();
 
                 return {
                     success: true,
                     message: 'Logout completed (with server warning)',
-                    warning: this.logoutErrorMessage
+                    warning: parseApiError(this.logoutError, 'logout')
                 };
 
             } finally {
@@ -671,32 +530,16 @@ export const useAccountStore = defineStore('accounts', {
                 this.activationSuccess = true;
 
                 if (response.user) {
-                    localStorage.setItem('userEmail', response.user.email);
-                    if (response.user.id) {
-                        localStorage.setItem('userId', response.user.id.toString());
-                    }
+                    this.setUser(response.user);
                 }
 
-                return {
-                    success: true,
-                    data: response,
-                    message: response.message || 'Account activated successfully'
-                };
+                return createSuccessResult(response, 'Account activated successfully');
 
             } catch (err) {
-                this.activationError = {
-                    status: err.status || 500,
-                    message: err.message || 'Account activation failed',
-                    field: err.field || null
-                };
-
+                this.activationError = createErrorObject(err, 'Account activation failed');
                 this.activationSuccess = false;
 
-                return {
-                    success: false,
-                    error: this.activationError,
-                    message: this.activationErrorMessage
-                };
+                return createErrorResult(this.activationError, 'activation');
 
             } finally {
                 this.activationLoading = false;
@@ -721,26 +564,13 @@ export const useAccountStore = defineStore('accounts', {
 
                 this.resendSuccess = true;
 
-                return {
-                    success: true,
-                    data: response,
-                    message: response.message || 'Activation email sent successfully'
-                };
+                return createSuccessResult(response, 'Activation email sent successfully');
 
             } catch (err) {
-                this.resendError = {
-                    status: err.status || 500,
-                    message: err.message || 'Failed to send activation email',
-                    field: err.field || null
-                };
-
+                this.resendError = createErrorObject(err, 'Failed to send activation email');
                 this.resendSuccess = false;
 
-                return {
-                    success: false,
-                    error: this.resendError,
-                    message: this.resendErrorMessage
-                };
+                return createErrorResult(this.resendError, 'resend');
 
             } finally {
                 this.resendLoading = false;
@@ -842,18 +672,8 @@ export const useAccountStore = defineStore('accounts', {
          * (used internally by logout and initializeAuth)
          */
         clearLocalState() {
-            this.currentUser = null;
-            this.isAuthenticated = false;
-            this.accessToken = null;
-            this.refreshToken = null;
-
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('userEmail');
-            localStorage.removeItem('userId');
-            localStorage.removeItem('userGroup');
-            localStorage.removeItem('userName');
-
+            this.clearTokens();
+            this.clearUser();
             this.clearRegistrationState();
             this.clearLoginState();
             this.clearActivationState();
