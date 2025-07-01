@@ -1,10 +1,15 @@
+import {nextTick} from 'vue'
 import {defineStore} from 'pinia'
+
 import catalogService from '@/services/catalogService'
 import {useUserPreferencesStore} from '@/stores/userPreferences'
-import {nextTick} from 'vue'
 
-export const useCatalogStore = defineStore('catalog', {
-    state: () => ({
+/**
+ * Initial state factory for catalog store
+ * @returns {Object} - Initial state object
+ */
+function createInitialCatalogState() {
+    return {
         products: [],
         currentPage: 1,
         totalPages: 0,
@@ -33,7 +38,11 @@ export const useCatalogStore = defineStore('catalog', {
         isUpdatingFilters: false,
 
         searchQuery: null
-    }),
+    };
+}
+
+export const useCatalogStore = defineStore('catalog', {
+    state: () => createInitialCatalogState(),
 
     getters: {
         activeFiltersCount() {
@@ -181,8 +190,7 @@ export const useCatalogStore = defineStore('catalog', {
             this.filtersError = null;
 
             try {
-                const filters = await catalogService.getFilters(this.searchQuery);
-                this.availableFilters = filters;
+                this.availableFilters = await catalogService.getFilters(this.searchQuery);
             } catch (err) {
                 this.filtersError = err.response?.data || {message: 'Error loading filters'};
                 this.availableFilters = {gender: null, year: null};
@@ -229,7 +237,7 @@ export const useCatalogStore = defineStore('catalog', {
         },
 
         setSearchQuery(query) {
-            this.searchQuery = query && query.trim() ? query.trim() : null;
+            this.searchQuery = query?.trim() || null;
         },
 
         loadFiltersFromQuery(query) {
@@ -253,11 +261,7 @@ export const useCatalogStore = defineStore('catalog', {
                 this.activeFilters.max_year = parseInt(query.max_year);
             }
 
-            if (query.q) {
-                this.searchQuery = query.q;
-            } else {
-                this.searchQuery = null;
-            }
+            this.searchQuery = query.q?.trim() || null;
 
             nextTick(() => {
                 this.isUpdatingFilters = false;
@@ -283,31 +287,11 @@ export const useCatalogStore = defineStore('catalog', {
             this.productError = null;
         },
 
+        /**
+         * Reset catalog store to initial state
+         */
         resetState() {
-            this.products = [];
-            this.currentPage = 1;
-            this.totalPages = 0;
-            this.totalItems = 0;
-            this.currentOrdering = '-id';
-            this.error = null;
-            this.isFilterDrawerOpen = false;
-            this.searchQuery = null;
-
-            this.currentProduct = null;
-            this.productLoading = false;
-            this.productError = null;
-
-            this.availableFilters = {
-                gender: null,
-                year: null
-            };
-            this.activeFilters = {
-                gender: null,
-                min_year: null,
-                max_year: null
-            };
-            this.filtersError = null;
-            this.isUpdatingFilters = false;
+            Object.assign(this.$state, createInitialCatalogState());
         }
     }
 });
