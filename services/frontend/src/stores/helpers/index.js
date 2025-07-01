@@ -7,3 +7,5 @@ export {
 } from './apiErrorParser.js';
 
 export { storage } from './storage.js';
+
+export { createSlug, slugToName } from './slugUtils.js';

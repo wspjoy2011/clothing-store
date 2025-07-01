@@ -1,14 +1,16 @@
 import {defineStore} from 'pinia';
+import {nextTick} from 'vue';
+
 import categoryService from "@/services/categoryService.js";
 import router from '@/router';
-import { nextTick } from 'vue';
+import {createSlug} from './helpers';
 
-const createSlug = (name) => {
-    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-};
-
-export const useCategoryStore = defineStore('category', {
-    state: () => ({
+/**
+ * Initial state factory for category store
+ * @returns {Object} - Initial state object
+ */
+function createInitialCategoryState() {
+    return {
         categories: [],
         loading: false,
         error: null,
@@ -29,7 +31,11 @@ export const useCategoryStore = defineStore('category', {
         isFilterDrawerOpen: false,
         isUpdatingFilters: false,
         searchQuery: null
-    }),
+    };
+}
+
+export const useCategoryStore = defineStore('category', {
+    state: () => createInitialCategoryState(),
 
     getters: {
         hasCategories: (state) => state.categories.length > 0,
@@ -44,9 +50,9 @@ export const useCategoryStore = defineStore('category', {
             if (
                 this.availableFilters?.year &&
                 ((this.activeFilters.min_year !== null &&
-                  this.activeFilters.min_year !== this.availableFilters.year.min) ||
-                 (this.activeFilters.max_year !== null &&
-                  this.activeFilters.max_year !== this.availableFilters.year.max))
+                        this.activeFilters.min_year !== this.availableFilters.year.min) ||
+                    (this.activeFilters.max_year !== null &&
+                        this.activeFilters.max_year !== this.availableFilters.year.max))
             ) {
                 count++;
             }
@@ -229,7 +235,6 @@ export const useCategoryStore = defineStore('category', {
                 this.categories = response.categories || [];
             } catch (error) {
                 this.error = error.message || 'Failed to load categories';
-                console.error('Category menu fetch error:', error);
             } finally {
                 this.loading = false;
             }
@@ -245,11 +250,10 @@ export const useCategoryStore = defineStore('category', {
                     subId,
                     articleId
                 );
-                this.availableFilters = filters || { gender: null, year: null };
+                this.availableFilters = filters || {gender: null, year: null};
             } catch (err) {
                 this.filtersError = err;
-                this.availableFilters = { gender: null, year: null };
-                console.error('Error fetching category filters:', err);
+                this.availableFilters = {gender: null, year: null};
             } finally {
                 this.filtersLoading = false;
             }
@@ -293,7 +297,7 @@ export const useCategoryStore = defineStore('category', {
         },
 
         setSearchQuery(query) {
-            this.searchQuery = query && query.trim() ? query.trim() : null;
+            this.searchQuery = query?.trim() || null;
         },
 
         loadFiltersFromQuery(query) {
@@ -317,11 +321,7 @@ export const useCategoryStore = defineStore('category', {
                 this.activeFilters.max_year = parseInt(query.max_year);
             }
 
-            if (query.q) {
-                this.searchQuery = query.q;
-            } else {
-                this.searchQuery = null;
-            }
+            this.searchQuery = query.q?.trim() || null;
 
             nextTick(() => {
                 this.isUpdatingFilters = false;
@@ -358,12 +358,9 @@ export const useCategoryStore = defineStore('category', {
         },
 
         navigateToCategory(categoryInfo) {
-            console.log('Navigating to category via store:', categoryInfo);
-
             this.closeMenus();
 
             if (!categoryInfo || !categoryInfo.type || !categoryInfo.id) {
-                console.error('Invalid category info:', categoryInfo);
                 return;
             }
 
@@ -378,13 +375,11 @@ export const useCategoryStore = defineStore('category', {
             } else if (type === 'sub') {
                 const parentId = categoryInfo.parentId;
                 if (!parentId) {
-                    console.error('Missing parentId for sub-category navigation');
                     return;
                 }
 
                 const masterCategory = this.getMasterCategory(parentId);
                 if (!masterCategory) {
-                    console.error('Master category not found for parentId:', parentId);
                     return;
                 }
 
@@ -400,19 +395,16 @@ export const useCategoryStore = defineStore('category', {
                 const grandParentId = categoryInfo.grandParentId;
 
                 if (!parentId || !grandParentId) {
-                    console.error('Missing parentId or grandParentId for article-type navigation');
                     return;
                 }
 
                 const masterCategory = this.getMasterCategory(grandParentId);
                 if (!masterCategory) {
-                    console.error('Master category not found for grandParentId:', grandParentId);
                     return;
                 }
 
                 const subCategory = this.getSubCategory(grandParentId, parentId);
                 if (!subCategory) {
-                    console.error('Sub category not found for parentId:', parentId);
                     return;
                 }
 
@@ -427,30 +419,11 @@ export const useCategoryStore = defineStore('category', {
             }
         },
 
-        async loadCategoryData(masterId, subId = null, articleId = null) {
-            if (!this.hasCategories && !this.loading) {
-                await this.fetchCategoryMenu();
-            }
-
-            return {
-                masterCategory: this.getMasterCategory(masterId),
-                subCategory: subId ? this.getSubCategory(masterId, subId) : null,
-                articleType: articleId ? this.getArticleType(masterId, subId, articleId) : null
-            };
-        },
-
-        getAllMasterCategories() {
-            return this.categories;
-        },
-
-        getSubCategoriesFor(masterId) {
-            const master = this.getMasterCategory(masterId);
-            return master?.sub_categories || [];
-        },
-
-        getArticleTypesFor(masterId, subId) {
-            const sub = this.getSubCategory(masterId, subId);
-            return sub?.article_types || [];
+        /**
+         * Reset category store to initial state
+         */
+        resetState() {
+            Object.assign(this.$state, createInitialCategoryState());
         }
     }
 });
