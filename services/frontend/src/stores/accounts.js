@@ -8,7 +8,6 @@ import {
     createErrorObject,
     createSuccessResult,
     createErrorResult,
-    storage
 } from './helpers'
 
 export const useAccountStore = defineStore('accounts', {
@@ -42,8 +41,8 @@ export const useAccountStore = defineStore('accounts', {
 
         currentUser: null,
         isAuthenticated: false,
-        accessToken: storage.get('accessToken') || null,
-        refreshToken: storage.get('refreshToken') || null,
+        accessToken: null,
+        refreshToken: null,
 
         isInitialized: false,
     }),
@@ -158,11 +157,11 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         userEmail() {
-            return this.currentUser?.email || storage.get('userEmail') || null;
+            return this.currentUser?.email || null;
         },
 
         userName() {
-            return this.currentUser?.email || storage.get('userName') || null;
+            return this.currentUser?.name || this.currentUser?.email || null;
         },
 
         hasTokens() {
@@ -191,11 +190,9 @@ export const useAccountStore = defineStore('accounts', {
         setTokens(tokens) {
             if (tokens.access_token) {
                 this.accessToken = tokens.access_token;
-                storage.set('accessToken', tokens.access_token);
             }
             if (tokens.refresh_token) {
                 this.refreshToken = tokens.refresh_token;
-                storage.set('refreshToken', tokens.refresh_token);
             }
             this.isAuthenticated = !!this.refreshToken;
         },
@@ -210,19 +207,6 @@ export const useAccountStore = defineStore('accounts', {
          */
         setUser(user) {
             this.currentUser = user;
-
-            if (user.email) {
-                storage.set('userEmail', user.email);
-            }
-            if (user.name) {
-                storage.set('userName', user.name);
-            }
-            if (user.id) {
-                storage.set('userId', user.id.toString());
-            }
-            if (user.group_name) {
-                storage.set('userGroup', user.group_name);
-            }
         },
 
         /**
@@ -232,7 +216,6 @@ export const useAccountStore = defineStore('accounts', {
             this.accessToken = null;
             this.refreshToken = null;
             this.isAuthenticated = false;
-            storage.remove('accessToken', 'refreshToken');
         },
 
         /**
@@ -240,7 +223,6 @@ export const useAccountStore = defineStore('accounts', {
          */
         clearUser() {
             this.currentUser = null;
-            storage.remove('userEmail', 'userId', 'userGroup', 'userName');
         },
 
         async initializeAuth() {
@@ -249,12 +231,7 @@ export const useAccountStore = defineStore('accounts', {
             }
 
             try {
-                const refreshToken = storage.get('refreshToken');
-
-                if (refreshToken) {
-                    this.refreshToken = refreshToken;
-                    this.accessToken = storage.get('accessToken');
-
+                if (this.refreshToken) {
                     const userResult = await this.loadCurrentUser();
 
                     if (userResult.success) {
@@ -267,12 +244,6 @@ export const useAccountStore = defineStore('accounts', {
                     this.isAuthenticated = false;
                     this.currentUser = null;
                     this.accessToken = null;
-
-                    const userEmail = storage.get('userEmail');
-                    if (userEmail) {
-                        console.warn('Found userEmail in localStorage but no refresh token, clearing...');
-                        this.clearUser();
-                    }
                 }
 
             } catch (error) {
@@ -416,10 +387,6 @@ export const useAccountStore = defineStore('accounts', {
 
                 this.registrationSuccess = true;
 
-                if (response.user) {
-                    storage.set('userEmail', response.user.email);
-                }
-
                 return createSuccessResult(response, 'Registration successful');
 
             } catch (err) {
@@ -482,7 +449,7 @@ export const useAccountStore = defineStore('accounts', {
             this.logoutError = null;
 
             try {
-                const refreshToken = this.refreshToken || storage.get('refreshToken');
+                const refreshToken = this.refreshToken;
 
                 if (refreshToken) {
                     await accountService.logout({
@@ -682,5 +649,18 @@ export const useAccountStore = defineStore('accounts', {
             this.clearUserState();
             this.clearSocialAuthState();
         }
-    }
+    },
+
+    persist: [
+        {
+            key: 'auth-tokens',
+            storage: localStorage,
+            paths: ['accessToken', 'refreshToken', 'isAuthenticated']
+        },
+        {
+            key: 'user-data',
+            storage: localStorage,
+            paths: ['currentUser']
+        }
+    ]
 });
