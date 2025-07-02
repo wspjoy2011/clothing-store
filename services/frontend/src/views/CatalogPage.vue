@@ -1,182 +1,26 @@
 <template>
   <div class="catalog-layout">
-    <!-- Filter Drawer -->
-    <v-navigation-drawer
-        v-model="catalogStore.isFilterDrawerOpen"
-        location="left"
-        temporary
-        width="320"
-        class="filter-drawer"
-    >
-      <div class="drawer-header">
-        <h3 class="text-h6">Filters</h3>
-        <v-btn icon="mdi-close" variant="text" size="small" @click="catalogStore.toggleFilterDrawer(false)"/>
-      </div>
-      <filter-sidebar/>
-    </v-navigation-drawer>
+    <catalog-filter-panel :has-products="hasProducts"/>
 
-    <!-- Filter Toggle Button -->
-    <div v-if="hasProducts" class="filter-toggle-container">
-      <v-btn
-          icon="mdi-filter"
-          variant="outlined"
-          size="small"
-          class="filter-btn"
-          @click="catalogStore.toggleFilterDrawer(true)"
-      >
-        <v-badge
-            :content="catalogStore.activeFiltersCount"
-            :value="catalogStore.activeFiltersCount > 0"
-            :color="catalogStore.activeFiltersCount > 0 ? 'error' : 'primary'"
-            location="top end"
-        />
-      </v-btn>
-    </div>
-
-    <!-- Main Content Area -->
     <div class="main-content">
       <div class="container-custom mx-auto my-6">
-        <!-- Page header -->
-        <v-row justify="center">
-          <v-col cols="12">
-            <h1 class="text-h4 font-weight-bold mb-2 text-center">Fashion & Accessories Catalog</h1>
-
-            <!-- Search results indicator -->
-            <div v-if="catalogStore.searchQuery" class="text-center mb-6">
-              <v-chip
-                  color="primary"
-                  variant="outlined"
-                  size="large"
-                  closable
-                  @click:close="clearSearch"
-                  prepend-icon="mdi-magnify"
-              >
-                Search results for: "{{ catalogStore.searchQuery }}"
-              </v-chip>
-            </div>
-          </v-col>
-        </v-row>
-
-        <!-- Control panel -->
-        <v-row v-if="hasProducts" justify="center" align="center" class="mb-3">
-          <v-col cols="12" sm="6" md="4" lg="3">
-            <product-sorting @update:ordering="handleOrderingChange"/>
-          </v-col>
-
-          <v-spacer class="d-none d-md-flex"></v-spacer>
-
-          <v-col cols="12" sm="6" md="4" lg="3" class="d-flex justify-end">
-            <items-per-page-select
-                :options="itemsPerPageOptions"
-                @update:perPage="handleItemsPerPageChange"
-            />
-          </v-col>
-        </v-row>
-
-        <!-- Active filters summary -->
-        <v-row v-if="catalogStore.hasActiveFilters && !catalogStore.loading" class="mb-4">
-          <v-col cols="12">
-            <v-sheet rounded class="pa-3" color="grey-lighten-4">
-              <div class="d-flex align-center justify-space-between">
-                <div class="d-flex align-center">
-                  <v-icon icon="mdi-filter-variant" class="mr-2"/>
-                  <span class="text-body-1">Active Filters</span>
-                  <v-chip
-                      v-if="catalogStore.activeFilters.gender"
-                      size="small"
-                      class="ml-2"
-                      closable
-                      @click:close="catalogStore.activeFilters.gender = null"
-                  >
-                    Gender: {{ catalogStore.activeFilters.gender }}
-                  </v-chip>
-                  <v-chip
-                      v-if="catalogStore.activeFilters.min_year || catalogStore.activeFilters.max_year"
-                      size="small"
-                      class="ml-2"
-                      closable
-                      @click:close="catalogStore.activeFilters.min_year = null; catalogStore.activeFilters.max_year = null"
-                  >
-                    Year: {{
-                      catalogStore.activeFilters.min_year || catalogStore.availableFilters.year?.min
-                    }}-{{ catalogStore.activeFilters.max_year || catalogStore.availableFilters.year?.max }}
-                  </v-chip>
-                  <v-progress-circular
-                      v-if="catalogStore.filtersLoading"
-                      size="16"
-                      width="2"
-                      indeterminate
-                      class="ml-2"
-                      color="primary"
-                  />
-                </div>
-                <v-btn
-                    variant="text"
-                    color="primary"
-                    density="comfortable"
-                    @click="clearAllFilters"
-                    :disabled="catalogStore.filtersLoading"
-                >
-                  Clear All
-                </v-btn>
-              </div>
-            </v-sheet>
-          </v-col>
-        </v-row>
-
-        <!-- Loader -->
-        <content-loader v-if="catalogStore.loading"/>
-
-        <!-- Error message -->
-        <error-alert v-if="catalogStore.error" :message="catalogStore.error.message"/>
-
-        <!-- Products grid -->
-        <v-row v-if="!catalogStore.loading && !catalogStore.error && catalogStore.products.length > 0">
-          <v-col
-              v-for="product in catalogStore.products"
-              :key="product.product_id"
-              cols="12"
-              sm="6"
-              md="4"
-              lg="3"
-          >
-            <clothes-card :product="product"/>
-          </v-col>
-        </v-row>
-
-        <!-- Products count indicator -->
-        <v-row v-if="hasProducts" justify="center" class="mt-4 mb-4">
-          <v-col cols="12" class="text-center">
-            <v-chip
-                color="primary"
-                variant="flat"
-                class="px-4 py-2"
-                size="large"
-            >
-              <v-icon start icon="mdi-tag-multiple" class="mr-1"/>
-              {{ catalogStore.totalItems }} products found
-            </v-chip>
-          </v-col>
-        </v-row>
-
-        <!-- No products found -->
-        <no-items-found
-            v-if="isEmpty"
-            title="No products found"
-            message="Try adjusting your filters or search query"
-            icon="mdi-search-off"
+        <catalog-header
+            :has-products="hasProducts"
+            :items-per-page-options="itemsPerPageOptions"
+            @clear-search="clearSearch"
+            @update:ordering="handleOrderingChange"
+            @update:per-page="handleItemsPerPageChange"
         />
 
-        <!-- Pagination  -->
-        <v-row justify="center" v-if="hasItems">
-          <v-col cols="12" class="px-0">
-            <app-pagination
-                :current-page="catalogStore.currentPage"
-                :total-pages="catalogStore.totalPages"
-                @update:page="handlePageChange"
-            />
-          </v-col>
-        </v-row>
+        <active-filters-summary @clear-all-filters="clearAllFilters"/>
+
+        <catalog-grid :has-products="hasProducts"/>
+
+        <catalog-footer
+            :is-empty="isEmpty"
+            :has-items="hasItems"
+            @update:page="handlePageChange"
+        />
       </div>
     </div>
   </div>
@@ -186,7 +30,6 @@
 import {onMounted, onUnmounted} from 'vue';
 import {useRoute} from 'vue-router';
 
-import {useCatalogStore} from '@/stores/catalog';
 import {useProductPagination} from '@/composables/catalog/useProductPagination';
 import {useProductFiltering} from '@/composables/catalog/useProductFiltering';
 import {useProductSearch} from '@/composables/catalog/useProductSearch';
@@ -194,22 +37,16 @@ import {useProductSorting} from '@/composables/catalog/useProductSorting';
 import {useProductRouting} from '@/composables/catalog/useProductRouting';
 import {useProductUI} from '@/composables/catalog/useProductUI';
 
-import ClothesCard from '@/components/catalog/ClothesCard.vue';
-import ContentLoader from '@/components/ui/loaders/ContentLoader.vue';
-import ErrorAlert from '@/components/ui/alerts/ErrorAlert.vue';
-import AppPagination from '@/components/ui/pagination/AppPagination.vue';
-import ItemsPerPageSelect from '@/components/ui/pagination/ItemsPerPageSelect.vue';
-import NoItemsFound from '@/components/ui/empty-states/NoItemsFound.vue';
-import ProductSorting from '@/components/ui/sorting/ProductSorting.vue';
-import FilterSidebar from '@/components/ui/filters/FilterSidebar.vue';
+import CatalogHeader from '@/components/catalog/CatalogHeader.vue';
+import CatalogFilterPanel from '@/components/catalog/CatalogFilterPanel.vue';
+import ActiveFiltersSummary from '@/components/catalog/ActiveFiltersSummary.vue';
+import CatalogGrid from '@/components/catalog/CatalogGrid.vue';
+import CatalogFooter from '@/components/catalog/CatalogFooter.vue';
 
 const route = useRoute();
-const catalogStore = useCatalogStore();
 
 const {createQueryFromFilters, clearAllFilters} = useProductFiltering(route);
-
 const {hasProducts, isEmpty} = useProductUI();
-
 const {
   itemsPerPageOptions,
   hasItems,
@@ -217,11 +54,8 @@ const {
   handlePageChange,
   handleItemsPerPageChange
 } = useProductPagination(createQueryFromFilters, route);
-
 const {clearSearch} = useProductSearch(createQueryFromFilters, route);
-
 const {handleOrderingChange} = useProductSorting(createQueryFromFilters);
-
 const {initialize, cleanup} = useProductRouting(createQueryFromFilters, ensureValidPage);
 
 onMounted(initialize);
@@ -233,31 +67,6 @@ onUnmounted(cleanup);
   display: flex;
   min-height: calc(100vh - 64px);
   position: relative;
-}
-
-.filter-drawer {
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-}
-
-.drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.filter-toggle-container {
-  position: fixed;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 5;
-}
-
-.filter-btn {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  background-color: white;
 }
 
 .main-content {
@@ -272,22 +81,6 @@ onUnmounted(cleanup);
   max-width: 1280px;
   padding: 0 16px;
   box-sizing: border-box;
-}
-
-.v-theme--dark .v-sheet {
-  background-color: #2c2c2c !important;
-  color: #ffffff !important;
-}
-
-.v-theme--dark .v-chip {
-  background-color: #1976d2 !important;
-  color: #ffffff !important;
-}
-
-.v-theme--dark .filter-btn {
-  background-color: #1e1e1e !important;
-  color: #ffffff !important;
-  border-color: #424242 !important;
 }
 
 @media (min-width: 960px) {
@@ -305,15 +98,6 @@ onUnmounted(cleanup);
 @media (min-width: 1920px) {
   .container-custom {
     max-width: 1600px;
-  }
-}
-
-@media (max-width: 600px) {
-  .filter-toggle-container {
-    top: auto;
-    bottom: 24px;
-    left: 24px;
-    transform: none;
   }
 }
 </style>
