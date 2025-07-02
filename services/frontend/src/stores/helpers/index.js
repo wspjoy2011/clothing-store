@@ -22,3 +22,11 @@ export {
     getCategoryRoute,
     buildBreadcrumbs
 } from './navigation.js';
+
+export {
+    createDocumentState,
+    createInitialLegalState,
+    createLegalGetters,
+    createLegalActions,
+    getLegalPersistPaths
+} from './legalDocuments.js';

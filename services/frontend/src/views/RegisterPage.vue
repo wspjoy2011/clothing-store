@@ -155,8 +155,8 @@
                         :rules="termsRules"
                         color="primary"
                         :disabled="isLoading || isSocialAuthLoading"
-                        validate-on="input lazy"
                         :readonly="!legalStore.hasReadBothDocuments"
+                        validate-on="input lazy"
                         @click="handleCheckboxClick"
                     >
                       <template v-slot:label>
@@ -192,9 +192,16 @@
                     </v-checkbox>
 
                     <div v-if="!legalStore.hasReadBothDocuments" class="terms-requirement-hint">
-                      <v-chip size="small" color="info" variant="tonal">
+                      <v-chip size="small" color="warning" variant="tonal">
                         <v-icon start size="small">mdi-information</v-icon>
-                        Please read both documents first
+                        Please read and accept both documents first
+                      </v-chip>
+                    </div>
+
+                    <div v-else-if="!acceptTerms" class="terms-requirement-hint">
+                      <v-chip size="small" color="info" variant="tonal">
+                        <v-icon start size="small">mdi-check-circle</v-icon>
+                        You can now accept the terms to continue
                       </v-chip>
                     </div>
                   </div>
@@ -286,14 +293,17 @@
     </v-container>
 
     <TermsOfService
-        v-model="legalStore.showTermsDialog"
+        :model-value="legalStore.showTermsDialog"
+        @update:model-value="(value) => value ? legalStore.openTermsDialog() : legalStore.closeTermsDialog()"
         @accept="handleTermsAccept"
     />
 
     <PrivacyPolicy
-        v-model="legalStore.showPrivacyDialog"
+        :model-value="legalStore.showPrivacyDialog"
+        @update:model-value="(value) => value ? legalStore.openPrivacyDialog() : legalStore.closePrivacyDialog()"
         @acknowledge="handlePrivacyAcknowledge"
     />
+
   </div>
 </template>
 
@@ -374,6 +384,9 @@ const {
 const handleCheckboxClick = (event) => {
   if (!legalStore.hasReadBothDocuments) {
     event.preventDefault()
+    event.stopPropagation()
+
+    showError('Please read and accept both Terms of Service and Privacy Policy first')
     return false
   }
 }
@@ -673,6 +686,27 @@ onMounted(() => {
 .terms-requirement-hint {
   margin-top: 8px;
   margin-left: 32px;
+}
+
+:deep(.v-checkbox--disabled) .v-label {
+  opacity: 0.6;
+}
+
+:deep(.v-checkbox--readonly) .v-selection-control__input {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.v-checkbox--disabled .terms-link,
+.v-checkbox--readonly .terms-link {
+  opacity: 1 !important;
+  text-decoration: underline;
+  pointer-events: all !important;
+}
+
+.v-checkbox--disabled .terms-link:hover,
+.v-checkbox--readonly .terms-link:hover {
+  color: #1976D2 !important;
 }
 
 .register-btn {
