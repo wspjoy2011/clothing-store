@@ -16,7 +16,10 @@
             :filter-store="catalogStore"
         />
 
-        <catalog-grid :has-products="hasProducts"/>
+        <product-grid
+            :store="catalogStore"
+            :has-products="hasProducts"
+        />
 
         <catalog-footer
             :is-empty="isEmpty"
@@ -42,7 +45,7 @@ import {useProductUI} from '@/composables/catalog/useProductUI';
 import CatalogHeader from '@/components/catalog/CatalogHeader.vue';
 import CatalogFilterPanel from '@/components/catalog/CatalogFilterPanel.vue';
 import ActiveFilters from '@/components/catalog/ActiveFilters.vue';
-import CatalogGrid from '@/components/catalog/CatalogGrid.vue';
+import ProductGrid from '@/components/catalog/ProductGrid.vue';
 import CatalogFooter from '@/components/catalog/CatalogFooter.vue';
 
 const route = useRoute();
@@ -53,7 +56,6 @@ const {createQueryFromFilters, clearAllFilters} = useFiltering(route, catalogSto
 });
 
 provide('clearAllFilters', clearAllFilters);
-
 provide('filterStore', computed(() => catalogStore));
 
 const {hasProducts, isEmpty} = useProductUI();

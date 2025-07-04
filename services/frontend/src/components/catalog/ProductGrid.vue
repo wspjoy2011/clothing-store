@@ -1,9 +1,9 @@
 <template>
   <!-- Loader -->
-  <content-loader v-if="isLoading"/>
+  <content-loader v-if="store.loading"/>
 
   <!-- Error message -->
-  <error-alert v-if="error" :message="error.message"/>
+  <error-alert v-if="store.error" :message="store.error.message"/>
 
   <!-- Filter loading error -->
   <v-row v-if="filtersError && !isLoadingFilters" class="mb-4">
@@ -25,9 +25,9 @@
   </v-row>
 
   <!-- Products grid -->
-  <v-row v-if="!isLoading && !error && products.length > 0">
+  <v-row v-if="!store.loading && !store.error && store.products.length > 0">
     <v-col
-        v-for="product in products"
+        v-for="product in store.products"
         :key="product.product_id"
         cols="12"
         sm="6"
@@ -48,7 +48,7 @@
           size="large"
       >
         <v-icon start icon="mdi-tag-multiple" class="mr-1"/>
-        {{ totalItems }} products found{{ categoryContext ? ` in ${categoryContext}` : '' }}
+        {{ store.totalItems }} products found{{ context ? ` in ${context}` : '' }}
       </v-chip>
     </v-col>
   </v-row>
@@ -59,28 +59,16 @@ import ClothesCard from '@/components/catalog/ClothesCard.vue';
 import ContentLoader from '@/components/ui/loaders/ContentLoader.vue';
 import ErrorAlert from '@/components/ui/alerts/ErrorAlert.vue';
 
-defineProps({
-  isLoading: {
-    type: Boolean,
-    required: true
-  },
-  error: {
+const props = defineProps({
+  store: {
     type: Object,
-    default: null
-  },
-  products: {
-    type: Array,
-    required: true
-  },
-  totalItems: {
-    type: Number,
     required: true
   },
   hasProducts: {
     type: Boolean,
     required: true
   },
-  categoryContext: {
+  context: {
     type: String,
     default: null
   },

@@ -1,6 +1,7 @@
 import {defineStore} from 'pinia';
 
 import categoryService from "@/services/categoryService.js";
+import {useUserPreferencesStore} from '@/stores/userPreferences';
 import {
     createSlug,
     findCategoryTree,
@@ -29,6 +30,10 @@ function createInitialCategoryState() {
         error: null,
         categoryMenuOpen: false,
         mobileDrawerOpen: false,
+
+        products: [],
+        currentOrdering: '-id',
+
         ...createInitialFiltersState(),
         ...createPaginationState()
     };
@@ -157,6 +162,48 @@ export const useCategoryStore = defineStore('category', {
             }
         },
 
+        async fetchProducts(page = 1, ordering = null, masterId = null, subId = null, articleId = null) {
+            this.loading = true;
+            this.error = null;
+
+            const preferencesStore = useUserPreferencesStore();
+            const perPage = preferencesStore.itemsPerPage;
+
+            const effectiveOrdering = ordering !== null ? ordering : this.currentOrdering;
+
+            try {
+                const filters = {
+                    ...this.activeFilters,
+                    q: this.searchQuery
+                };
+
+                const response = await categoryService.getProductsByCategory(
+                    masterId,
+                    subId,
+                    articleId,
+                    page,
+                    perPage,
+                    effectiveOrdering,
+                    filters,
+                    this.searchQuery
+                );
+
+                this.products = response.products;
+                this.setPaginationData({
+                    currentPage: page,
+                    totalPages: response.total_pages,
+                    totalItems: response.total_items
+                });
+                this.currentOrdering = effectiveOrdering;
+            } catch (err) {
+                this.error = err.response?.data || {message: 'Error loading products'};
+                this.products = [];
+                this.resetPagination();
+            } finally {
+                this.loading = false;
+            }
+        },
+
         async fetchCategoryFilters(masterId, subId = null, articleId = null) {
             this.filtersLoading = true;
             this.filtersError = null;
@@ -178,6 +225,12 @@ export const useCategoryStore = defineStore('category', {
 
         ...createFiltersActions(),
         ...createPaginationActions(),
+
+        setOrdering(ordering) {
+            if (ordering !== this.currentOrdering) {
+                this.currentOrdering = ordering;
+            }
+        },
 
         resetCategoryFilters() {
             this.resetFilters();

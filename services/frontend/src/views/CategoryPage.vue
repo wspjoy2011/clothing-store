@@ -27,13 +27,10 @@
             :filter-store="categoryStore"
         />
 
-        <category-grid
-            :is-loading="isLoading"
-            :error="error"
-            :products="products"
-            :total-items="totalItems"
+        <product-grid
+            :store="categoryStore"
             :has-products="hasProducts"
-            :category-context="currentCategoryTitle"
+            :context="currentCategoryTitle"
             :filters-error="filtersError"
             :is-loading-filters="isLoadingFilters"
             @clear-filters-error="filtersError = null"
@@ -60,7 +57,7 @@ import CategoryBreadcrumbs from '@/components/catalog/CategoryBreadcrumbs.vue';
 import CategoryHeader from '@/components/catalog/CategoryHeader.vue';
 import CatalogFilterPanel from '@/components/catalog/CatalogFilterPanel.vue';
 import ActiveFilters from '@/components/catalog/ActiveFilters.vue';
-import CategoryGrid from '@/components/catalog/CategoryGrid.vue';
+import ProductGrid from '@/components/catalog/ProductGrid.vue';
 import CatalogFooter from '@/components/catalog/CatalogFooter.vue';
 
 const route = useRoute();
@@ -77,15 +74,11 @@ const {
 } = useCategoryMeta(route);
 
 const {
-  isLoading,
-  error,
-  products,
   totalPages,
   totalItems,
   currentPage,
   isLoadingFilters,
   filtersError,
-  availableFilters,
   activeFilters,
   searchQuery,
   hasProducts,
@@ -103,8 +96,7 @@ const {
 
 const {createQueryFromFilters, disableFilterWatcher, enableFilterWatcher} = useFiltering(route, categoryStore, {
   routeName: 'category',
-  fetchProducts,
-  provideKey: 'categoryAvailableFilters'
+  fetchProducts
 });
 
 const handlePageChangeHandler = handlePageChange(createQueryFromFilters);
@@ -133,11 +125,6 @@ const categoryPaginationHandlers = computed(() => ({
 provide('paginationData', paginationData);
 provide('paginationHandlers', paginationHandlers);
 provide('categoryPaginationHandlers', categoryPaginationHandlers);
-
-provide('categoryAvailableFilters', availableFilters);
-provide('filtersError', filtersError);
-provide('hasActiveFilters', computed(() => categoryStore.hasActiveFilters));
-
 provide('filterStore', computed(() => categoryStore));
 
 watch(

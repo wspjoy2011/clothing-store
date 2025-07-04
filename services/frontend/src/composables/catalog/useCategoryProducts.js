@@ -1,18 +1,10 @@
 import {ref, computed, provide} from 'vue';
 import {useRouter} from 'vue-router';
 import {useCategoryStore} from '@/stores/categoryStore';
-import categoryService from '@/services/categoryService';
 
 export function useCategoryProducts(route) {
     const router = useRouter();
     const categoryStore = useCategoryStore();
-
-    const isLoading = ref(true);
-    const error = ref(null);
-    const products = ref([]);
-    const totalPages = ref(0);
-    const totalItems = ref(0);
-    const currentPage = ref(1);
 
     const isLoadingFilters = ref(false);
     const filtersError = ref(null);
@@ -35,20 +27,20 @@ export function useCategoryProducts(route) {
     const itemsPerPageOptions = [8, 12, 16, 20];
 
     const hasProducts = computed(() =>
-        !isLoading.value && !error.value && products.value.length > 0
+        !categoryStore.loading && !categoryStore.error && categoryStore.products.length > 0
     );
 
     const isEmpty = computed(() =>
-        !isLoading.value && !error.value && products.value.length === 0
+        !categoryStore.loading && !categoryStore.error && categoryStore.products.length === 0
     );
 
     const hasItems = computed(() =>
-        !isLoading.value && !error.value && totalPages.value > 0
+        !categoryStore.loading && !categoryStore.error && categoryStore.totalPages > 0
     );
 
     const ensureValidPage = (page) => {
-        if (totalPages.value > 0 && page > totalPages.value) {
-            return totalPages.value;
+        if (categoryStore.totalPages > 0 && page > categoryStore.totalPages) {
+            return categoryStore.totalPages;
         }
         return page;
     };
@@ -56,37 +48,13 @@ export function useCategoryProducts(route) {
     const fetchCategoryProducts = async (page = 1, ordering = '-id') => {
         if (!masterCategoryId.value) return;
 
-        isLoading.value = true;
-        error.value = null;
-
-        try {
-            const filters = {};
-            if (categoryStore.activeFilters.gender) filters.gender = categoryStore.activeFilters.gender;
-            if (categoryStore.activeFilters.min_year) filters.min_year = categoryStore.activeFilters.min_year;
-            if (categoryStore.activeFilters.max_year) filters.max_year = categoryStore.activeFilters.max_year;
-
-            const result = await categoryService.getProductsByCategory(
-                masterCategoryId.value,
-                subCategoryId.value,
-                articleTypeId.value,
-                page,
-                route.query.per_page || 12,
-                ordering,
-                filters,
-                categoryStore.searchQuery
-            );
-
-            products.value = result.products;
-            totalPages.value = result.total_pages;
-            totalItems.value = result.total_items;
-            currentPage.value = page;
-
-            return result;
-        } catch (err) {
-            error.value = err;
-        } finally {
-            isLoading.value = false;
-        }
+        await categoryStore.fetchProducts(
+            page,
+            ordering,
+            masterCategoryId.value,
+            subCategoryId.value,
+            articleTypeId.value
+        );
     };
 
     const fetchCategoryFilters = async () => {
@@ -99,16 +67,13 @@ export function useCategoryProducts(route) {
         filtersError.value = null;
 
         try {
-            const filters = await categoryService.getFiltersByCategory(
+            await categoryStore.fetchCategoryFilters(
                 masterCategoryId.value,
                 subCategoryId.value,
                 articleTypeId.value
             );
-
-            categoryStore.setAvailableFilters(filters || {gender: null, year: null});
         } catch (err) {
             filtersError.value = err;
-            categoryStore.setAvailableFilters({gender: null, year: null});
         } finally {
             isLoadingFilters.value = false;
         }
@@ -200,8 +165,8 @@ export function useCategoryProducts(route) {
     });
 
     provide('categoryPaginationData', {
-        currentPage: computed(() => currentPage.value),
-        totalPages: computed(() => totalPages.value),
+        currentPage: computed(() => categoryStore.currentPage),
+        totalPages: computed(() => categoryStore.totalPages),
         hasItems: computed(() => hasItems.value),
         itemsPerPageOptions
     });
@@ -218,16 +183,20 @@ export function useCategoryProducts(route) {
     };
 
     return {
-        isLoading,
-        error,
-        products,
-        totalPages,
-        totalItems,
-        currentPage,
+        // Store data proxies
+        isLoading: computed(() => categoryStore.loading),
+        error: computed(() => categoryStore.error),
+        products: computed(() => categoryStore.products),
+        totalPages: computed(() => categoryStore.totalPages),
+        totalItems: computed(() => categoryStore.totalItems),
+        currentPage: computed(() => categoryStore.currentPage),
+
+        // Local loading states
         itemsPerPageOptions,
         isLoadingFilters,
         filtersError,
 
+        // Computed states
         hasProducts,
         isEmpty,
         hasItems,
@@ -235,10 +204,12 @@ export function useCategoryProducts(route) {
         subCategoryId,
         articleTypeId,
 
+        // Store getters
         availableFilters: computed(() => categoryStore.availableFilters),
         activeFilters: computed(() => categoryStore.activeFilters),
         searchQuery: computed(() => categoryStore.searchQuery),
 
+        // Methods
         fetchProducts: fetchCategoryProducts,
         fetchCategoryProducts,
         fetchCategoryFilters,
