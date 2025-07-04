@@ -55,10 +55,10 @@ import {useFiltering} from '@/composables/catalog/useFiltering';
 
 import CategoryBreadcrumbs from '@/components/catalog/CategoryBreadcrumbs.vue';
 import CategoryHeader from '@/components/catalog/CategoryHeader.vue';
-import CatalogFilterPanel from '@/components/catalog/CatalogFilterPanel.vue';
+import CatalogFilterPanel from '@/components/catalog/FilterPanel.vue';
 import ActiveFilters from '@/components/catalog/ActiveFilters.vue';
 import ProductGrid from '@/components/catalog/ProductGrid.vue';
-import CatalogFooter from '@/components/catalog/CatalogFooter.vue';
+import CatalogFooter from '@/components/catalog/Footer.vue';
 
 const route = useRoute();
 const categoryStore = useCategoryStore();

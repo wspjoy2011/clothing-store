@@ -43,10 +43,10 @@ import {useProductRouting} from '@/composables/catalog/useProductRouting';
 import {useProductUI} from '@/composables/catalog/useProductUI';
 
 import CatalogHeader from '@/components/catalog/CatalogHeader.vue';
-import CatalogFilterPanel from '@/components/catalog/CatalogFilterPanel.vue';
+import CatalogFilterPanel from '@/components/catalog/FilterPanel.vue';
 import ActiveFilters from '@/components/catalog/ActiveFilters.vue';
 import ProductGrid from '@/components/catalog/ProductGrid.vue';
-import CatalogFooter from '@/components/catalog/CatalogFooter.vue';
+import CatalogFooter from '@/components/catalog/Footer.vue';
 
 const route = useRoute();
 const catalogStore = useCatalogStore();
