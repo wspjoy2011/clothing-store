@@ -1,7 +1,6 @@
 import {ref, computed, provide} from 'vue';
 import {useRouter} from 'vue-router';
 import {useCategoryStore} from '@/stores/categoryStore';
-import {useCategoryFiltering} from './useCategoryFiltering';
 import categoryService from '@/services/categoryService';
 
 export function useCategoryProducts(route) {
@@ -85,17 +84,14 @@ export function useCategoryProducts(route) {
             return result;
         } catch (err) {
             error.value = err;
-            console.error('Error fetching category products:', err);
         } finally {
             isLoading.value = false;
         }
     };
 
-    const filtering = useCategoryFiltering(route, fetchCategoryProducts);
-
     const fetchCategoryFilters = async () => {
         if (!masterCategoryId.value) {
-            filtering.setAvailableFilters({gender: null, year: null});
+            categoryStore.setAvailableFilters({gender: null, year: null});
             return;
         }
 
@@ -109,19 +105,18 @@ export function useCategoryProducts(route) {
                 articleTypeId.value
             );
 
-            filtering.setAvailableFilters(filters || {gender: null, year: null});
+            categoryStore.setAvailableFilters(filters || {gender: null, year: null});
         } catch (err) {
             filtersError.value = err;
-            filtering.setAvailableFilters({gender: null, year: null});
-            console.error('Error fetching category filters:', err);
+            categoryStore.setAvailableFilters({gender: null, year: null});
         } finally {
             isLoadingFilters.value = false;
         }
     };
 
-    const handlePageChange = (page) => {
+    const handlePageChange = (createQueryFromFilters) => (page) => {
         const validPage = ensureValidPage(page);
-        const query = filtering.createQueryFromFilters();
+        const query = createQueryFromFilters();
 
         const routeName = route.name;
         const params = {...route.params};
@@ -140,8 +135,8 @@ export function useCategoryProducts(route) {
         });
     };
 
-    const handleItemsPerPageChange = (count) => {
-        const query = filtering.createQueryFromFilters();
+    const handleItemsPerPageChange = (createQueryFromFilters) => (count) => {
+        const query = createQueryFromFilters();
         const routeName = route.name;
         const params = {...route.params};
 
@@ -159,8 +154,8 @@ export function useCategoryProducts(route) {
         });
     };
 
-    const handleOrderingChange = (ordering) => {
-        const query = filtering.createQueryFromFilters();
+    const handleOrderingChange = (createQueryFromFilters) => (ordering) => {
+        const query = createQueryFromFilters();
         const routeName = route.name;
         const params = {...route.params};
 
@@ -178,10 +173,10 @@ export function useCategoryProducts(route) {
         });
     };
 
-    const clearSearch = () => {
-        filtering.clearSearch();
+    const clearSearch = (createQueryFromFilters) => () => {
+        categoryStore.clearSearchQuery();
 
-        const query = filtering.createQueryFromFilters();
+        const query = createQueryFromFilters();
         const routeName = route.name;
         const params = {...route.params};
 
@@ -212,14 +207,14 @@ export function useCategoryProducts(route) {
     });
 
     const initialize = async () => {
-        filtering.loadFiltersFromQuery(route.query);
+        categoryStore.loadFiltersFromQuery(route.query);
         await fetchCategoryFilters();
         const page = parseInt(route.query.page) || 1;
         await fetchCategoryProducts(page, route.query.ordering || '-id');
     };
 
     const cleanup = () => {
-        filtering.clearAvailableFilters();
+        categoryStore.setAvailableFilters({gender: null, year: null});
     };
 
     return {
@@ -240,8 +235,11 @@ export function useCategoryProducts(route) {
         subCategoryId,
         articleTypeId,
 
-        ...filtering,
+        availableFilters: computed(() => categoryStore.availableFilters),
+        activeFilters: computed(() => categoryStore.activeFilters),
+        searchQuery: computed(() => categoryStore.searchQuery),
 
+        fetchProducts: fetchCategoryProducts,
         fetchCategoryProducts,
         fetchCategoryFilters,
         handlePageChange,

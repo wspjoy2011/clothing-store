@@ -12,7 +12,10 @@ import {
 import {
     createInitialFiltersState,
     createFiltersGetters,
-    createFiltersActions
+    createFiltersActions,
+    createPaginationState,
+    createPaginationActions,
+    createPaginationGetters
 } from './composables';
 
 /**
@@ -26,7 +29,8 @@ function createInitialCategoryState() {
         error: null,
         categoryMenuOpen: false,
         mobileDrawerOpen: false,
-        ...createInitialFiltersState()
+        ...createInitialFiltersState(),
+        ...createPaginationState()
     };
 }
 
@@ -37,6 +41,7 @@ export const useCategoryStore = defineStore('category', {
         hasCategories: (state) => state.categories.length > 0,
 
         ...createFiltersGetters(),
+        ...createPaginationGetters(),
 
         getMasterCategory: (state) => (id) => {
             if (!id) return null;
@@ -172,9 +177,11 @@ export const useCategoryStore = defineStore('category', {
         },
 
         ...createFiltersActions(),
+        ...createPaginationActions(),
 
         resetCategoryFilters() {
             this.resetFilters();
+            this.resetPagination();
         },
 
         closeMenus() {

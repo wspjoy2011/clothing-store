@@ -1,5 +1,5 @@
 <template>
-  <v-row v-if="hasActiveFilters && !isLoading" class="mb-4">
+  <v-row v-if="filterStore.hasActiveFilters && !filterStore.loading" class="mb-4">
     <v-col cols="12">
       <v-sheet rounded class="pa-3" color="grey-lighten-4">
         <div class="d-flex align-center justify-space-between">
@@ -8,31 +8,31 @@
             <span class="text-body-1 mr-2">Active Filters</span>
 
             <v-chip
-                v-if="activeFilters.gender"
+                v-if="filterStore.activeFilters.gender"
                 size="small"
                 class="ml-2 mb-1"
                 closable
                 @click:close="clearGenderFilter"
             >
-              Gender: {{ activeFilters.gender }}
+              Gender: {{ filterStore.activeFilters.gender }}
             </v-chip>
 
             <v-chip
-                v-if="activeFilters.min_year || activeFilters.max_year"
+                v-if="filterStore.activeFilters.min_year || filterStore.activeFilters.max_year"
                 size="small"
                 class="ml-2 mb-1"
                 closable
                 @click:close="clearYearFilter"
             >
               Year: {{
-                activeFilters.min_year || availableFilters.year?.min
+                filterStore.activeFilters.min_year || filterStore.availableFilters.year?.min
               }}-{{
-                activeFilters.max_year || availableFilters.year?.max
+                filterStore.activeFilters.max_year || filterStore.availableFilters.year?.max
               }}
             </v-chip>
 
             <v-progress-circular
-                v-if="isLoadingFilters"
+                v-if="filterStore.filtersLoading"
                 size="16"
                 width="2"
                 indeterminate
@@ -46,7 +46,7 @@
               color="primary"
               density="comfortable"
               @click="clearAllFilters"
-              :disabled="isLoadingFilters"
+              :disabled="filterStore.filtersLoading"
           >
             Clear All
           </v-btn>
@@ -57,41 +57,31 @@
 </template>
 
 <script setup>
-defineProps({
-  hasActiveFilters: {
-    type: Boolean,
-    required: true
-  },
-  isLoading: {
-    type: Boolean,
-    required: true
-  },
-  isLoadingFilters: {
-    type: Boolean,
-    required: true
-  },
-  activeFilters: {
-    type: Object,
-    required: true
-  },
-  availableFilters: {
+import {inject} from 'vue';
+
+const props = defineProps({
+  filterStore: {
     type: Object,
     required: true
   }
 });
 
-const emit = defineEmits(['clear-all-filters', 'clear-gender-filter', 'clear-year-filter']);
+const clearAllFiltersFromProvider = inject('clearAllFilters', null);
 
 const clearGenderFilter = () => {
-  emit('clear-gender-filter');
+  props.filterStore.clearGenderFilter();
 };
 
 const clearYearFilter = () => {
-  emit('clear-year-filter');
+  props.filterStore.clearYearFilter();
 };
 
 const clearAllFilters = () => {
-  emit('clear-all-filters');
+  if (clearAllFiltersFromProvider) {
+    clearAllFiltersFromProvider();
+  } else {
+    props.filterStore.clearAllFilters();
+  }
 };
 </script>
 

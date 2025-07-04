@@ -5,7 +5,10 @@ import {useUserPreferencesStore} from '@/stores/userPreferences'
 import {
     createInitialFiltersState,
     createFiltersGetters,
-    createFiltersActions
+    createFiltersActions,
+    createPaginationState,
+    createPaginationActions,
+    createPaginationGetters
 } from './composables';
 
 /**
@@ -15,9 +18,6 @@ import {
 function createInitialCatalogState() {
     return {
         products: [],
-        currentPage: 1,
-        totalPages: 0,
-        totalItems: 0,
         currentOrdering: '-id',
         loading: false,
         error: null,
@@ -26,7 +26,8 @@ function createInitialCatalogState() {
         productLoading: false,
         productError: null,
 
-        ...createInitialFiltersState()
+        ...createInitialFiltersState(),
+        ...createPaginationState()
     };
 }
 
@@ -35,6 +36,7 @@ export const useCatalogStore = defineStore('catalog', {
 
     getters: {
         ...createFiltersGetters(),
+        ...createPaginationGetters(),
 
         getProductIdBySlug: (state) => (slug) => {
             if (!slug) return null;
@@ -78,13 +80,16 @@ export const useCatalogStore = defineStore('catalog', {
                 );
 
                 this.products = response.products;
-                this.totalPages = response.total_pages;
-                this.totalItems = response.total_items;
-                this.currentPage = page;
+                this.setPaginationData({
+                    currentPage: page,
+                    totalPages: response.total_pages,
+                    totalItems: response.total_items
+                });
                 this.currentOrdering = effectiveOrdering;
             } catch (err) {
                 this.error = err.response?.data || {message: 'Error loading products'};
                 this.products = [];
+                this.resetPagination();
             } finally {
                 this.loading = false;
             }
@@ -167,6 +172,7 @@ export const useCatalogStore = defineStore('catalog', {
         },
 
         ...createFiltersActions(),
+        ...createPaginationActions(),
 
         setOrdering(ordering) {
             if (ordering !== this.currentOrdering) {

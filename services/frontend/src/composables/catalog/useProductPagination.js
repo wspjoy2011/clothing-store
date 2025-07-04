@@ -1,25 +1,35 @@
-import {computed, watch} from 'vue';
+import {computed, watch, provide} from 'vue';
 import {useRouter} from 'vue-router';
-import {useCatalogStore} from '@/stores/catalog';
 import {useUserPreferencesStore} from '@/stores/userPreferences';
 
-
-export function useProductPagination(createQueryFromFilters, route) {
+/**
+ * Universal product pagination composable
+ * @param {Object} store - Store instance (catalogStore or categoryStore)
+ * @param {Function} createQueryFromFilters - Function to create query from filters
+ * @param {Object} route - Vue route object
+ * @param {Object} options - Configuration options
+ * @returns {Object} Pagination utilities
+ */
+export function useProductPagination(store, createQueryFromFilters, route, options = {}) {
     const router = useRouter();
-    const catalogStore = useCatalogStore();
     const preferencesStore = useUserPreferencesStore();
+
+    const {
+        routeName = 'catalog',
+        fetchMethod = 'fetchProducts'
+    } = options;
 
     const itemsPerPageOptions = [8, 12, 16, 20];
 
     const hasItems = computed(() =>
-        !catalogStore.loading &&
-        !catalogStore.error &&
-        catalogStore.totalPages > 0
+        !store.loading &&
+        !store.error &&
+        store.totalPages > 0
     );
 
     const ensureValidPage = (page) => {
-        if (catalogStore.totalPages > 0 && page > catalogStore.totalPages) {
-            return catalogStore.totalPages;
+        if (store.totalPages > 0 && page > store.totalPages) {
+            return store.totalPages;
         }
         return page;
     };
@@ -28,28 +38,33 @@ export function useProductPagination(createQueryFromFilters, route) {
         const validPage = ensureValidPage(page);
         const query = createQueryFromFilters();
 
+        const routeParams = routeName === 'category' ? {...route.params} : {};
+
         router.push({
-            name: 'catalog',
+            name: routeName,
+            ...(routeName === 'category' && {params: routeParams}),
             query: {
                 ...query,
                 page: validPage > 1 ? validPage : undefined
             }
         });
 
-        catalogStore.fetchProducts(validPage);
+        store[fetchMethod](validPage);
     };
 
     const handleItemsPerPageChange = (count) => {
         const query = createQueryFromFilters();
+        const routeParams = routeName === 'category' ? {...route.params} : {};
 
         preferencesStore.setItemsPerPage(count);
 
-        catalogStore.fetchProducts(1).then(() => {
-            if (catalogStore.currentPage > catalogStore.totalPages) {
-                const correctedPage = catalogStore.totalPages > 0 ? catalogStore.totalPages : 1;
+        store[fetchMethod](1).then(() => {
+            if (store.currentPage > store.totalPages) {
+                const correctedPage = store.totalPages > 0 ? store.totalPages : 1;
 
                 router.push({
-                    name: 'catalog',
+                    name: routeName,
+                    ...(routeName === 'category' && {params: routeParams}),
                     query: {
                         ...query,
                         page: correctedPage > 1 ? correctedPage : undefined,
@@ -58,11 +73,12 @@ export function useProductPagination(createQueryFromFilters, route) {
                 });
 
                 if (correctedPage !== 1) {
-                    catalogStore.fetchProducts(correctedPage);
+                    store[fetchMethod](correctedPage);
                 }
             } else {
                 router.push({
-                    name: 'catalog',
+                    name: routeName,
+                    ...(routeName === 'category' && {params: routeParams}),
                     query: {
                         ...query,
                         page: undefined,
@@ -73,13 +89,29 @@ export function useProductPagination(createQueryFromFilters, route) {
         });
     };
 
+    const paginationData = computed(() => ({
+        currentPage: store.currentPage || 1,
+        totalPages: store.totalPages || 0,
+        totalItems: store.totalItems || 0,
+        hasItems: hasItems.value,
+        itemsPerPageOptions
+    }));
+
+    const paginationHandlers = computed(() => ({
+        handlePageChange,
+        handleItemsPerPageChange
+    }));
+
+    provide('paginationData', paginationData);
+    provide('paginationHandlers', paginationHandlers);
+
     watch(() => preferencesStore.itemsPerPage, () => {
-        if (catalogStore.totalItems > 0) {
-            const validPage = ensureValidPage(catalogStore.currentPage);
-            if (validPage !== catalogStore.currentPage) {
-                catalogStore.fetchProducts(validPage);
+        if (store.totalItems > 0) {
+            const validPage = ensureValidPage(store.currentPage);
+            if (validPage !== store.currentPage) {
+                store[fetchMethod](validPage);
             } else {
-                catalogStore.fetchProducts(catalogStore.currentPage);
+                store[fetchMethod](store.currentPage);
             }
         }
     });
@@ -89,6 +121,8 @@ export function useProductPagination(createQueryFromFilters, route) {
         hasItems,
         ensureValidPage,
         handlePageChange,
-        handleItemsPerPageChange
+        handleItemsPerPageChange,
+        paginationData,
+        paginationHandlers
     };
 }

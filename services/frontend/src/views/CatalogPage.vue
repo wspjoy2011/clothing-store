@@ -12,14 +12,15 @@
             @update:per-page="handleItemsPerPageChange"
         />
 
-        <active-filters-summary @clear-all-filters="clearAllFilters"/>
+        <active-filters
+            :filter-store="catalogStore"
+        />
 
         <catalog-grid :has-products="hasProducts"/>
 
         <catalog-footer
             :is-empty="isEmpty"
             :has-items="hasItems"
-            @update:page="handlePageChange"
         />
       </div>
     </div>
@@ -27,11 +28,12 @@
 </template>
 
 <script setup>
-import {onMounted, onUnmounted} from 'vue';
+import {onMounted, onUnmounted, provide} from 'vue';
 import {useRoute} from 'vue-router';
+import {useCatalogStore} from '@/stores/catalog';
 
 import {useProductPagination} from '@/composables/catalog/useProductPagination';
-import {useProductFiltering} from '@/composables/catalog/useProductFiltering';
+import {useFiltering} from '@/composables/catalog/useFiltering';
 import {useProductSearch} from '@/composables/catalog/useProductSearch';
 import {useProductSorting} from '@/composables/catalog/useProductSorting';
 import {useProductRouting} from '@/composables/catalog/useProductRouting';
@@ -39,27 +41,42 @@ import {useProductUI} from '@/composables/catalog/useProductUI';
 
 import CatalogHeader from '@/components/catalog/CatalogHeader.vue';
 import CatalogFilterPanel from '@/components/catalog/CatalogFilterPanel.vue';
-import ActiveFiltersSummary from '@/components/catalog/ActiveFiltersSummary.vue';
+import ActiveFilters from '@/components/catalog/ActiveFilters.vue';
 import CatalogGrid from '@/components/catalog/CatalogGrid.vue';
 import CatalogFooter from '@/components/catalog/CatalogFooter.vue';
 
 const route = useRoute();
+const catalogStore = useCatalogStore();
 
-const {createQueryFromFilters, clearAllFilters} = useProductFiltering(route);
+const {createQueryFromFilters, clearAllFilters} = useFiltering(route, catalogStore, {
+  routeName: 'catalog'
+});
+
+provide('clearAllFilters', clearAllFilters);
+
 const {hasProducts, isEmpty} = useProductUI();
+
 const {
   itemsPerPageOptions,
   hasItems,
   ensureValidPage,
-  handlePageChange,
   handleItemsPerPageChange
-} = useProductPagination(createQueryFromFilters, route);
+} = useProductPagination(catalogStore, createQueryFromFilters, route, {
+  routeName: 'catalog',
+  fetchMethod: 'fetchProducts'
+});
+
 const {clearSearch} = useProductSearch(createQueryFromFilters, route);
 const {handleOrderingChange} = useProductSorting(createQueryFromFilters);
 const {initialize, cleanup} = useProductRouting(createQueryFromFilters, ensureValidPage);
 
-onMounted(initialize);
-onUnmounted(cleanup);
+onMounted(() => {
+  initialize();
+});
+
+onUnmounted(() => {
+  cleanup();
+});
 </script>
 
 <style scoped>

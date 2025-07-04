@@ -11,8 +11,8 @@
   <v-row justify="center" v-if="hasItems">
     <v-col cols="12" class="px-0">
       <app-pagination
-          :current-page="currentPageValue"
-          :total-pages="totalPagesValue"
+          :current-page="currentPage"
+          :total-pages="totalPages"
           @update:page="handlePageChange"
       />
     </v-col>
@@ -20,12 +20,9 @@
 </template>
 
 <script setup>
-import {computed} from 'vue';
-import {useCatalogStore} from '@/stores/catalog';
+import {computed, inject} from 'vue';
 import AppPagination from '@/components/ui/pagination/AppPagination.vue';
 import NoItemsFound from '@/components/ui/empty-states/NoItemsFound.vue';
-
-const catalogStore = useCatalogStore();
 
 const props = defineProps({
   isEmpty: {
@@ -35,28 +32,25 @@ const props = defineProps({
   hasItems: {
     type: Boolean,
     required: true
-  },
-  currentPage: {
-    type: Number,
-    default: null
-  },
-  totalPages: {
-    type: Number,
-    default: null
   }
 });
 
-const emit = defineEmits(['update:page']);
+const paginationData = inject('paginationData', null);
+const paginationHandlers = inject('paginationHandlers', null);
 
-const currentPageValue = computed(() => {
-  return props.currentPage !== null ? props.currentPage : catalogStore.currentPage;
+const currentPage = computed(() => {
+  return paginationData?.value?.currentPage || 1;
 });
 
-const totalPagesValue = computed(() => {
-  return props.totalPages !== null ? props.totalPages : catalogStore.totalPages;
+const totalPages = computed(() => {
+  return paginationData?.value?.totalPages || 0;
 });
 
 const handlePageChange = (page) => {
-  emit('update:page', page);
+  if (paginationHandlers?.value?.handlePageChange) {
+    paginationHandlers.value.handlePageChange(page);
+  } else {
+    console.error('No pagination handler found');
+  }
 };
 </script>

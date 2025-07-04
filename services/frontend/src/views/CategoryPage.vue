@@ -23,20 +23,13 @@
             :search-query="searchQuery"
             :has-products="hasProducts"
             :items-per-page-options="itemsPerPageOptions"
-            @clear-search="clearSearch"
-            @update:ordering="handleOrderingChange"
-            @update:per-page="handleItemsPerPageChange"
+            @clear-search="clearSearchHandler"
+            @update:ordering="handleOrderingChangeHandler"
+            @update:per-page="handleItemsPerPageChangeHandler"
         />
 
-        <category-active-filters
-            :has-active-filters="categoryStore.hasActiveFilters"
-            :is-loading="isLoading"
-            :is-loading-filters="isLoadingFilters"
-            :active-filters="activeFilters"
-            :available-filters="availableFilters"
-            @clear-all-filters="clearAllFilters"
-            @clear-gender-filter="activeFilters.gender = null"
-            @clear-year-filter="activeFilters.min_year = null; activeFilters.max_year = null"
+        <active-filters
+            :filter-store="categoryStore"
         />
 
         <category-grid
@@ -54,9 +47,6 @@
         <catalog-footer
             :is-empty="isEmpty"
             :has-items="hasItems"
-            :current-page="currentPage"
-            :total-pages="totalPages"
-            @update:page="handlePageChange"
         />
       </div>
     </div>
@@ -69,11 +59,12 @@ import {useRoute} from 'vue-router';
 import {useCategoryStore} from '@/stores/categoryStore';
 import {useCategoryProducts} from '@/composables/catalog/useCategoryProducts';
 import {useCategoryMeta} from '@/composables/catalog/useCategoryMeta';
+import {useFiltering} from '@/composables/catalog/useFiltering';
 
 import CategoryBreadcrumbs from '@/components/catalog/CategoryBreadcrumbs.vue';
 import CategoryHeader from '@/components/catalog/CategoryHeader.vue';
 import CategoryFilterPanel from '@/components/catalog/CategoryFilterPanel.vue';
-import CategoryActiveFilters from '@/components/catalog/CategoryActiveFilters.vue';
+import ActiveFilters from '@/components/catalog/ActiveFilters.vue';
 import CategoryGrid from '@/components/catalog/CategoryGrid.vue';
 import CatalogFooter from '@/components/catalog/CatalogFooter.vue';
 
@@ -110,17 +101,47 @@ const {
   handleItemsPerPageChange,
   handleOrderingChange,
   clearSearch,
-  clearAllFilters,
   initialize,
   cleanup,
-  disableFilterWatcher,
-  enableFilterWatcher,
+  fetchProducts
 } = useCategoryProducts(route);
+
+const {createQueryFromFilters, disableFilterWatcher, enableFilterWatcher} = useFiltering(route, categoryStore, {
+  routeName: 'category',
+  fetchProducts,
+  provideKey: 'categoryAvailableFilters'
+});
+
+const handlePageChangeHandler = handlePageChange(createQueryFromFilters);
+const handleItemsPerPageChangeHandler = handleItemsPerPageChange(createQueryFromFilters);
+const handleOrderingChangeHandler = handleOrderingChange(createQueryFromFilters);
+const clearSearchHandler = clearSearch(createQueryFromFilters);
+
+const paginationData = computed(() => ({
+  currentPage: currentPage.value,
+  totalPages: totalPages.value,
+  totalItems: totalItems.value,
+  hasItems: hasItems.value,
+  itemsPerPageOptions
+}));
+
+const paginationHandlers = computed(() => ({
+  handlePageChange: handlePageChangeHandler,
+  handleItemsPerPageChange: handleItemsPerPageChangeHandler
+}));
+
+const categoryPaginationHandlers = computed(() => ({
+  handlePageChange: handlePageChangeHandler,
+  handleItemsPerPageChange: handleItemsPerPageChangeHandler
+}));
+
+provide('paginationData', paginationData);
+provide('paginationHandlers', paginationHandlers);
+provide('categoryPaginationHandlers', categoryPaginationHandlers);
 
 provide('categoryAvailableFilters', availableFilters);
 provide('filtersError', filtersError);
 provide('hasActiveFilters', computed(() => categoryStore.hasActiveFilters));
-provide('clearAllFilters', clearAllFilters);
 
 watch(
     () => [route.params.masterCategory, route.params.subCategory, route.params.articleType],
