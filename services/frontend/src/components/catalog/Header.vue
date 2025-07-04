@@ -1,17 +1,24 @@
 <template>
-  <div class="category-header mb-6 text-center">
-    <h1 class="text-h4 font-weight-bold mb-3">
-      {{ title }}
-    </h1>
-    <div class="divider-container">
-      <div class="divider-line"></div>
+  <div class="header mb-6">
+    <!-- Title section -->
+    <div class="text-center">
+      <h1 class="text-h4 font-weight-bold mb-2">
+        {{ title }}
+      </h1>
+
+      <!-- Decorative divider for category pages -->
+      <div v-if="showDivider" class="divider-container">
+        <div class="divider-line"></div>
+      </div>
+
+      <!-- Description for category pages -->
+      <p v-if="description" class="text-subtitle-1 mt-4 mx-auto" style="max-width: 800px;">
+        {{ description }}
+      </p>
     </div>
-    <p class="text-subtitle-1 mt-4 mx-auto" v-if="description" style="max-width: 800px;">
-      {{ description }}
-    </p>
 
     <!-- Search results indicator -->
-    <div v-if="searchQuery && searchQuery.trim()" class="mt-6">
+    <div v-if="searchQuery && searchQuery.trim()" class="text-center" :class="showDivider ? 'mt-6' : 'mb-6'">
       <v-chip
           color="primary"
           variant="outlined"
@@ -25,7 +32,7 @@
     </div>
 
     <!-- Control panel -->
-    <v-row v-if="hasProducts" justify="center" align="center" class="mt-6 mb-3">
+    <v-row v-if="hasProducts" justify="center" align="center" :class="showDivider ? 'mt-6 mb-3' : 'mb-3'">
       <v-col cols="12" sm="6" md="4" lg="3">
         <product-sorting @update:ordering="handleOrderingChange"/>
       </v-col>
@@ -45,8 +52,13 @@
 <script setup>
 import ProductSorting from '@/components/ui/sorting/ProductSorting.vue';
 import ItemsPerPageSelect from '@/components/ui/pagination/ItemsPerPageSelect.vue';
+import {computed} from "vue";
 
-defineProps({
+const props = defineProps({
+  store: {
+    type: Object,
+    required: true
+  },
   title: {
     type: String,
     required: true
@@ -55,9 +67,9 @@ defineProps({
     type: String,
     default: null
   },
-  searchQuery: {
-    type: String,
-    default: null
+  showDivider: {
+    type: Boolean,
+    default: false
   },
   hasProducts: {
     type: Boolean,
@@ -75,6 +87,8 @@ const emit = defineEmits([
   'update:per-page'
 ]);
 
+const searchQuery = computed(() => props.store.searchQuery);
+
 const clearSearch = () => {
   emit('clear-search');
 };
@@ -89,7 +103,7 @@ const handleItemsPerPageChange = (perPage) => {
 </script>
 
 <style scoped>
-.category-header {
+.header {
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   padding-bottom: 16px;
 }

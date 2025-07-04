@@ -15,7 +15,7 @@
     <div v-else class="category-menu-container">
       <category-menu-item
         v-for="category in categoriesData"
-        :key="`category-${category.id}`"
+        :key="`${category.type}-${category.id}`"
         :item="category"
         @item-click="handleCategoryClick"
         class="menu-item-vertical"
@@ -75,7 +75,6 @@ const categoriesExist = computed(() => {
   return props.propHasCategories !== null ? props.propHasCategories : categoryStore.categories.length > 0;
 });
 
-// Methods
 const handleCategoryClick = (categoryInfo) => {
   console.log('Category clicked:', categoryInfo);
   categoryStore.navigateToCategory(categoryInfo);
@@ -94,7 +93,6 @@ const loadFromStore = async () => {
   }
 };
 
-// Lifecycle
 onMounted(() => {
   if (props.propCategories === null && !props.propHasCategories && !props.propLoading) {
     loadFromStore();

@@ -4,7 +4,9 @@
 
     <div class="main-content">
       <div class="container-custom mx-auto my-6">
-        <catalog-header
+        <header-component
+            :store="catalogStore"
+            title="Fashion & Accessories Catalog"
             :has-products="hasProducts"
             :items-per-page-options="itemsPerPageOptions"
             @clear-search="clearSearch"
@@ -42,7 +44,7 @@ import {useProductSorting} from '@/composables/catalog/useProductSorting';
 import {useProductRouting} from '@/composables/catalog/useProductRouting';
 import {useProductUI} from '@/composables/catalog/useProductUI';
 
-import CatalogHeader from '@/components/catalog/CatalogHeader.vue';
+import HeaderComponent from '@/components/catalog/Header.vue';
 import CatalogFilterPanel from '@/components/catalog/FilterPanel.vue';
 import ActiveFilters from '@/components/catalog/ActiveFilters.vue';
 import ProductGrid from '@/components/catalog/ProductGrid.vue';

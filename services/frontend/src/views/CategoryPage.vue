@@ -12,10 +12,11 @@
             :sub-category-slug="subCategorySlug"
         />
 
-        <category-header
+        <header-component
+            :store="categoryStore"
             :title="currentCategoryTitle"
             :description="currentCategoryDescription"
-            :search-query="searchQuery"
+            :show-divider="true"
             :has-products="hasProducts"
             :items-per-page-options="itemsPerPageOptions"
             @clear-search="clearSearchHandler"
@@ -54,7 +55,7 @@ import {useCategoryMeta} from '@/composables/catalog/useCategoryMeta';
 import {useFiltering} from '@/composables/catalog/useFiltering';
 
 import CategoryBreadcrumbs from '@/components/catalog/CategoryBreadcrumbs.vue';
-import CategoryHeader from '@/components/catalog/CategoryHeader.vue';
+import HeaderComponent from '@/components/catalog/Header.vue';
 import CatalogFilterPanel from '@/components/catalog/FilterPanel.vue';
 import ActiveFilters from '@/components/catalog/ActiveFilters.vue';
 import ProductGrid from '@/components/catalog/ProductGrid.vue';
@@ -80,7 +81,6 @@ const {
   isLoadingFilters,
   filtersError,
   activeFilters,
-  searchQuery,
   hasProducts,
   isEmpty,
   hasItems,
