@@ -1,7 +1,8 @@
 <template>
   <!-- Filter Drawer -->
   <v-navigation-drawer
-      v-model="catalogStore.isFilterDrawerOpen"
+      :model-value="isFilterDrawerOpen"
+      @update:model-value="toggleFilterDrawer"
       location="left"
       temporary
       width="320"
@@ -13,7 +14,7 @@
           icon="mdi-close"
           variant="text"
           size="small"
-          @click="catalogStore.toggleFilterDrawer(false)"
+          @click="toggleFilterDrawer(false)"
       />
     </div>
     <filter-sidebar/>
@@ -26,12 +27,12 @@
         variant="outlined"
         size="small"
         class="filter-btn"
-        @click="catalogStore.toggleFilterDrawer(true)"
+        @click="toggleFilterDrawer(true)"
     >
       <v-badge
-          :content="catalogStore.activeFiltersCount"
-          :value="catalogStore.activeFiltersCount > 0"
-          :color="catalogStore.activeFiltersCount > 0 ? 'error' : 'primary'"
+          :content="activeFiltersCount"
+          :value="activeFiltersCount > 0"
+          :color="activeFiltersCount > 0 ? 'error' : 'primary'"
           location="top end"
       />
     </v-btn>
@@ -39,10 +40,8 @@
 </template>
 
 <script setup>
-import {useCatalogStore} from '@/stores/catalog';
+import {computed, inject} from 'vue';
 import FilterSidebar from '@/components/ui/filters/FilterSidebar.vue';
-
-const catalogStore = useCatalogStore();
 
 defineProps({
   hasProducts: {
@@ -50,6 +49,22 @@ defineProps({
     required: true
   }
 });
+
+const filterStore = inject('filterStore', null);
+
+const isFilterDrawerOpen = computed(() => {
+  return filterStore?.value?.isFilterDrawerOpen || false;
+});
+
+const activeFiltersCount = computed(() => {
+  return filterStore?.value?.activeFiltersCount || 0;
+});
+
+const toggleFilterDrawer = (isOpen) => {
+  if (filterStore?.value?.toggleFilterDrawer) {
+    filterStore.value.toggleFilterDrawer(isOpen);
+  }
+};
 </script>
 
 <style scoped>

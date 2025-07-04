@@ -1,11 +1,6 @@
 <template>
   <div class="catalog-layout">
-    <category-filter-panel
-        :has-products="hasProducts"
-        :is-filter-drawer-open="categoryStore.isFilterDrawerOpen"
-        :active-filters-count="categoryStore.activeFiltersCount"
-        @toggle-filter-drawer="categoryStore.toggleFilterDrawer"
-    />
+    <catalog-filter-panel :has-products="hasProducts"/>
 
     <div class="main-content">
       <div class="container-custom mx-auto my-6">
@@ -63,7 +58,7 @@ import {useFiltering} from '@/composables/catalog/useFiltering';
 
 import CategoryBreadcrumbs from '@/components/catalog/CategoryBreadcrumbs.vue';
 import CategoryHeader from '@/components/catalog/CategoryHeader.vue';
-import CategoryFilterPanel from '@/components/catalog/CategoryFilterPanel.vue';
+import CatalogFilterPanel from '@/components/catalog/CatalogFilterPanel.vue';
 import ActiveFilters from '@/components/catalog/ActiveFilters.vue';
 import CategoryGrid from '@/components/catalog/CategoryGrid.vue';
 import CatalogFooter from '@/components/catalog/CatalogFooter.vue';
@@ -142,6 +137,8 @@ provide('categoryPaginationHandlers', categoryPaginationHandlers);
 provide('categoryAvailableFilters', availableFilters);
 provide('filtersError', filtersError);
 provide('hasActiveFilters', computed(() => categoryStore.hasActiveFilters));
+
+provide('filterStore', computed(() => categoryStore));
 
 watch(
     () => [route.params.masterCategory, route.params.subCategory, route.params.articleType],

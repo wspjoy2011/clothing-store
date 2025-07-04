@@ -28,7 +28,7 @@
 </template>
 
 <script setup>
-import {onMounted, onUnmounted, provide} from 'vue';
+import {computed, onMounted, onUnmounted, provide} from 'vue';
 import {useRoute} from 'vue-router';
 import {useCatalogStore} from '@/stores/catalog';
 
@@ -53,6 +53,8 @@ const {createQueryFromFilters, clearAllFilters} = useFiltering(route, catalogSto
 });
 
 provide('clearAllFilters', clearAllFilters);
+
+provide('filterStore', computed(() => catalogStore));
 
 const {hasProducts, isEmpty} = useProductUI();
 
