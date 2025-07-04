@@ -81,6 +81,13 @@ export function createFiltersActions() {
         },
 
         /**
+         * Clear search - alias for clearSearchQuery for backward compatibility
+         */
+        clearSearch() {
+            this.clearSearchQuery();
+        },
+
+        /**
          * Toggle filter drawer
          * @param {boolean} isOpen - Drawer state
          */
@@ -114,7 +121,7 @@ export function createFiltersGetters() {
 
         hasAvailableFilters(state) {
             return state.availableFilters &&
-                   (state.availableFilters.gender || state.availableFilters.year);
+                (state.availableFilters.gender || state.availableFilters.year);
         }
     };
 }

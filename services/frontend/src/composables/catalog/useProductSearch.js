@@ -8,7 +8,7 @@ export function useProductSearch(createQueryFromFilters, route) {
   const catalogStore = useCatalogStore();
 
   const clearSearch = () => {
-    catalogStore.clearSearch();
+    catalogStore.clearSearchQuery();
 
     const query = {...route.query};
     delete query.q;
@@ -25,7 +25,7 @@ export function useProductSearch(createQueryFromFilters, route) {
   };
 
   watch(() => catalogStore.searchQuery, (newValue, oldValue) => {
-    if (newValue !== oldValue && !catalogStore.isUpdatingFilters) {
+    if (newValue !== oldValue) {
       const query = createQueryFromFilters();
 
       catalogStore.fetchFilters().then(() => {

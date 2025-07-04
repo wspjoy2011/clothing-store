@@ -101,10 +101,10 @@
 </template>
 
 <script setup>
-import {ref, nextTick, computed, watch, onMounted, onUnmounted} from 'vue';
+import {computed, nextTick, onMounted, onUnmounted, ref, watch} from 'vue';
 import {useTheme} from 'vuetify';
 import {useCatalogStore} from '@/stores/catalog';
-import {useRouter, useRoute} from 'vue-router';
+import {useRoute, useRouter} from 'vue-router';
 import {useDebounce} from '@/composables/useDebounce';
 import catalogService from '@/services/catalogService';
 
@@ -148,19 +148,17 @@ const updateSuggestionPosition = () => {
   };
 };
 
-watch(() => catalogStore.searchQuery, (newVal) => {
-  if (newVal !== searchQuery.value) {
-    searchQuery.value = newVal || '';
-  }
-}, {immediate: true});
-
 watch(isExpanded, (expanded) => {
   if (expanded) {
+    searchQuery.value = route.query.q || catalogStore.searchQuery || '';
+
     nextTick(() => {
+      searchInput.value?.focus();
       updateSuggestionPosition();
     });
   } else {
     suggestionPosition.value = null;
+    hideSuggestions();
   }
 });
 
@@ -196,9 +194,6 @@ const handleResize = () => {
 };
 
 onMounted(() => {
-  if (route.query.q) {
-    searchQuery.value = route.query.q;
-  }
   window.addEventListener('resize', handleResize);
   window.addEventListener('scroll', handleResize);
 });
@@ -263,13 +258,7 @@ const handleEscape = () => {
 const toggleSearch = () => {
   isExpanded.value = !isExpanded.value;
 
-  if (isExpanded.value) {
-    nextTick(() => {
-      searchInput.value?.focus();
-      updateSuggestionPosition();
-    });
-  } else {
-    hideSuggestions();
+  if (!isExpanded.value) {
     if (!searchQuery.value.trim()) {
       clearSearch();
     }
@@ -288,7 +277,7 @@ const clearSearch = () => {
     delete query.q;
     delete query.page;
 
-    catalogStore.clearSearch();
+    catalogStore.clearSearchQuery();
 
     router.push({
       name: 'catalog',
@@ -301,7 +290,7 @@ const clearSearch = () => {
       }, 300);
     });
   } else {
-    catalogStore.clearSearch();
+    catalogStore.clearSearchQuery();
   }
 
   searchInput.value?.focus();
