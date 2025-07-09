@@ -15,161 +15,24 @@
                 class="activate-card elevation-12"
                 :class="{ 'dark-theme': isDarkTheme }"
             >
-              <!-- Loading State -->
-              <div v-if="isLoading" class="activate-loading">
-                <div class="loading-content">
-                  <v-progress-circular
-                      indeterminate
-                      size="64"
-                      color="primary"
-                      class="mb-4"
-                  ></v-progress-circular>
-                  <h2 class="loading-title">Activating Account</h2>
-                  <p class="loading-subtitle">Please wait while we activate your account...</p>
-                </div>
-              </div>
+              <activation-status-card
+                  :is-loading="isLoading"
+                  :activation-success="activationSuccess"
+                  :has-error="hasError"
+                  :error-message="errorMessage"
+                  :error-details="getErrorDetails"
+              />
 
-              <!-- Success State -->
-              <div v-else-if="activationSuccess" class="activate-success">
-                <div class="success-content">
-                  <v-icon
-                      icon="mdi-check-circle"
-                      size="64"
-                      color="success"
-                      class="success-icon mb-4"
-                  ></v-icon>
-                  <h2 class="success-title">Account Activated!</h2>
-                  <p class="success-subtitle">
-                    Your account has been successfully activated.
-                    You can now sign in and start shopping.
-                  </p>
-
-                  <div class="success-actions">
-                    <v-btn
-                        color="primary"
-                        size="large"
-                        class="action-btn"
-                        @click="goToLogin"
-                    >
-                      <v-icon start icon="mdi-login"></v-icon>
-                      Sign In Now
-                    </v-btn>
-
-                    <v-btn
-                        variant="outlined"
-                        size="large"
-                        class="action-btn mt-3"
-                        @click="goToHome"
-                    >
-                      <v-icon start icon="mdi-home"></v-icon>
-                      Go to Homepage
-                    </v-btn>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Error State -->
-              <div v-else-if="hasError" class="activate-error">
-                <div class="error-content">
-                  <v-icon
-                      :icon="errorIcon"
-                      size="64"
-                      color="error"
-                      class="error-icon mb-4"
-                  ></v-icon>
-                  <h2 class="error-title">{{ errorTitle }}</h2>
-                  <p class="error-subtitle">{{ errorMessage }}</p>
-
-                  <div class="error-actions">
-                    <v-btn
-                        color="primary"
-                        size="large"
-                        class="action-btn"
-                        @click="retryActivation"
-                        v-if="canRetry"
-                    >
-                      <v-icon start icon="mdi-refresh"></v-icon>
-                      Try Again
-                    </v-btn>
-
-                    <!-- Show Resend Button if token expired (410) -->
-                    <v-btn
-                        color="warning"
-                        size="large"
-                        class="action-btn"
-                        :class="{ 'mt-3': canRetry }"
-                        @click="handleResendActivation"
-                        v-if="isTokenExpired"
-                    >
-                      <v-icon start icon="mdi-email-refresh"></v-icon>
-                      Resend Activation Email
-                    </v-btn>
-
-                    <!-- Show Register Button for other errors (404, etc.) -->
-                    <v-btn
-                        variant="outlined"
-                        size="large"
-                        class="action-btn"
-                        :class="{ 'mt-3': canRetry || isTokenExpired }"
-                        @click="goToRegister"
-                        v-if="shouldShowRegister && !isTokenExpired"
-                    >
-                      <v-icon start icon="mdi-account-plus"></v-icon>
-                      Register New Account
-                    </v-btn>
-
-                    <v-btn
-                        variant="outlined"
-                        size="large"
-                        class="action-btn"
-                        :class="{ 'mt-3': canRetry || shouldShowRegister || isTokenExpired }"
-                        @click="goToHome"
-                    >
-                      <v-icon start icon="mdi-home"></v-icon>
-                      Go to Homepage
-                    </v-btn>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Invalid Link State -->
-              <div v-else class="activate-invalid">
-                <div class="invalid-content">
-                  <v-icon
-                      icon="mdi-link-off"
-                      size="64"
-                      color="warning"
-                      class="invalid-icon mb-4"
-                  ></v-icon>
-                  <h2 class="invalid-title">Invalid Activation Link</h2>
-                  <p class="invalid-subtitle">
-                    The activation link is missing required parameters.
-                    Please check your email and click the activation link again.
-                  </p>
-
-                  <div class="invalid-actions">
-                    <v-btn
-                        color="primary"
-                        size="large"
-                        class="action-btn"
-                        @click="goToRegister"
-                    >
-                      <v-icon start icon="mdi-account-plus"></v-icon>
-                      Register Account
-                    </v-btn>
-
-                    <v-btn
-                        variant="outlined"
-                        size="large"
-                        class="action-btn mt-3"
-                        @click="goToHome"
-                    >
-                      <v-icon start icon="mdi-home"></v-icon>
-                      Go to Homepage
-                    </v-btn>
-                  </div>
-                </div>
-              </div>
+              <activation-actions
+                  :activation-success="activationSuccess"
+                  :has-error="hasError"
+                  :error-details="getErrorDetails"
+                  @go-login="goToLogin"
+                  @go-home="goToHome"
+                  @go-register="goToRegister"
+                  @retry="retryActivation"
+                  @resend="handleResendActivation"
+              />
             </v-card>
           </div>
         </v-col>
@@ -179,10 +42,9 @@
 </template>
 
 <script setup>
-import {computed, onMounted, ref, watch} from 'vue'
-import {useTheme} from 'vuetify'
-import {useAccountStore} from '@/stores/accounts'
-import {useNavigation} from '@/composables/accounts/useNavigation'
+import {useActivationPage} from '@/composables/accounts/useActivationPage';
+import ActivationStatusCard from '@/components/accounts/ActivationStatusCard.vue';
+import ActivationActions from '@/components/accounts/ActivationActions.vue';
 
 const props = defineProps({
   email: {
@@ -193,114 +55,21 @@ const props = defineProps({
     type: String,
     default: ''
   }
-})
-
-const theme = useTheme()
-const accountStore = useAccountStore()
+});
 
 const {
+  isDarkTheme,
+  isLoading,
+  activationSuccess,
+  hasError,
+  errorMessage,
+  getErrorDetails,
+  retryActivation,
+  handleResendActivation,
   goToLogin,
   goToRegister,
-  goToHome,
-  goToResendActivation
-} = useNavigation()
-
-const activationAttempted = ref(false)
-
-const isDarkTheme = computed(() => theme.global.current.value.dark)
-const isLoading = computed(() => accountStore.isActivating)
-const activationSuccess = computed(() => accountStore.activationSuccess)
-const hasError = computed(() => accountStore.hasActivationError)
-const errorMessage = computed(() => accountStore.activationErrorMessage)
-const isTokenExpired = computed(() => accountStore.isTokenExpired)
-
-const hasValidParams = computed(() => {
-  return props.email && props.token
-})
-
-const errorIcon = computed(() => {
-  const status = accountStore.activationError?.status
-  switch (status) {
-    case 410:
-      return 'mdi-clock-alert'
-    case 404:
-      return 'mdi-account-question'
-    case 400:
-      return 'mdi-shield-alert'
-    default:
-      return 'mdi-alert-circle'
-  }
-})
-
-const errorTitle = computed(() => {
-  const status = accountStore.activationError?.status
-  switch (status) {
-    case 410:
-      return 'Link Expired'
-    case 404:
-      return 'User Not Found'
-    case 400:
-      return 'Invalid Request'
-    default:
-      return 'Activation Failed'
-  }
-})
-
-const canRetry = computed(() => {
-  const status = accountStore.activationError?.status
-  return status === 500 && hasValidParams.value
-})
-
-const shouldShowRegister = computed(() => {
-  const status = accountStore.activationError?.status
-  return status === 404
-})
-
-const activateAccount = async () => {
-  if (!hasValidParams.value || activationAttempted.value) {
-    return
-  }
-
-  activationAttempted.value = true
-
-  const result = await accountStore.activate({
-    email: props.email,
-    token: props.token
-  })
-
-  if (result.success) {
-    console.log('Account activated successfully:', result.data)
-  } else {
-    console.error('Account activation failed:', result.error)
-  }
-}
-
-const retryActivation = async () => {
-  activationAttempted.value = false
-  accountStore.clearActivationState()
-  await activateAccount()
-}
-
-const handleResendActivation = () => {
-  goToResendActivation(props.email)
-}
-
-watch([() => props.email, () => props.token], ([newEmail, newToken]) => {
-  if (newEmail && newToken && !activationAttempted.value) {
-    accountStore.clearActivationState()
-    activateAccount()
-  }
-})
-
-onMounted(() => {
-  document.title = 'StyleShop - Activate Account'
-
-  accountStore.clearActivationState()
-
-  if (hasValidParams.value && !activationAttempted.value) {
-    activateAccount()
-  }
-})
+  goToHome
+} = useActivationPage(props);
 </script>
 
 <style scoped>
@@ -412,125 +181,14 @@ onMounted(() => {
   }
 }
 
-.activate-loading,
-.activate-success,
-.activate-error,
-.activate-invalid {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 400px;
-  padding: 40px 24px;
-}
-
-.loading-content,
-.success-content,
-.error-content,
-.invalid-content {
-  text-align: center;
-  max-width: 400px;
-}
-
-.loading-title,
-.success-title,
-.error-title,
-.invalid-title {
-  font-size: 1.75rem;
-  font-weight: 600;
-  margin: 0 0 16px;
-  color: inherit;
-}
-
-.loading-subtitle,
-.success-subtitle,
-.error-subtitle,
-.invalid-subtitle {
-  font-size: 1rem;
-  opacity: 0.8;
-  margin: 0 0 32px;
-  line-height: 1.5;
-}
-
-.success-icon {
-  animation: checkmark 0.6s ease-in-out;
-}
-
-.error-icon,
-.invalid-icon {
-  animation: shake 0.6s ease-in-out;
-}
-
-@keyframes checkmark {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes shake {
-  0%, 100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-5px);
-  }
-  75% {
-    transform: translateX(5px);
-  }
-}
-
-.success-actions,
-.error-actions,
-.invalid-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.action-btn {
-  border-radius: 12px;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0.025em;
-  transition: all 0.3s ease;
-}
-
-.action-btn:hover {
-  transform: translateY(-2px);
-}
-
 @media (max-width: 600px) {
   .activate-container {
     padding: 10px;
   }
 
-  .activate-loading,
-  .activate-success,
-  .activate-error,
-  .activate-invalid {
-    padding: 24px 16px;
-    min-height: 350px;
-  }
-
-  .loading-title,
-  .success-title,
-  .error-title,
-  .invalid-title {
-    font-size: 1.5rem;
-  }
-
-  .loading-subtitle,
-  .success-subtitle,
-  .error-subtitle,
-  .invalid-subtitle {
-    font-size: 0.9rem;
+  .activate-card {
+    margin: 1rem;
+    border-radius: 16px;
   }
 }
 
