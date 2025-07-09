@@ -154,76 +154,29 @@
 </template>
 
 <script setup>
-import {ref, computed, onMounted, onUnmounted} from 'vue'
-import {useRouter} from 'vue-router'
-import {useTheme} from 'vuetify'
-import {useAccountStore} from '@/stores/accounts'
-import {useNotifications} from '@/composables/accounts/useNotifications'
+import {useResendActivationPage} from '@/composables/accounts/useResendActivationPage';
 
 const props = defineProps({
   email: {
     type: String,
     default: ''
   }
-})
+});
 
-const router = useRouter()
-const theme = useTheme()
-const accountStore = useAccountStore()
-const {showSuccess, showError} = useNotifications()
-
-const email = ref(props.email)
-const formValid = ref(false)
-const resendForm = ref(null)
-
-const isDarkTheme = computed(() => theme.global.current.value.dark)
-const isResending = computed(() => accountStore.isResending)
-const hasResendError = computed(() => accountStore.hasResendError)
-const resendErrorMessage = computed(() => accountStore.resendErrorMessage)
-const resendSuccess = computed(() => accountStore.resendSuccess)
-
-const emailRules = [
-  v => !!v || 'Email is required',
-  v => /.+@.+\..+/.test(v) || 'Please enter a valid email address',
-]
-
-const handleResendActivation = async () => {
-  if (!formValid.value) return
-
-  try {
-    const result = await accountStore.resendActivation({email: email.value})
-
-    if (result.success) {
-      showSuccess(result.message || 'Activation email sent successfully!')
-    } else {
-      showError(result.message || 'Failed to send activation email')
-    }
-  } catch (error) {
-    console.error('Resend activation error:', error)
-    showError('An unexpected error occurred')
-  }
-}
-
-const resetForm = () => {
-  accountStore.clearResendState()
-  email.value = ''
-  if (resendForm.value) {
-    resendForm.value.resetValidation()
-  }
-}
-
-const goToRegister = () => {
-  router.push({name: 'register'})
-}
-
-onMounted(() => {
-  document.title = 'StyleShop - Resend Activation'
-  accountStore.clearResendState()
-})
-
-onUnmounted(() => {
-  accountStore.clearResendState()
-})
+const {
+  isDarkTheme,
+  email,
+  emailRules,
+  formValid,
+  resendForm,
+  isResending,
+  hasResendError,
+  resendErrorMessage,
+  resendSuccess,
+  handleResendActivation,
+  resetForm,
+  goToRegister
+} = useResendActivationPage(props);
 </script>
 
 <style scoped>
