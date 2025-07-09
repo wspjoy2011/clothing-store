@@ -14,19 +14,14 @@
                 class="logout-card elevation-12"
                 :class="{ 'dark-theme': isDarkTheme }"
             >
-              <div class="logout-header">
-                <v-icon
-                    :icon="getStatusIcon"
-                    :color="getStatusColor"
-                    size="64"
-                    class="logout-icon mb-4"
-                ></v-icon>
-                <h1 class="logout-title">{{ getStatusTitle }}</h1>
-                <p class="logout-subtitle">{{ getStatusSubtitle }}</p>
-              </div>
+              <logout-status-icon
+                  :is-loading="isLoading"
+                  :logout-success="logoutSuccess"
+                  :logout-error="logoutError"
+                  :is-dark-theme="isDarkTheme"
+              />
 
               <v-card-text class="logout-content">
-                <!-- Loading State -->
                 <div v-if="isLoading" class="loading-section">
                   <v-progress-circular
                       indeterminate
@@ -37,7 +32,6 @@
                   <p class="text-body-1">Signing you out...</p>
                 </div>
 
-                <!-- Success State -->
                 <div v-else-if="logoutSuccess" class="success-section">
                   <v-alert
                       type="success"
@@ -63,7 +57,6 @@
                   </p>
                 </div>
 
-                <!-- Error State -->
                 <div v-else-if="logoutError" class="error-section">
                   <v-alert
                       type="error"
@@ -80,34 +73,11 @@
                 </div>
               </v-card-text>
 
-              <v-card-actions class="logout-actions">
-                <div class="action-buttons">
-                  <v-btn
-                      color="primary"
-                      variant="elevated"
-                      block
-                      size="large"
-                      @click="goToHome"
-                      :disabled="isLoading"
-                  >
-                    <v-icon start icon="mdi-home"></v-icon>
-                    Go to Home
-                  </v-btn>
-
-                  <div class="secondary-actions mt-3">
-                    <v-btn
-                        variant="outlined"
-                        color="primary"
-                        block
-                        @click="goToLogin"
-                        :disabled="isLoading"
-                    >
-                      <v-icon start icon="mdi-login"></v-icon>
-                      Sign In Again
-                    </v-btn>
-                  </div>
-                </div>
-              </v-card-actions>
+              <logout-actions
+                  :is-loading="isLoading"
+                  @go-home="goToHome"
+                  @go-login="goToLogin"
+              />
             </v-card>
           </div>
         </v-col>
@@ -117,76 +87,19 @@
 </template>
 
 <script setup>
-import {computed, onMounted, ref} from 'vue'
-import {useTheme} from 'vuetify'
-import {useAccountStore} from '@/stores/accounts'
-import {useNavigation} from '@/composables/accounts/useNavigation'
+import {useLogoutPage} from '@/composables/accounts/useLogoutPage';
+import LogoutStatusIcon from '@/components/accounts/LogoutStatusIcon.vue';
+import LogoutActions from '@/components/accounts/LogoutActions.vue';
 
-const theme = useTheme()
-const accountStore = useAccountStore()
-const {goToHome, goToLogin} = useNavigation()
-
-const isDarkTheme = computed(() => theme.global.current.value.dark)
-
-const isLoading = ref(true)
-const logoutSuccess = ref(false)
-const logoutError = ref(null)
-const logoutWarning = ref(null)
-
-const getStatusIcon = computed(() => {
-  if (isLoading.value) return 'mdi-loading'
-  if (logoutSuccess.value) return 'mdi-check-circle'
-  if (logoutError.value) return 'mdi-alert-circle'
-  return 'mdi-logout'
-})
-
-const getStatusColor = computed(() => {
-  if (isLoading.value) return 'primary'
-  if (logoutSuccess.value) return 'success'
-  if (logoutError.value) return 'error'
-  return 'primary'
-})
-
-const getStatusTitle = computed(() => {
-  if (isLoading.value) return 'Signing Out'
-  if (logoutSuccess.value) return 'You have been successfully logged out'
-  if (logoutError.value) return 'Logout Error'
-  return 'Logout'
-})
-
-const getStatusSubtitle = computed(() => {
-  if (isLoading.value) return 'Please wait while we sign you out...'
-  if (logoutSuccess.value) return 'Your session has been safely terminated'
-  if (logoutError.value) return 'There was an issue, but you are logged out locally'
-  return 'Logout process'
-})
-
-onMounted(async () => {
-  try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    const result = await accountStore.logout()
-
-    if (result.success) {
-      logoutSuccess.value = true
-
-      if (result.warning) {
-        logoutWarning.value = result.warning
-      }
-
-      console.log('User logged out successfully')
-    } else {
-      logoutError.value = result.message || 'Failed to logout'
-    }
-  } catch (error) {
-    console.error('Logout error:', error)
-    logoutError.value = 'Network error occurred during logout'
-
-    accountStore.clearLocalState()
-  } finally {
-    isLoading.value = false
-  }
-})
+const {
+  isDarkTheme,
+  isLoading,
+  logoutSuccess,
+  logoutError,
+  logoutWarning,
+  goToHome,
+  goToLogin
+} = useLogoutPage();
 </script>
 
 <style scoped>
@@ -287,32 +200,6 @@ onMounted(async () => {
   }
 }
 
-.logout-header {
-  text-align: center;
-  padding: 2rem 2rem 1rem;
-}
-
-.logout-title {
-  font-size: 1.75rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: rgba(0, 0, 0, 0.87);
-}
-
-.dark-theme .logout-title {
-  color: rgba(255, 255, 255, 0.87);
-}
-
-.logout-subtitle {
-  color: rgba(0, 0, 0, 0.6);
-  font-size: 1rem;
-  margin: 0;
-}
-
-.dark-theme .logout-subtitle {
-  color: rgba(255, 255, 255, 0.6);
-}
-
 .logout-content {
   padding: 1rem 2rem;
 }
@@ -323,21 +210,12 @@ onMounted(async () => {
   text-align: center;
 }
 
-.logout-actions {
-  padding: 1rem 2rem 2rem;
+:deep(.dark-theme .logout-title) {
+  color: rgba(255, 255, 255, 0.87);
 }
 
-.action-buttons {
-  width: 100%;
-}
-
-.secondary-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.secondary-actions .v-btn {
-  flex: 1;
+:deep(.dark-theme .logout-subtitle) {
+  color: rgba(255, 255, 255, 0.6);
 }
 
 @media (max-width: 600px) {
@@ -346,25 +224,8 @@ onMounted(async () => {
     border-radius: 16px;
   }
 
-  .logout-header {
-    padding: 1.5rem 1.5rem 1rem;
-  }
-
   .logout-content {
     padding: 1rem 1.5rem;
-  }
-
-  .logout-actions {
-    padding: 1rem 1.5rem 1.5rem;
-  }
-
-  .secondary-actions {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .secondary-actions .v-btn {
-    flex: none;
   }
 }
 </style>
