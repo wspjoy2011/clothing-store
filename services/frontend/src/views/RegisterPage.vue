@@ -155,7 +155,7 @@
                         :rules="termsRules"
                         color="primary"
                         :disabled="isLoading || isSocialAuthLoading"
-                        :readonly="!legalStore.hasReadBothDocuments"
+                        :readonly="!canAcceptTerms"
                         validate-on="input lazy"
                         @click="handleCheckboxClick"
                     >
@@ -191,7 +191,7 @@
                       </template>
                     </v-checkbox>
 
-                    <div v-if="!legalStore.hasReadBothDocuments" class="terms-requirement-hint">
+                    <div v-if="!canAcceptTerms" class="terms-requirement-hint">
                       <v-chip size="small" color="warning" variant="tonal">
                         <v-icon start size="small">mdi-information</v-icon>
                         Please read and accept both documents first
@@ -308,27 +308,14 @@
 </template>
 
 <script setup>
-import {computed, onMounted, ref} from 'vue'
-import {useTheme} from 'vuetify'
-import {useRegistrationForm} from '@/composables/accounts/useRegistrationForm'
-import {useNotifications} from '@/composables/accounts/useNotifications'
-import {useNavigation} from '@/composables/accounts/useNavigation'
-import {useLegalStore} from '@/stores/legal'
-import TermsOfService from '@/components/modals/TermsOfService.vue'
-import PrivacyPolicy from '@/components/modals/PrivacyPolicy.vue'
-
-const theme = useTheme()
-const isDarkTheme = computed(() => theme.global.current.value.dark)
-const legalStore = useLegalStore()
-
-const facebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID || ''
-
-const isSocialAuthLoading = ref(false)
-const socialAuthType = ref('')
-const showSocialSuccessMessage = ref(false)
-const socialSuccessMessage = ref('')
+import {useRegisterPage} from '@/composables/accounts/useRegisterPage';
+import TermsOfService from '@/components/modals/TermsOfService.vue';
+import PrivacyPolicy from '@/components/modals/PrivacyPolicy.vue';
 
 const {
+  isDarkTheme,
+  facebookAppId,
+  legalStore,
   formRef,
   isFormValid,
   email,
@@ -344,8 +331,6 @@ const {
   passwordRules,
   confirmPasswordRules,
   termsRules,
-  resetForm,
-  handleRegister,
   emailTouched,
   passwordTouched,
   confirmPasswordTouched,
@@ -354,153 +339,31 @@ const {
   confirmPasswordError,
   emailErrorMessage,
   passwordErrorMessage,
-  confirmPasswordErrorMessage
-} = useRegistrationForm()
-
-const {
+  confirmPasswordErrorMessage,
+  canAcceptTerms,
+  isSocialAuthLoading,
+  socialAuthType,
+  showSocialSuccessMessage,
+  socialSuccessMessage,
   showSuccessMessage,
   showErrorMessage,
   errorMessage,
   successMessage,
-  showSuccess,
-  showError,
+  onRegister,
+  handleCheckboxClick,
+  hideSocialSuccess,
+  onGoogleRegister,
+  onFacebookSuccess,
+  onFacebookError,
   hideSuccess,
-  hideError
-} = useNotifications()
-
-const {
+  hideError,
   goToLogin,
-  handleGoogleAuth,
-  handleFacebookSuccess,
-  handleFacebookError,
-  HFaceBookLogin,
   openTerms,
   openPrivacy,
   handleTermsAccept,
   handlePrivacyAcknowledge,
-  goToHome
-} = useNavigation()
-
-const handleCheckboxClick = (event) => {
-  if (!legalStore.hasReadBothDocuments) {
-    event.preventDefault()
-    event.stopPropagation()
-
-    showError('Please read and accept both Terms of Service and Privacy Policy first')
-    return false
-  }
-}
-
-const hideSocialSuccess = () => {
-  showSocialSuccessMessage.value = false
-  socialSuccessMessage.value = ''
-  socialAuthType.value = ''
-}
-
-const onGoogleRegister = async () => {
-  isSocialAuthLoading.value = true
-  socialAuthType.value = 'google'
-
-  try {
-    const result = await handleGoogleAuth(false)
-
-    if (result && result.success) {
-      if (result.isNewUser) {
-        socialSuccessMessage.value = 'Welcome! Your Google account has been successfully registered.'
-      } else {
-        socialSuccessMessage.value = 'Welcome back! You have been signed in with your existing Google account.'
-      }
-
-      showSocialSuccessMessage.value = true
-
-      setTimeout(() => {
-        hideSocialSuccess()
-        goToHome()
-      }, 4000)
-
-    } else if (result && result.error) {
-      showError(result.message || 'Google registration failed. Please try again.')
-    } else {
-      showError('Google registration failed. Please try again.')
-    }
-
-  } catch (error) {
-    console.error('Google registration error:', error)
-    showError('An unexpected error occurred during Google registration.')
-  } finally {
-    isSocialAuthLoading.value = false
-    socialAuthType.value = ''
-  }
-}
-
-const onFacebookSuccess = async (response) => {
-  isSocialAuthLoading.value = true
-  socialAuthType.value = 'facebook'
-
-  try {
-    const result = await handleFacebookSuccess(response)
-
-    if (result && result.success) {
-      if (result.isNewUser) {
-        socialSuccessMessage.value = 'Welcome! Your Facebook account has been successfully registered.'
-      } else {
-        socialSuccessMessage.value = 'Welcome back! You have been signed in with your existing Facebook account.'
-      }
-
-      showSocialSuccessMessage.value = true
-
-      setTimeout(() => {
-        hideSocialSuccess()
-        goToHome()
-      }, 4000)
-
-    } else if (result && result.error) {
-      showError(result.message || 'Facebook registration failed. Please try again.')
-    } else {
-      showError('Facebook registration failed. Please try again.')
-    }
-
-  } catch (error) {
-    console.error('Facebook registration error:', error)
-    showError('An unexpected error occurred during Facebook registration.')
-  } finally {
-    isSocialAuthLoading.value = false
-    socialAuthType.value = ''
-  }
-}
-
-const onFacebookError = (error) => {
-  const result = handleFacebookError(error)
-
-  if (result && result.error) {
-    showError(result.message || 'Facebook registration failed. Please try again.')
-  } else {
-    showError('Facebook registration failed. Please try again.')
-  }
-}
-
-const onRegister = async () => {
-  const result = await handleRegister()
-
-  if (result && result.success) {
-    showSuccess('Account created successfully! Please check your email for verification.')
-    resetForm()
-
-    setTimeout(() => {
-      hideSuccess()
-      goToLogin()
-    }, 4000)
-
-  } else if (result && result.error) {
-    showError(result.error)
-  } else {
-    showError('Registration failed. Please try again.')
-  }
-}
-
-onMounted(() => {
-  document.title = 'StyleShop - Register'
-})
+  HFaceBookLogin
+} = useRegisterPage();
 </script>
 
 <style scoped>
