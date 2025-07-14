@@ -92,3 +92,28 @@ class InvalidRefreshTokenError(AccountServiceError):
 class TokenValidationError(AccountServiceError):
     """Raised when token validation fails"""
     pass
+
+
+class PasswordResetError(AccountServiceError):
+    """Base exception for password reset operations"""
+    pass
+
+
+class InvalidPasswordResetTokenError(PasswordResetError):
+    """Raised when password reset token is invalid or doesn't match the user"""
+    pass
+
+
+class ExpiredPasswordResetTokenError(PasswordResetError):
+    """Raised when password reset token has expired"""
+    pass
+
+
+class PasswordResetTokenNotFoundError(PasswordResetError):
+    """Raised when password reset token is not found"""
+    pass
+
+
+class PasswordResetEmailError(PasswordResetError):
+    """Raised when password reset email sending fails"""
+    pass

@@ -171,6 +171,20 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
 
         return result is not None
 
+    async def delete_password_reset_tokens_by_user_id(self, user_id: int) -> bool:
+        """Delete all password reset tokens for user"""
+        query = f"DELETE FROM {self.APP_NAME}_password_reset_tokens WHERE user_id = %s"
+        params = [user_id]
+
+        try:
+            result = await self._execute_custom_update_query(query, params, "Delete password reset tokens by user ID")
+            logger.info(f"Deleted password reset tokens for user {user_id}")
+            return result
+        except Exception as e:
+            if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
+                raise TokenDeletionError(f"Failed to delete password reset tokens for user ID: {user_id}", e)
+            raise TokenDeletionError(f"Unexpected error deleting password reset tokens for user ID: {user_id}", e)
+
     async def get_refresh_token_by_token(self, token: str) -> Optional[RefreshTokenDTO]:
         """Get refresh token by token string"""
         self._build_refresh_token_query()

@@ -4,6 +4,7 @@ import secrets
 import datetime as datetime_lib
 from datetime import datetime, timedelta
 
+from apps.accounts.dto.password_reset import PasswordResetConfirmDTO, PasswordResetRequestDTO
 from apps.accounts.dto.users import UserDTO, CreateUserDTO, UserLoginDTO, LoginResponseDTO
 from apps.accounts.dto.tokens import CreateTokenDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
@@ -25,7 +26,14 @@ from apps.accounts.services.exceptions import (
     InvalidCredentialsError,
     UserInactiveError,
     LoginError,
-    TokenGenerationError, InvalidRefreshTokenError, TokenValidationError
+    TokenGenerationError,
+    InvalidRefreshTokenError,
+    TokenValidationError,
+    PasswordResetError,
+    InvalidPasswordResetTokenError,
+    ExpiredPasswordResetTokenError,
+    PasswordResetTokenNotFoundError,
+    PasswordResetEmailError
 )
 from apps.accounts.repositories.exceptions import (
     UserCreationError as RepoUserCreationError,
@@ -404,6 +412,204 @@ class AccountService(AccountServiceInterface):
 
         logger.info(f"User retrieved successfully by refresh token for email: {user_email}")
         return user
+
+    async def request_password_reset(self, request_data: PasswordResetRequestDTO) -> bool:
+        """
+        Request password reset by email
+
+        Sends reset email if user exists (security - always returns True)
+
+        Args:
+            request_data: Password reset request data containing email
+
+        Returns:
+            True if process completed (always returns True for security)
+
+        Raises:
+            BaseEmailError: If email sending fails (only for existing users)
+        """
+        logger.info(f"Starting password reset request for email: {request_data.email}")
+
+        user = await self._user_repository.get_user_by_email(request_data.email)
+
+        if not user:
+            logger.info(
+                f"Password reset request for non-existent email: {request_data.email} (returning True for security)")
+            return True
+
+        if not user.is_active:
+            logger.info(f"Password reset request for inactive user: {request_data.email} (returning True for security)")
+            return True
+
+        try:
+            await self._token_repository.delete_password_reset_tokens_by_user_id(user.id)
+            logger.info(f"Deleted existing password reset tokens for user {user.id}")
+
+            reset_token = await self._create_password_reset_token(user.id)
+            logger.info(f"Password reset token created for user: {request_data.email}, user_id: {user.id}")
+
+            await self._send_password_reset_email(request_data.email, reset_token)
+            logger.info(f"Password reset email sent successfully to {request_data.email}")
+
+            return True
+
+        except TokenCreationError as e:
+            logger.error(f"Failed to create password reset token for user {user.id}: {e}")
+            return True
+        except BaseEmailError as e:
+            logger.error(f"Failed to send password reset email to {request_data.email}: {e}")
+            raise PasswordResetEmailError(
+                f"Failed to send password reset email to {request_data.email}",
+                original_error=e
+            )
+
+    @atomic(['_user_repository', '_token_repository'])
+    async def confirm_password_reset(self, confirm_data: PasswordResetConfirmDTO) -> bool:
+        """
+        Confirm password reset using token and new password
+
+        Args:
+            confirm_data: Password reset confirmation data containing token and new password
+
+        Returns:
+            True if password was reset successfully
+
+        Raises:
+            InvalidPasswordResetTokenError: If token is invalid
+            ExpiredPasswordResetTokenError: If token has expired
+            PasswordResetTokenNotFoundError: If token not found
+            UserPasswordError: If password processing fails
+        """
+        logger.info(f"Starting password reset confirmation for token: {confirm_data.token[:10]}...")
+
+        reset_token = await self._token_repository.get_password_reset_token_by_token(confirm_data.token)
+
+        if not reset_token:
+            logger.warning(f"Password reset token not found: {confirm_data.token[:10]}...")
+            raise PasswordResetTokenNotFoundError("Password reset token not found or has been used")
+
+        current_time = datetime.now(datetime_lib.UTC)
+        if reset_token.expires_at <= current_time:
+            logger.warning(f"Password reset token expired: {confirm_data.token[:10]}...")
+            try:
+                await self._token_repository.delete_password_reset_token(confirm_data.token)
+            except Exception as e:
+                logger.warning(f"Failed to delete expired password reset token: {e}")
+            raise ExpiredPasswordResetTokenError("Password reset token has expired")
+
+        user = await self._user_repository.get_user_by_id(reset_token.user_id)
+        if not user:
+            logger.error(f"User not found for password reset token: user_id={reset_token.user_id}")
+            raise InvalidPasswordResetTokenError("Invalid password reset token")
+
+        try:
+            hashed_password = self._password_manager.hash_password(confirm_data.new_password)
+            logger.debug(f"New password hashed successfully for user: {user.email}")
+        except (EmptyPasswordError, PasswordTooLongError, HashingError) as e:
+            logger.error(f"Password hashing failed for user {user.email}: {e}")
+            raise UserPasswordError(f"Password processing failed: {e}", e)
+
+        try:
+            success = await self._user_repository.update_user_password(user.id, hashed_password)
+            if not success:
+                logger.error(f"Failed to update password for user {user.id}")
+                raise PasswordResetError("Failed to update password")
+
+            logger.info(f"Password updated successfully for user {user.id}")
+        except UserUpdateError as e:
+            logger.error(f"Failed to update password for user {user.id}: {e}")
+            raise PasswordResetError(f"Failed to update password: {e}", e)
+
+        try:
+            await self._token_repository.delete_password_reset_token(confirm_data.token)
+            logger.info(f"Password reset token deleted for user {user.id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete password reset token for user {user.id}: {e}")
+
+        try:
+            await self._send_password_reset_complete_email(user.email)
+            logger.info(f"Password reset complete email sent to {user.email}")
+        except BaseEmailError as e:
+            logger.warning(f"Failed to send password reset complete email to {user.email}: {e}")
+
+        logger.info(f"Password reset completed successfully for user: {user.email}")
+        return True
+
+    async def _create_password_reset_token(self, user_id: int) -> str:
+        """
+        Create password reset token for user
+
+        Args:
+            user_id: ID of the user to create token for
+
+        Returns:
+            Generated password reset token string
+
+        Raises:
+            TokenCreationError: If token creation fails
+        """
+        token = secrets.token_urlsafe(32)
+
+        expires_at = datetime.now(datetime_lib.UTC) + timedelta(days=config.PASSWORD_TOKEN_VALID_DAYS)
+
+        token_data = CreateTokenDTO(
+            token=token,
+            expires_at=expires_at,
+            user_id=user_id
+        )
+
+        logger.debug(f"Creating password reset token for user {user_id}, expires at: {expires_at}")
+
+        try:
+            await self._token_repository.create_password_reset_token(token_data)
+            logger.debug(f"Password reset token created successfully for user {user_id}")
+            return token
+        except TokenRepositoryError as e:
+            logger.error(f"Failed to create password reset token for user {user_id}: {e}")
+            raise TokenCreationError(f"Failed to create password reset token for user {user_id}", e)
+
+    async def _send_password_reset_email(self, email: str, token: str) -> None:
+        """
+        Send password reset email to user
+
+        Args:
+            email: User's email address
+            token: Password reset token
+
+        Raises:
+            BaseEmailError: If email sending fails
+        """
+        reset_link = config.build_frontend_url('/accounts/reset-password', token=token)
+
+        logger.info(f"Sending password reset email to {email}")
+
+        try:
+            await self._email_sender.send_password_reset_email(email, reset_link)
+            logger.info(f"Password reset email sent successfully to {email}")
+        except BaseEmailError as e:
+            logger.error(f"Failed to send password reset email to {email}: {e}")
+            raise
+
+    async def _send_password_reset_complete_email(self, email: str) -> None:
+        """
+        Send password reset complete email to user
+
+        Args:
+            email: User's email address
+
+        Raises:
+            BaseEmailError: If email sending fails
+        """
+        login_link = config.build_frontend_url('/accounts/login')
+
+        logger.info(f"Sending password reset complete email to {email}")
+
+        try:
+            await self._email_sender.send_password_reset_complete_email(email, login_link)
+            logger.info(f"Password reset complete email sent successfully to {email}")
+        except BaseEmailError as e:
+            logger.error(f"Failed to send password reset complete email to {email}: {e}")
+            raise
 
     async def _store_refresh_token(self, user_id: int, refresh_token: str) -> None:
         """

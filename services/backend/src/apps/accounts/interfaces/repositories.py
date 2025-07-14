@@ -315,6 +315,11 @@ class TokenRepositoryInterface(ABC):
         pass
 
     @abstractmethod
+    async def delete_password_reset_tokens_by_user_id(self, user_id: int) -> bool:
+        """Delete all password reset tokens for user"""
+        pass
+
+    @abstractmethod
     async def get_refresh_token_by_token(self, token: str) -> Optional[RefreshTokenDTO]:
         """Get refresh token by token string"""
         pass

@@ -4,9 +4,12 @@ from dataclasses import asdict
 
 from fastapi import HTTPException
 
+from apps.accounts.dto.password_reset import PasswordResetRequestDTO, PasswordResetConfirmDTO
 from apps.accounts.dto.users import CreateUserDTO, UserLoginDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.interfaces.services import AccountServiceInterface
+from apps.accounts.schemas.password_reset import PasswordResetRequestSchema, PasswordResetRequestResponseSchema, \
+    PasswordResetConfirmSchema, PasswordResetConfirmResponseSchema
 from apps.accounts.schemas.user import (
     CreateUserSchema,
     CreateUserResponseSchema,
@@ -36,7 +39,12 @@ from apps.accounts.services.exceptions import (
     TokenGenerationError,
     LoginError,
     InvalidRefreshTokenError,
-    TokenValidationError
+    TokenValidationError,
+    PasswordResetEmailError,
+    InvalidPasswordResetTokenError,
+    ExpiredPasswordResetTokenError,
+    PasswordResetTokenNotFoundError,
+    PasswordResetError
 )
 
 
@@ -308,4 +316,98 @@ async def get_user_by_refresh_token_controller(
         return RefreshTokenResponseSchema(
             user=user_response,
             message="User retrieved successfully"
+        )
+
+async def request_password_reset_controller(
+        request_data: PasswordResetRequestSchema,
+        account_service: AccountServiceInterface,
+) -> PasswordResetRequestResponseSchema:
+    """
+    Controller for password reset request
+
+    Args:
+        request_data: Password reset request data from request
+        account_service: Account service for business logic
+
+    Returns:
+        PasswordResetRequestResponseSchema with success message and email
+
+    Raises:
+        HTTPException: 500 if email sending fails (only for existing users)
+    """
+    reset_request_dto = PasswordResetRequestDTO(
+        email=str(request_data.email)
+    )
+
+    try:
+        await account_service.request_password_reset(reset_request_dto)
+    except PasswordResetEmailError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error occurred during password reset request"
+        )
+    else:
+        return PasswordResetRequestResponseSchema(
+            message="Password reset request processed successfully",
+            email=str(request_data.email)
+        )
+
+
+async def confirm_password_reset_controller(
+        confirm_data: PasswordResetConfirmSchema,
+        account_service: AccountServiceInterface,
+) -> PasswordResetConfirmResponseSchema:
+    """
+    Controller for password reset confirmation
+
+    Args:
+        confirm_data: Password reset confirmation data from request
+        account_service: Account service for business logic
+
+    Returns:
+        PasswordResetConfirmResponseSchema with success message
+
+    Raises:
+        HTTPException: 400 for invalid/expired tokens, 404 for token not found, 500 for server errors
+    """
+    reset_confirm_dto = PasswordResetConfirmDTO(
+        token=confirm_data.token,
+        new_password=confirm_data.new_password
+    )
+
+    try:
+        await account_service.confirm_password_reset(reset_confirm_dto)
+    except InvalidPasswordResetTokenError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except ExpiredPasswordResetTokenError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except PasswordResetTokenNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+    except PasswordResetError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error occurred during password reset confirmation"
+        )
+    else:
+        return PasswordResetConfirmResponseSchema(
+            message="Password reset completed successfully"
         )

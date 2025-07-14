@@ -63,6 +63,7 @@ class AppConfig(BaseSettings):
 
     # Token settings
     ACTIVATION_TOKEN_VALID_DAYS: int = 7
+    PASSWORD_TOKEN_VALID_DAYS: int = 7
 
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env"),

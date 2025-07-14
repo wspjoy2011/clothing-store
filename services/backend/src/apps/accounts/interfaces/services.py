@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 
+from apps.accounts.dto.password_reset import PasswordResetRequestDTO, PasswordResetConfirmDTO
 from apps.accounts.dto.users import UserDTO, CreateUserDTO, UserLoginDTO, LoginResponseDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 
@@ -115,5 +116,42 @@ class AccountServiceInterface(ABC):
             InvalidRefreshTokenError: If refresh token is invalid or expired
             UserNotFoundError: If user associated with token is not found
             TokenValidationError: If token validation fails
+        """
+        pass
+
+    @abstractmethod
+    async def request_password_reset(self, request_data: PasswordResetRequestDTO) -> bool:
+        """
+        Request password reset by email
+
+        Sends reset email if user exists (security - always returns True)
+
+        Args:
+            request_data: Password reset request data containing email
+
+        Returns:
+            True if process completed (always returns True for security)
+
+        Raises:
+            BaseEmailError: If email sending fails (only for existing users)
+        """
+        pass
+
+    @abstractmethod
+    async def confirm_password_reset(self, confirm_data: PasswordResetConfirmDTO) -> bool:
+        """
+        Confirm password reset using token and new password
+
+        Args:
+            confirm_data: Password reset confirmation data containing token and new password
+
+        Returns:
+            True if password was reset successfully
+
+        Raises:
+            InvalidPasswordResetTokenError: If token is invalid
+            ExpiredPasswordResetTokenError: If token has expired
+            PasswordResetTokenNotFoundError: If token not found
+            UserPasswordError: If password processing fails
         """
         pass

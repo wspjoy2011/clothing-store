@@ -8,7 +8,7 @@ from apps.accounts.controllers.accounts import (
     resend_activation_controller,
     login_user_controller,
     logout_user_controller,
-    get_user_by_refresh_token_controller
+    get_user_by_refresh_token_controller, request_password_reset_controller, confirm_password_reset_controller
 )
 from apps.accounts.dependencies import get_account_service
 from apps.accounts.interfaces.services import AccountServiceInterface
@@ -37,6 +37,11 @@ from apps.accounts.schemas.examples.errors import (
     REFRESH_TOKEN_EXPIRED_ERROR,
     TOKEN_VALIDATION_ERROR
 )
+from apps.accounts.schemas.examples.password_reset import PASSWORD_RESET_REQUEST_SUCCESS_RESPONSE, \
+    PASSWORD_RESET_REQUEST_VALIDATION_ERROR, PASSWORD_RESET_EMAIL_ERROR, PASSWORD_RESET_REQUEST_EXAMPLE, \
+    PASSWORD_RESET_CONFIRM_SUCCESS_RESPONSE, PASSWORD_RESET_INVALID_TOKEN_ERROR, PASSWORD_RESET_EXPIRED_TOKEN_ERROR, \
+    PASSWORD_RESET_TOKEN_NOT_FOUND_ERROR, PASSWORD_RESET_CONFIRM_VALIDATION_ERROR, \
+    PASSWORD_RESET_CONFIRM_WEAK_PASSWORD_ERROR, PASSWORD_RESET_SERVER_ERROR, PASSWORD_RESET_CONFIRM_EXAMPLE
 from apps.accounts.schemas.examples.user import (
     CREATE_USER_SUCCESS_RESPONSE,
     LOGIN_RESPONSE_EXAMPLE,
@@ -57,6 +62,8 @@ from apps.accounts.schemas.examples.activation import (
     RESEND_USER_NOT_FOUND_ERROR,
     RESEND_RATE_LIMIT_ERROR
 )
+from apps.accounts.schemas.password_reset import PasswordResetRequestResponseSchema, PasswordResetRequestSchema, \
+    PasswordResetConfirmResponseSchema, PasswordResetConfirmSchema
 from apps.accounts.schemas.user import (
     CreateUserSchema,
     CreateUserResponseSchema,
@@ -80,6 +87,8 @@ API_PATHS: dict[str, str] = {
     "logout": "/logout",
     "activate": "/activate",
     "resend_activation": "/resend-activation",
+    "password_reset_request": "/password-reset/request",
+    "password_reset_confirm": "/password-reset/confirm",
     "me": "/me",
 }
 
@@ -795,5 +804,244 @@ async def get_user_by_refresh_token_route(
     """
     return await get_user_by_refresh_token_controller(
         refresh_token=refresh_token,
+        account_service=account_service
+    )
+
+
+@router.post(
+    API_PATHS["password_reset_request"],
+    response_model=PasswordResetRequestResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Request password reset",
+    description=(
+            "<h3>This endpoint initiates a password reset process by sending a reset email to the user. "
+            "For security reasons, this endpoint always returns success regardless of whether the email exists. "
+            "If the email exists and the user is active, a password reset email will be sent with a unique token. "
+            "The token will be valid for a limited time and can only be used once.</h3>"
+    ),
+    responses={
+        200: {
+            "description": "Password reset request processed successfully",
+            "content": {
+                "application/json": {
+                    "example": PASSWORD_RESET_REQUEST_SUCCESS_RESPONSE
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_email": {
+                            "summary": "Invalid email format",
+                            "description": "Email address format validation failed",
+                            "value": EMAIL_VALIDATION_ERROR
+                        },
+                        "validation_error": {
+                            "summary": "General validation error",
+                            "description": "Request validation failed",
+                            "value": PASSWORD_RESET_REQUEST_VALIDATION_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "email_sending_error": {
+                            "summary": "Email sending failed",
+                            "description": "Failed to send password reset email",
+                            "value": PASSWORD_RESET_EMAIL_ERROR
+                        },
+                        "internal_server_error": {
+                            "summary": "General server error",
+                            "description": "Internal server error occurred during password reset request",
+                            "value": INTERNAL_SERVER_ERROR
+                        }
+                    }
+                }
+            }
+        }
+    },
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "password_reset_request": {
+                            "summary": "Password reset request",
+                            "description": "Example of password reset request with email only",
+                            "value": PASSWORD_RESET_REQUEST_EXAMPLE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def request_password_reset_route(
+        request_data: PasswordResetRequestSchema,
+        account_service: AccountServiceInterface = Depends(get_account_service)
+) -> PasswordResetRequestResponseSchema:
+    """
+    Request password reset by email
+
+    Args:
+        request_data: Password reset request data (email only)
+        account_service: Account service for business logic
+
+    Returns:
+        PasswordResetRequestResponseSchema: Success message with email confirmation
+
+    Raises:
+        HTTPException:
+            - 422 for validation errors
+            - 500 for email sending failures or internal server errors
+
+    Note:
+        This endpoint always returns success for security reasons,
+        regardless of whether the email exists in the system.
+    """
+    return await request_password_reset_controller(
+        request_data=request_data,
+        account_service=account_service
+    )
+
+
+@router.post(
+    API_PATHS["password_reset_confirm"],
+    response_model=PasswordResetConfirmResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Confirm password reset",
+    description=(
+            "<h3>This endpoint completes the password reset process using the token sent via email. "
+            "The token must be valid, not expired, and the new password must meet security requirements. "
+            "After successful reset, the user can login with the new password. "
+            "The reset token will be automatically deleted after use for security.</h3>"
+    ),
+    responses={
+        200: {
+            "description": "Password reset completed successfully",
+            "content": {
+                "application/json": {
+                    "example": PASSWORD_RESET_CONFIRM_SUCCESS_RESPONSE
+                }
+            }
+        },
+        400: {
+            "description": "Invalid or expired token",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_token": {
+                            "summary": "Invalid password reset token",
+                            "description": "Password reset token is invalid or doesn't match",
+                            "value": PASSWORD_RESET_INVALID_TOKEN_ERROR
+                        },
+                        "expired_token": {
+                            "summary": "Expired password reset token",
+                            "description": "Password reset token has expired and cannot be used",
+                            "value": PASSWORD_RESET_EXPIRED_TOKEN_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Token not found",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "token_not_found": {
+                            "summary": "Password reset token not found",
+                            "description": "Password reset token not found in database",
+                            "value": PASSWORD_RESET_TOKEN_NOT_FOUND_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "validation_error": {
+                            "summary": "General validation error",
+                            "description": "Request validation failed",
+                            "value": PASSWORD_RESET_CONFIRM_VALIDATION_ERROR
+                        },
+                        "weak_password": {
+                            "summary": "Weak password",
+                            "description": "New password doesn't meet security requirements",
+                            "value": PASSWORD_RESET_CONFIRM_WEAK_PASSWORD_ERROR
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "password_reset_error": {
+                            "summary": "Password reset processing error",
+                            "description": "Error occurred during password reset processing",
+                            "value": PASSWORD_RESET_SERVER_ERROR
+                        },
+                        "internal_server_error": {
+                            "summary": "General server error",
+                            "description": "Internal server error occurred during password reset confirmation",
+                            "value": INTERNAL_SERVER_ERROR
+                        }
+                    }
+                }
+            }
+        }
+    },
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "password_reset_confirm": {
+                            "summary": "Password reset confirmation",
+                            "description": "Example of password reset confirmation with token and new password",
+                            "value": PASSWORD_RESET_CONFIRM_EXAMPLE
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
+async def confirm_password_reset_route(
+        confirm_data: PasswordResetConfirmSchema,
+        account_service: AccountServiceInterface = Depends(get_account_service)
+) -> PasswordResetConfirmResponseSchema:
+    """
+    Confirm password reset with token and new password
+
+    Args:
+        confirm_data: Password reset confirmation data (token and new password)
+        account_service: Account service for business logic
+
+    Returns:
+        PasswordResetConfirmResponseSchema: Success message
+
+    Raises:
+        HTTPException:
+            - 400 for invalid/expired tokens
+            - 404 if token not found
+            - 422 for validation errors
+            - 500 for internal server errors
+    """
+    return await confirm_password_reset_controller(
+        confirm_data=confirm_data,
         account_service=account_service
     )
