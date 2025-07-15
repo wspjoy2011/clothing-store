@@ -559,10 +559,33 @@ export const useAccountStore = defineStore('accounts', {
                     data: response
                 };
             } catch (error) {
-                console.error('Password reset request error:', error);
                 return {
                     success: false,
                     message: error.response?.data?.detail || 'Failed to send password reset email',
+                    error: error.response?.data
+                };
+            }
+        },
+
+        /**
+         * Confirm password reset
+         * @param {Object} confirmData - Password reset confirmation data
+         * @param {string} confirmData.token - Password reset token
+         * @param {string} confirmData.new_password - New password
+         * @returns {Promise<Object>} - Result object with success status and message
+         */
+        async confirmPasswordReset(confirmData) {
+            try {
+                const response = await accountService.confirmPasswordReset(confirmData);
+                return {
+                    success: true,
+                    message: response.message || 'Password reset successful',
+                    data: response
+                };
+            } catch (error) {
+                return {
+                    success: false,
+                    message: error.response?.data?.detail || 'Failed to reset password',
                     error: error.response?.data
                 };
             }

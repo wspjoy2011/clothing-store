@@ -87,6 +87,18 @@ export default {
     async requestPasswordReset(resetData) {
         const response = await api.post(`${BASE_URL}/password-reset/request`, resetData);
         return response.data;
+    },
+
+    /**
+     * Confirm password reset
+     * @param {Object} confirmData - Password reset confirmation data
+     * @param {string} confirmData.token - Password reset token
+     * @param {string} confirmData.new_password - New password
+     * @returns {Promise<Object>} - Password reset confirmation response data
+     */
+    async confirmPasswordReset(confirmData) {
+        const response = await api.post(`${BASE_URL}/password-reset/confirm`, confirmData);
+        return response.data;
     }
 
 }

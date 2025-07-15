@@ -13,6 +13,7 @@ import LoginPage from '@/views/LoginPage.vue'
 import ActivatePage from '@/views/ActivatePage.vue'
 import ResendActivationPage from '@/views/ResendActivationPage.vue'
 import PasswordResetRequestPage from '@/views/PasswordResetRequestPage.vue'
+import PasswordResetConfirmPage from '@/views/PasswordResetConfirmPage.vue'
 import LogoutPage from '@/views/LogoutPage.vue'
 
 const processCatalogRouteProps = (route) => {
@@ -94,6 +95,12 @@ const processResendActivationRouteProps = (route) => {
 const processPasswordResetRequestRouteProps = (route) => {
     return {
         email: route.query.email || ''
+    }
+};
+
+const processPasswordResetConfirmRouteProps = (route) => {
+    return {
+        token: route.query.token || ''
     }
 };
 
@@ -203,6 +210,16 @@ const routes = [
         name: 'password-reset-request',
         component: PasswordResetRequestPage,
         props: processPasswordResetRequestRouteProps,
+        meta: {
+            title: 'StyleShop - Reset Password',
+            requiresGuest: true
+        }
+    },
+    {
+        path: '/accounts/reset-password/confirm',
+        name: 'password-reset-confirm',
+        component: PasswordResetConfirmPage,
+        props: processPasswordResetConfirmRouteProps,
         meta: {
             title: 'StyleShop - Reset Password',
             requiresGuest: true
