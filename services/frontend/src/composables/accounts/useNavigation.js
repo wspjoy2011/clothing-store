@@ -36,6 +36,14 @@ export function useNavigation() {
         })
     }
 
+    const goToPasswordReset = (email = null) => {
+        const query = email ? {email} : {}
+        router.push({
+            name: 'password-reset-request',
+            query
+        })
+    }
+
     const goToLogout = () => {
         router.push({name: 'logout'})
     }
@@ -72,9 +80,7 @@ export function useNavigation() {
                 throw new Error('No access_token received from Google')
             }
 
-            const authResult = await accountStore.authenticateWithGoogle(response.access_token)
-
-            return authResult
+            return await accountStore.authenticateWithGoogle(response.access_token)
 
         } catch (error) {
             let errorMessage = 'Unknown error occurred'
@@ -142,6 +148,7 @@ export function useNavigation() {
         goToRegister,
         goToActivation,
         goToResendActivation,
+        goToPasswordReset,
         goToLogout,
 
         // Authenticated user navigation

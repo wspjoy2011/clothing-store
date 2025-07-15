@@ -8,7 +8,7 @@ import {useLoginAuth} from './useLoginAuth';
 export function useLoginPage() {
   const theme = useTheme();
   const accountStore = useAccountStore();
-  const {goToRegister, goToActivation, goToHome} = useNavigation();
+  const {goToRegister, goToActivation, goToHome, goToPasswordReset} = useNavigation();
   const notifications = useNotifications();
   const loginAuth = useLoginAuth();
 
@@ -152,6 +152,10 @@ export function useLoginPage() {
     goToRegister();
   };
 
+  const handleForgotPassword = () => {
+    goToPasswordReset();
+  };
+
   const handleClearLoginError = () => {
     clearFormLoginError();
     hideError();
@@ -191,6 +195,7 @@ export function useLoginPage() {
     handleActivation,
     handleRegistration,
     handleRegisterClick,
+    handleForgotPassword,
     handleClearLoginError
   };
 }

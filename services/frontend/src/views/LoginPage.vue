@@ -56,6 +56,7 @@
                     @activate="handleActivation"
                     @register="handleRegistration"
                     @clear-login-error="handleClearLoginError"
+                    @forgot-password="handleForgotPassword"
                 />
               </v-card-text>
 
@@ -148,6 +149,7 @@ const {
   handleActivation,
   handleRegistration,
   handleRegisterClick,
+  handleForgotPassword,
   handleClearLoginError
 } = useLoginPage();
 </script>

@@ -51,6 +51,21 @@
       />
     </div>
 
+    <!-- Forgot Password Link -->
+    <div class="forgot-password-wrapper">
+      <v-btn
+          variant="text"
+          color="primary"
+          size="small"
+          class="forgot-password-link"
+          :disabled="isLoading || isSocialAuthLoading"
+          @click="$emit('forgot-password')"
+      >
+        <v-icon start size="small">mdi-help-circle-outline</v-icon>
+        Forgot Password?
+      </v-btn>
+    </div>
+
     <div class="form-field-wrapper">
       <v-btn
           type="submit"
@@ -117,7 +132,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['submit', 'activate', 'register', 'clear-login-error']);
+const emit = defineEmits(['submit', 'activate', 'register', 'clear-login-error', 'forgot-password']);
 
 const {
   formRef,
@@ -176,6 +191,19 @@ const handleClearLoginError = () => {
 <style scoped>
 .form-field-wrapper {
   margin-bottom: 16px;
+}
+
+.forgot-password-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.forgot-password-link {
+  text-transform: none;
+  font-weight: 500;
+  padding: 4px 8px;
+  min-width: auto;
 }
 
 .animated-field {

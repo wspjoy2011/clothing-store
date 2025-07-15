@@ -76,5 +76,17 @@ export default {
     async resendActivation(resendData) {
         const response = await api.post(`${BASE_URL}/resend-activation`, resendData);
         return response.data;
+    },
+
+    /**
+     * Request password reset
+     * @param {Object} resetData - Password reset request data
+     * @param {string} resetData.email - User email address
+     * @returns {Promise<Object>} - Password reset request response data
+     */
+    async requestPasswordReset(resetData) {
+        const response = await api.post(`${BASE_URL}/password-reset/request`, resetData);
+        return response.data;
     }
+
 }

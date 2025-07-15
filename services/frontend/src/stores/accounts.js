@@ -545,6 +545,30 @@ export const useAccountStore = defineStore('accounts', {
         },
 
         /**
+         * Request password reset
+         * @param {Object} resetData - Password reset request data
+         * @param {string} resetData.email - User email address
+         * @returns {Promise<Object>} - Result object with success status and message
+         */
+        async requestPasswordReset(resetData) {
+            try {
+                const response = await accountService.requestPasswordReset(resetData);
+                return {
+                    success: true,
+                    message: response.message || 'Password reset request sent successfully',
+                    data: response
+                };
+            } catch (error) {
+                console.error('Password reset request error:', error);
+                return {
+                    success: false,
+                    message: error.response?.data?.detail || 'Failed to send password reset email',
+                    error: error.response?.data
+                };
+            }
+        },
+
+        /**
          * Clear registration state
          */
         clearRegistrationState() {

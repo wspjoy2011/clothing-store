@@ -12,6 +12,7 @@ import RegisterPage from '@/views/RegisterPage.vue'
 import LoginPage from '@/views/LoginPage.vue'
 import ActivatePage from '@/views/ActivatePage.vue'
 import ResendActivationPage from '@/views/ResendActivationPage.vue'
+import PasswordResetRequestPage from '@/views/PasswordResetRequestPage.vue'
 import LogoutPage from '@/views/LogoutPage.vue'
 
 const processCatalogRouteProps = (route) => {
@@ -85,6 +86,12 @@ const processActivationRouteProps = (route) => {
 };
 
 const processResendActivationRouteProps = (route) => {
+    return {
+        email: route.query.email || ''
+    }
+};
+
+const processPasswordResetRequestRouteProps = (route) => {
     return {
         email: route.query.email || ''
     }
@@ -190,6 +197,16 @@ const routes = [
             title: 'StyleShop - Resend Activation',
             requiresGuest: true
         }
+    },
+    {
+        path: '/accounts/reset-password/request',
+        name: 'password-reset-request',
+        component: PasswordResetRequestPage,
+        props: processPasswordResetRequestRouteProps,
+        meta: {
+            title: 'StyleShop - Reset Password',
+            requiresGuest: true
+        }
     }
 ]
 
@@ -216,14 +233,14 @@ router.beforeEach(async (to, from, next) => {
         console.log('Access denied: authentication required');
         next({
             name: 'login',
-            query: { redirect: to.fullPath }
+            query: {redirect: to.fullPath}
         });
         return;
     }
 
     if (to.meta.requiresGuest && accountStore.isAuthenticated) {
         console.log('Access denied: already authenticated');
-        next({ name: 'home' });
+        next({name: 'home'});
         return;
     }
 

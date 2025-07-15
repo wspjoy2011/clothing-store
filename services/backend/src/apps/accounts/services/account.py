@@ -579,7 +579,7 @@ class AccountService(AccountServiceInterface):
         Raises:
             BaseEmailError: If email sending fails
         """
-        reset_link = config.build_frontend_url('/accounts/reset-password', token=token)
+        reset_link = config.build_frontend_url('/accounts/reset-password/confirm', token=token)
 
         logger.info(f"Sending password reset email to {email}")
 
