@@ -64,7 +64,7 @@ from security.exceptions import (
     TokenCreationError as SecurityTokenCreationError,
     TokenVerificationError,
     InvalidTokenError,
-    ExpiredTokenError
+    ExpiredTokenError, TokenSignatureError, InvalidTokenTypeError, EmptyTokenError
 )
 from notifications.email.interfaces import EmailSenderInterface
 from notifications.exceptions.email import BaseEmailError
@@ -636,6 +636,83 @@ class AccountService(AccountServiceInterface):
             logger.warning(f"Failed to send password change notification email to {user_email}: {e}")
 
         logger.info(f"Password change completed successfully for user: {user_email}")
+
+    async def refresh_access_token(self, refresh_token: str) -> str:
+        """
+        Refresh access token using refresh token
+
+        Args:
+            refresh_token: Valid refresh token
+
+        Returns:
+            New access token string
+
+        Raises:
+            InvalidRefreshTokenError: If refresh token is invalid, expired, or not found in database
+            UserNotFoundError: If user associated with token is not found
+            TokenValidationError: If token validation fails
+            TokenGenerationError: If new access token generation fails
+        """
+        logger.info("Starting access token refresh")
+
+        try:
+            payload = self._jwt_manager.verify_refresh_token(refresh_token)
+            user_id = payload.get("user_id")
+
+            if not user_id:
+                logger.warning("Refresh token payload missing user_id")
+                raise InvalidRefreshTokenError("Invalid refresh token payload")
+
+            logger.debug(f"Refresh token payload verified for user_id: {user_id}")
+        except (ExpiredTokenError, InvalidTokenError, TokenSignatureError,
+                InvalidTokenTypeError, EmptyTokenError) as e:
+            logger.warning(f"Refresh token verification failed: {e}")
+            raise InvalidRefreshTokenError(f"Invalid refresh token: {str(e)}", e)
+        except Exception as e:
+            logger.error(f"Unexpected error during refresh token verification: {e}")
+            raise TokenValidationError(f"Token validation failed: {str(e)}", e)
+
+        try:
+            stored_token = await self._token_repository.get_refresh_token_by_token(refresh_token)
+            if not stored_token:
+                logger.warning(f"Refresh token not found in database for user_id: {user_id}")
+                raise InvalidRefreshTokenError("Refresh token not found or expired")
+
+            logger.debug(f"Refresh token found in database for user_id: {user_id}")
+        except Exception as e:
+            logger.error(f"Error checking refresh token in database: {e}")
+            raise TokenValidationError(f"Failed to validate refresh token: {str(e)}", e)
+
+        try:
+            user = await self._user_repository.get_user_by_id(user_id)
+            if not user:
+                logger.warning(f"User not found for user_id: {user_id}")
+                raise UserNotFoundError(f"User with ID {user_id} not found")
+
+            logger.debug(f"User found for token refresh: {user.email}")
+        except Exception as e:
+            logger.error(f"Error getting user for token refresh: {e}")
+            raise UserNotFoundError(f"Failed to get user data: {str(e)}", e)
+
+        try:
+            token_payload = {
+                "user_id": user.id,
+                "email": user.email,
+                "group_id": user.group_id,
+                "group_name": user.group_name
+            }
+
+            new_access_token = self._jwt_manager.create_access_token(token_payload)
+            logger.info(f"New access token created for user: {user.email}")
+
+            return new_access_token
+
+        except SecurityTokenCreationError as e:
+            logger.error(f"Failed to create new access token for user {user.id}: {e}")
+            raise TokenGenerationError(f"Failed to generate new access token: {str(e)}", e)
+        except Exception as e:
+            logger.error(f"Unexpected error creating access token for user {user.id}: {e}")
+            raise TokenGenerationError(f"Token generation failed: {str(e)}", e)
 
     async def _send_password_change_notification_email(self, email: str) -> None:
         """

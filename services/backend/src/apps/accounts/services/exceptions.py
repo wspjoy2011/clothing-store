@@ -137,3 +137,13 @@ class IncorrectCurrentPasswordError(PasswordChangeError):
 class SamePasswordError(PasswordChangeError):
     """Raised when new password is the same as current password"""
     pass
+
+
+class TokenRefreshError(AccountServiceError):
+    """Base exception for token refresh operations"""
+    pass
+
+
+class RefreshTokenNotFoundError(TokenRefreshError):
+    """Raised when refresh token is not found in database"""
+    pass

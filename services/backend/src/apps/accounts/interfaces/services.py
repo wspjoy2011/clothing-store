@@ -176,3 +176,22 @@ class AccountServiceInterface(ABC):
             UserPasswordError: If password processing fails
         """
         pass
+
+    @abstractmethod
+    async def refresh_access_token(self, refresh_token: str) -> str:
+        """
+        Refresh access token using refresh token
+
+        Args:
+            refresh_token: Valid refresh token
+
+        Returns:
+            New access token string
+
+        Raises:
+            InvalidRefreshTokenError: If refresh token is invalid, expired, or not found in database
+            UserNotFoundError: If user associated with token is not found
+            TokenValidationError: If token validation fails
+            TokenGenerationError: If new access token generation fails
+        """
+        pass

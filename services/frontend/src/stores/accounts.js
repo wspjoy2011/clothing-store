@@ -181,12 +181,6 @@ export const useAccountStore = defineStore('accounts', {
     },
 
     actions: {
-        /**
-         * Set authentication tokens
-         * @param {Object} tokens - Token object
-         * @param {string} tokens.access_token - Access token
-         * @param {string} tokens.refresh_token - Refresh token
-         */
         setTokens(tokens) {
             if (tokens.access_token) {
                 this.accessToken = tokens.access_token;
@@ -197,30 +191,16 @@ export const useAccountStore = defineStore('accounts', {
             this.isAuthenticated = !!this.refreshToken;
         },
 
-        /**
-         * Set user data
-         * @param {Object} user - User object
-         * @param {string} user.email - User email
-         * @param {string} user.name - User name
-         * @param {number} user.id - User ID
-         * @param {string} user.group_name - User group
-         */
         setUser(user) {
             this.currentUser = user;
         },
 
-        /**
-         * Clear authentication tokens
-         */
         clearTokens() {
             this.accessToken = null;
             this.refreshToken = null;
             this.isAuthenticated = false;
         },
 
-        /**
-         * Clear user data
-         */
         clearUser() {
             this.currentUser = null;
         },
@@ -237,7 +217,6 @@ export const useAccountStore = defineStore('accounts', {
                     if (userResult.success) {
                         this.isAuthenticated = true;
                     } else {
-                        console.warn('Failed to load user with refresh token, clearing auth state');
                         this.clearLocalState();
                     }
                 } else {
@@ -247,17 +226,12 @@ export const useAccountStore = defineStore('accounts', {
                 }
 
             } catch (error) {
-                console.error('Error during auth initialization:', error);
                 this.clearLocalState();
             } finally {
                 this.isInitialized = true;
             }
         },
 
-        /**
-         * Load current user data by refresh token
-         * @returns {Promise<Object>} - Load user result
-         */
         async loadCurrentUser() {
             if (!this.refreshToken) {
                 return createErrorResult(
@@ -282,7 +256,6 @@ export const useAccountStore = defineStore('accounts', {
                 this.userError = createErrorObject(err, 'Failed to load user data');
 
                 if (err.status === 401) {
-                    console.warn('Refresh token expired or invalid, clearing auth state');
                     this.clearLocalState();
                 }
 
@@ -293,30 +266,14 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Authenticate with Google OAuth
-         * @param {string} accessToken - Google OAuth access token
-         * @returns {Promise<Object>} - Social authentication result
-         */
         async authenticateWithGoogle(accessToken) {
             return this.socialAuthenticate('google', accessToken);
         },
 
-        /**
-         * Authenticate with Facebook OAuth
-         * @param {string} accessToken - Facebook OAuth access token
-         * @returns {Promise<Object>} - Social authentication result
-         */
         async authenticateWithFacebook(accessToken) {
             return this.socialAuthenticate('facebook', accessToken);
         },
 
-        /**
-         * Authenticate with social OAuth provider
-         * @param {string} provider - OAuth provider name
-         * @param {string} accessToken - OAuth access token
-         * @returns {Promise<Object>} - Social authentication result
-         */
         async socialAuthenticate(provider, accessToken) {
             this.socialAuthLoading = true;
             this.socialAuthError = null;
@@ -367,13 +324,6 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Register a new user
-         * @param {Object} userData - User registration data
-         * @param {string} userData.email - User email
-         * @param {string} userData.password - User password
-         * @returns {Promise<Object>} - Registration result
-         */
         async register(userData) {
             this.registrationLoading = true;
             this.registrationError = null;
@@ -400,13 +350,6 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Login user
-         * @param {Object} loginData - User login data
-         * @param {string} loginData.email - User email
-         * @param {string} loginData.password - User password
-         * @returns {Promise<Object>} - Login result
-         */
         async login(loginData) {
             this.loginLoading = true;
             this.loginError = null;
@@ -440,10 +383,6 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Logout user
-         * @returns {Promise<Object>} - Logout result
-         */
         async logout() {
             this.logoutLoading = true;
             this.logoutError = null;
@@ -476,13 +415,6 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Activate user account
-         * @param {Object} activationData - Account activation data
-         * @param {string} activationData.email - User email
-         * @param {string} activationData.token - Activation token
-         * @returns {Promise<Object>} - Activation result
-         */
         async activate(activationData) {
             this.activationLoading = true;
             this.activationError = null;
@@ -513,12 +445,6 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Resend activation email
-         * @param {Object} resendData - Resend activation data
-         * @param {string} resendData.email - User email
-         * @returns {Promise<Object>} - Resend result
-         */
         async resendActivation(resendData) {
             this.resendLoading = true;
             this.resendError = null;
@@ -544,12 +470,6 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Request password reset
-         * @param {Object} resetData - Password reset request data
-         * @param {string} resetData.email - User email address
-         * @returns {Promise<Object>} - Result object with success status and message
-         */
         async requestPasswordReset(resetData) {
             try {
                 const response = await accountService.requestPasswordReset(resetData);
@@ -567,13 +487,6 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Confirm password reset
-         * @param {Object} confirmData - Password reset confirmation data
-         * @param {string} confirmData.token - Password reset token
-         * @param {string} confirmData.new_password - New password
-         * @returns {Promise<Object>} - Result object with success status and message
-         */
         async confirmPasswordReset(confirmData) {
             try {
                 const response = await accountService.confirmPasswordReset(confirmData);
@@ -591,11 +504,6 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-
-        /**
-         * Refresh access token using refresh token
-         * @returns {Promise<Object>} - Token refresh result
-         */
         async refreshTokens() {
             if (!this.refreshToken) {
                 return createErrorResult(
@@ -617,7 +525,6 @@ export const useAccountStore = defineStore('accounts', {
                 const errorObj = createErrorObject(err, 'Failed to refresh tokens');
 
                 if (err.status === 401) {
-                    console.warn('Refresh token expired, clearing auth state');
                     this.clearLocalState();
                 }
 
@@ -625,13 +532,6 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Execute API call with automatic token rotation on 401 error
-         * @param {Function} apiCall - Function that makes the API call
-         * @param {Object} options - Options object
-         * @param {boolean} options.requireAuth - Whether authentication is required
-         * @returns {Promise<Object>} - API call result
-         */
         async executeWithTokenRotation(apiCall, options = {requireAuth: true}) {
             if (options.requireAuth && !this.accessToken) {
                 throw new Error('Authentication required');
@@ -640,7 +540,9 @@ export const useAccountStore = defineStore('accounts', {
             try {
                 return await apiCall();
             } catch (error) {
-                if (error.response?.status === 401 && this.refreshToken) {
+                const statusCode = error.response?.status || error.status;
+
+                if (statusCode === 401 && this.refreshToken) {
                     try {
                         const refreshResult = await this.refreshTokens();
 
@@ -660,75 +562,47 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
-        /**
-         * Change user password with automatic token rotation
-         * @param {Object} passwordData - Password change data
-         * @param {string} passwordData.old_password - Current password
-         * @param {string} passwordData.new_password - New password
-         * @returns {Promise<Object>} - Password change result
-         */
         async changePassword(passwordData) {
             return await this.executeWithTokenRotation(
-                () => accountService.changePassword(this.accessToken, passwordData),
+                () => accountService.changePassword(passwordData),
                 {requireAuth: true}
             );
         },
 
-        /**
-         * Clear registration state
-         */
         clearRegistrationState() {
             this.registrationError = null;
             this.registrationSuccess = false;
             this.registrationLoading = false;
         },
 
-        /**
-         * Clear login state
-         */
         clearLoginState() {
             this.loginError = null;
             this.loginSuccess = false;
             this.loginLoading = false;
         },
 
-        /**
-         * Clear activation state
-         */
         clearActivationState() {
             this.activationError = null;
             this.activationSuccess = false;
             this.activationLoading = false;
         },
 
-        /**
-         * Clear resend state
-         */
         clearResendState() {
             this.resendError = null;
             this.resendSuccess = false;
             this.resendLoading = false;
         },
 
-        /**
-         * Clear logout state
-         */
         clearLogoutState() {
             this.logoutError = null;
             this.logoutLoading = false;
         },
 
-        /**
-         * Clear user data state
-         */
         clearUserState() {
             this.userError = null;
             this.userLoading = false;
         },
 
-        /**
-         * Clear social auth state
-         */
         clearSocialAuthState() {
             this.socialAuthError = null;
             this.socialAuthSuccess = false;
@@ -736,9 +610,6 @@ export const useAccountStore = defineStore('accounts', {
             this.socialAuthResult = null;
         },
 
-        /**
-         * Clear all account state
-         */
         resetState() {
             this.registrationLoading = false;
             this.registrationError = null;
@@ -764,10 +635,6 @@ export const useAccountStore = defineStore('accounts', {
             this.isAuthenticated = false;
         },
 
-        /**
-         * Clear local authentication state
-         * (used internally by logout and initializeAuth)
-         */
         clearLocalState() {
             this.clearTokens();
             this.clearUser();

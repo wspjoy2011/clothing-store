@@ -9,6 +9,52 @@ const api = axios.create({
     }
 });
 
+const getAccessToken = () => {
+    try {
+        const authTokens = localStorage.getItem('auth-tokens');
+        if (authTokens) {
+            const tokens = JSON.parse(authTokens);
+            return tokens.accessToken;
+        }
+        return null;
+    } catch (error) {
+        return null;
+    }
+};
+
+const getRefreshToken = () => {
+    try {
+        const authTokens = localStorage.getItem('auth-tokens');
+        if (authTokens) {
+            const tokens = JSON.parse(authTokens);
+            return tokens.refreshToken;
+        }
+        return null;
+    } catch (error) {
+        return null;
+    }
+};
+
+api.interceptors.request.use(
+    (config) => {
+        if (config.url && config.url.includes('/accounts/me')) {
+            const refreshToken = getRefreshToken();
+            if (refreshToken) {
+                config.headers.Authorization = `Bearer ${refreshToken}`;
+            }
+        } else {
+            const accessToken = getAccessToken();
+            if (accessToken) {
+                config.headers.Authorization = `Bearer ${accessToken}`;
+            }
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
 const handleApiError = (error) => {
     const {response} = error;
 
@@ -45,6 +91,13 @@ const handleApiError = (error) => {
         return Promise.reject({
             status: response.status,
             message: response.data.detail || response.data.message || 'Invalid request data'
+        });
+    }
+
+    if (response && response.status === 401) {
+        return Promise.reject({
+            status: response.status,
+            message: response.data.detail || response.data.message || 'Unauthorized'
         });
     }
 

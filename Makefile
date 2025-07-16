@@ -1,4 +1,3 @@
-
 ENV_FILE=services/backend/.env
 
 .PHONY: help up down build logs restart sync-products migrate-status migrate-up migrate-dry-run migrate-force rollback-last rollback-dry-run rollback-force rollback-to

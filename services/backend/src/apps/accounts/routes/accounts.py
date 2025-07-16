@@ -11,7 +11,7 @@ from apps.accounts.controllers.accounts import (
     get_user_by_refresh_token_controller,
     request_password_reset_controller,
     confirm_password_reset_controller,
-    change_password_controller
+    change_password_controller, refresh_access_token_controller
 )
 from apps.accounts.dependencies import get_account_service
 from apps.accounts.interfaces.services import AccountServiceInterface
@@ -40,6 +40,7 @@ from apps.accounts.schemas.examples.errors import (
     REFRESH_TOKEN_EXPIRED_ERROR,
     TOKEN_VALIDATION_ERROR
 )
+from apps.accounts.schemas.examples.jwt_token import REFRESH_TOKEN_RESPONSE_EXAMPLES, TOKEN_ERROR_EXAMPLES
 from apps.accounts.schemas.examples.password_reset import (
     PASSWORD_RESET_REQUEST_SUCCESS_RESPONSE,
     PASSWORD_RESET_REQUEST_VALIDATION_ERROR,
@@ -76,6 +77,7 @@ from apps.accounts.schemas.examples.activation import (
     RESEND_USER_NOT_FOUND_ERROR,
     RESEND_RATE_LIMIT_ERROR
 )
+from apps.accounts.schemas.jwt_token import RefreshTokenResponse, TokenErrorResponse, RefreshTokenRequest
 from apps.accounts.schemas.password_reset import (
     PasswordResetRequestResponseSchema,
     PasswordResetRequestSchema,
@@ -110,6 +112,7 @@ API_PATHS: dict[str, str] = {
     "password_reset_request": "/password-reset/request",
     "password_reset_confirm": "/password-reset/confirm",
     "password_change": "/password-change",
+    "refresh_token": "/refresh",
     "me": "/me",
 }
 
@@ -1170,34 +1173,129 @@ async def change_password_route(
         account_service: AccountServiceInterface = Depends(get_account_service)
 ) -> PasswordChangeResponseSchema:
     """
-    Change password for authenticated user
+    Change password for authenticated user.
 
     This endpoint allows authenticated users to change their password by providing
     their current password and the new password. The user must be authenticated
     with a valid access token.
 
-    **Request Body:**
-    - old_password: Current password of the user
-    - new_password: New password that meets security requirements
+    Args:
+        change_data: Password change data containing old and new passwords
+        access_token: JWT access token from Authorization header
+        account_service: Account service for business logic
 
-    **Authentication:**
-    - Requires valid Bearer token in Authorization header
+    Returns:
+        PasswordChangeResponseSchema with success message
 
-    **Security Requirements:**
-    - New password must be different from current password
-    - New password must meet strength requirements
-    - Current password must be correct
+    Raises:
+        HTTPException:
+            - 400: Password validation errors (same password, incorrect current password, weak password)
+            - 401: Invalid or expired access token
+            - 404: User not found
+            - 422: Request validation errors
+            - 500: Internal server error
 
-    **Response:**
-    - 200: Password changed successfully
-    - 400: Password validation errors (same password, incorrect current password, weak password)
-    - 401: Invalid or expired access token
-    - 404: User not found
-    - 422: Request validation errors
-    - 500: Internal server error
-
-    **Email Notification:**
-    - User will receive an email notification about the password change
-    - Email failure won't prevent password change but will be logged
+    Note:
+        User will receive an email notification about the password change.
+        Email failure won't prevent password change but will be logged.
     """
     return await change_password_controller(change_data, access_token, account_service)
+
+
+@router.post(
+    API_PATHS["refresh_token"],
+    response_model=RefreshTokenResponse,
+    status_code=200,
+    summary="Refresh access token",
+    description="Refresh access token using valid refresh token",
+    operation_id="refresh_access_token",
+    responses={
+        200: {
+            "description": "Token refreshed successfully",
+            "model": RefreshTokenResponse,
+            "content": {
+                "application/json": {
+                    "examples": REFRESH_TOKEN_RESPONSE_EXAMPLES
+                }
+            }
+        },
+        401: {
+            "description": "Invalid or expired refresh token",
+            "model": TokenErrorResponse,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_token": TOKEN_ERROR_EXAMPLES["invalid_refresh_token"],
+                        "expired_token": TOKEN_ERROR_EXAMPLES["invalid_refresh_token"],
+                        "empty_token": TOKEN_ERROR_EXAMPLES["empty_token"],
+                        "invalid_signature": TOKEN_ERROR_EXAMPLES["invalid_token_signature"],
+                        "wrong_type": TOKEN_ERROR_EXAMPLES["wrong_token_type"]
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "User not found",
+            "model": TokenErrorResponse,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "user_not_found": TOKEN_ERROR_EXAMPLES["user_not_found"],
+                        "token_not_found": TOKEN_ERROR_EXAMPLES["token_not_found"]
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Validation error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "validation_error": TOKEN_ERROR_EXAMPLES["validation_error"]
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "model": TokenErrorResponse,
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "token_generation_failed": TOKEN_ERROR_EXAMPLES["token_generation_failed"]
+                    }
+                }
+            }
+        }
+    },
+    tags=["Authentication"]
+)
+async def refresh_access_token_route(
+        token_data: RefreshTokenRequest,
+        account_service: AccountServiceInterface = Depends(get_account_service)
+) -> RefreshTokenResponse:
+    """
+    Refresh access token using valid refresh token.
+
+    This endpoint validates the refresh token and generates a new access token
+    if the token is valid and exists in the database.
+
+    Args:
+        token_data: Refresh token data from request body
+        account_service: Account service for business logic
+
+    Returns:
+        RefreshTokenResponse with new access token, token type, and expiration time
+
+    Raises:
+        HTTPException:
+            - 401: Invalid, expired, or revoked refresh token
+            - 404: User associated with token not found
+            - 422: Request validation errors
+            - 500: Server error during token generation
+
+    Note:
+        The refresh token must exist in the database and not be expired.
+        The new access token contains current user data and permissions.
+    """
+    return await refresh_access_token_controller(token_data, account_service)

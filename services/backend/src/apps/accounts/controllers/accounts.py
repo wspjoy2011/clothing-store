@@ -12,6 +12,7 @@ from apps.accounts.dto.password_reset import (
 from apps.accounts.dto.users import CreateUserDTO, UserLoginDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.interfaces.services import AccountServiceInterface
+from apps.accounts.schemas.jwt_token import RefreshTokenResponse, RefreshTokenRequest
 from apps.accounts.schemas.password_reset import (
     PasswordResetRequestSchema,
     PasswordResetRequestResponseSchema,
@@ -60,6 +61,7 @@ from apps.accounts.services.exceptions import (
     SamePasswordError,
     PasswordChangeError
 )
+from settings.config import config
 
 
 async def create_user_controller(
@@ -492,4 +494,56 @@ async def change_password_controller(
     else:
         return PasswordChangeResponseSchema(
             message="Password changed successfully"
+        )
+
+
+async def refresh_access_token_controller(
+        token_data: RefreshTokenRequest,
+        account_service: AccountServiceInterface,
+) -> RefreshTokenResponse:
+    """
+    Controller for refreshing access token using refresh token
+
+    Args:
+        token_data: Refresh token data from request
+        account_service: Account service for business logic
+
+    Returns:
+        RefreshTokenResponse with new access token
+
+    Raises:
+        HTTPException: 401 for invalid/expired tokens, 404 if user not found, 500 for server errors
+    """
+    try:
+        new_access_token = await account_service.refresh_access_token(token_data.refresh_token)
+    except InvalidRefreshTokenError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=str(e)
+        )
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+    except TokenValidationError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=str(e)
+        )
+    except TokenGenerationError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error occurred during token refresh"
+        )
+    else:
+        return RefreshTokenResponse(
+            access_token=new_access_token,
+            token_type="bearer",
+            expires_in=config.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )

@@ -43,15 +43,11 @@ export default {
 
     /**
      * Get current user by refresh token
-     * @param {string} refreshToken - User refresh token
+     * @param {string} refreshToken - User refresh token (not used here, handled by interceptor)
      * @returns {Promise<Object>} - User data response
      */
     async getCurrentUser(refreshToken) {
-        const response = await api.get(`${BASE_URL}/me`, {
-            headers: {
-                'Authorization': `Bearer ${refreshToken}`
-            }
-        });
+        const response = await api.get(`${BASE_URL}/me`);
         return response.data;
     },
 
@@ -103,18 +99,13 @@ export default {
 
     /**
      * Change user password
-     * @param {string} accessToken - User access token
      * @param {Object} passwordData - Password change data
      * @param {string} passwordData.old_password - Current password
      * @param {string} passwordData.new_password - New password
      * @returns {Promise<Object>} - Password change response data
      */
-    async changePassword(accessToken, passwordData) {
-        const response = await api.post(`${BASE_URL}/password-change`, passwordData, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
-        });
+    async changePassword(passwordData) {
+        const response = await api.post(`${BASE_URL}/password-change`, passwordData);
         return response.data;
     },
 
