@@ -57,3 +57,15 @@ class EmailSenderInterface(ABC):
             login_link (str): The login link to include in the email.
         """
         pass
+
+    @abstractmethod
+    async def send_password_change_notification_email(self, email: str, login_link: str, change_time: str) -> None:
+        """
+        Asynchronously send a notification email about password change.
+
+        Args:
+            email (str): The recipient's email address.
+            login_link (str): The login link to include in the email.
+            change_time (str): The time when the password was changed.
+        """
+        pass

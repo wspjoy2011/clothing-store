@@ -52,3 +52,17 @@ PASSWORD_RESET_TOKEN_NOT_FOUND_ERROR = {
 PASSWORD_RESET_SERVER_ERROR = {
     "detail": "Internal server error occurred during password reset"
 }
+
+PASSWORD_CHANGE_EXAMPLE = {
+    "old_password": "OldSecurePass123!",
+    "new_password": "NewSecurePass456!"
+}
+
+PASSWORD_CHANGE_SUCCESS_RESPONSE = {
+    "message": "Password changed successfully"
+}
+
+PASSWORD_CHANGE_SAME_PASSWORD_ERROR = {
+    "field": "new_password",
+    "message": "New password must be different from current password"
+}

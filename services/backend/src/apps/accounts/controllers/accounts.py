@@ -4,12 +4,22 @@ from dataclasses import asdict
 
 from fastapi import HTTPException
 
-from apps.accounts.dto.password_reset import PasswordResetRequestDTO, PasswordResetConfirmDTO
+from apps.accounts.dto.password_reset import (
+    PasswordResetRequestDTO,
+    PasswordResetConfirmDTO,
+    PasswordChangeDTO
+)
 from apps.accounts.dto.users import CreateUserDTO, UserLoginDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.interfaces.services import AccountServiceInterface
-from apps.accounts.schemas.password_reset import PasswordResetRequestSchema, PasswordResetRequestResponseSchema, \
-    PasswordResetConfirmSchema, PasswordResetConfirmResponseSchema
+from apps.accounts.schemas.password_reset import (
+    PasswordResetRequestSchema,
+    PasswordResetRequestResponseSchema,
+    PasswordResetConfirmSchema,
+    PasswordResetConfirmResponseSchema,
+    PasswordChangeResponseSchema,
+    PasswordChangeSchema
+)
 from apps.accounts.schemas.user import (
     CreateUserSchema,
     CreateUserResponseSchema,
@@ -44,7 +54,11 @@ from apps.accounts.services.exceptions import (
     InvalidPasswordResetTokenError,
     ExpiredPasswordResetTokenError,
     PasswordResetTokenNotFoundError,
-    PasswordResetError
+    PasswordResetError,
+    InvalidAccessTokenError,
+    IncorrectCurrentPasswordError,
+    SamePasswordError,
+    PasswordChangeError
 )
 
 
@@ -318,6 +332,7 @@ async def get_user_by_refresh_token_controller(
             message="User retrieved successfully"
         )
 
+
 async def request_password_reset_controller(
         request_data: PasswordResetRequestSchema,
         account_service: AccountServiceInterface,
@@ -410,4 +425,71 @@ async def confirm_password_reset_controller(
     else:
         return PasswordResetConfirmResponseSchema(
             message="Password reset completed successfully"
+        )
+
+
+async def change_password_controller(
+        change_data: PasswordChangeSchema,
+        access_token: str,
+        account_service: AccountServiceInterface,
+) -> PasswordChangeResponseSchema:
+    """
+    Controller for password change by authenticated user
+
+    Args:
+        change_data: Password change data from request
+        access_token: JWT access token from Authorization header
+        account_service: Account service for business logic
+
+    Returns:
+        PasswordChangeResponseSchema with success message
+
+    Raises:
+        HTTPException: 401 for invalid/expired tokens, 400 for password errors, 500 for server errors
+    """
+    change_dto = PasswordChangeDTO(
+        old_password=change_data.old_password,
+        new_password=change_data.new_password
+    )
+
+    try:
+        await account_service.change_password(access_token, change_dto)
+    except InvalidAccessTokenError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=str(e)
+        )
+    except UserNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+    except IncorrectCurrentPasswordError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except SamePasswordError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except UserPasswordError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except PasswordChangeError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error occurred during password change"
+        )
+    else:
+        return PasswordChangeResponseSchema(
+            message="Password changed successfully"
         )

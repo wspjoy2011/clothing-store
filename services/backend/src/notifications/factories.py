@@ -18,6 +18,7 @@ class EmailSenderFactory:
             activation_complete_template: str = "activation_complete.html",
             password_reset_template: str = "password_reset_request.html",
             password_reset_complete_template: str = "password_reset_complete.html",
+            password_change_notification_template: str = "password_change_notification.html",
     ) -> EmailSenderInterface:
         """
         Create a configured EmailSender instance.
@@ -29,6 +30,7 @@ class EmailSenderFactory:
             activation_complete_template: Name of activation complete email template
             password_reset_template: Name of password reset email template
             password_reset_complete_template: Name of password reset complete email template
+            password_change_notification_template: Name of password change notification email template
 
         Returns:
             EmailSenderInterface: Configured email sender instance
@@ -47,9 +49,11 @@ class EmailSenderFactory:
             use_ssl=email_config["use_ssl"],
             template_dir=template_dir,
             activation_email_template_name=activation_template,
+            resend_activation_email_template_name="resend_activation_request.html",
             activation_complete_email_template_name=activation_complete_template,
             password_email_template_name=password_reset_template,
             password_complete_email_template_name=password_reset_complete_template,
+            password_change_notification_template_name=password_change_notification_template,
             timeout=email_config.get("timeout", 30),
         )
 
@@ -97,8 +101,10 @@ class EmailSenderFactory:
             use_ssl=use_ssl,
             template_dir=template_dir,
             activation_email_template_name="activation_request.html",
+            resend_activation_email_template_name="resend_activation_request.html",
             activation_complete_email_template_name="activation_complete.html",
             password_email_template_name="password_reset_request.html",
             password_complete_email_template_name="password_reset_complete.html",
+            password_change_notification_template_name="password_change_notification.html",
             timeout=30,
         )

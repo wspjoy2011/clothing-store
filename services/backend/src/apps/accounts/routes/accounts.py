@@ -8,7 +8,10 @@ from apps.accounts.controllers.accounts import (
     resend_activation_controller,
     login_user_controller,
     logout_user_controller,
-    get_user_by_refresh_token_controller, request_password_reset_controller, confirm_password_reset_controller
+    get_user_by_refresh_token_controller,
+    request_password_reset_controller,
+    confirm_password_reset_controller,
+    change_password_controller
 )
 from apps.accounts.dependencies import get_account_service
 from apps.accounts.interfaces.services import AccountServiceInterface
@@ -37,11 +40,22 @@ from apps.accounts.schemas.examples.errors import (
     REFRESH_TOKEN_EXPIRED_ERROR,
     TOKEN_VALIDATION_ERROR
 )
-from apps.accounts.schemas.examples.password_reset import PASSWORD_RESET_REQUEST_SUCCESS_RESPONSE, \
-    PASSWORD_RESET_REQUEST_VALIDATION_ERROR, PASSWORD_RESET_EMAIL_ERROR, PASSWORD_RESET_REQUEST_EXAMPLE, \
-    PASSWORD_RESET_CONFIRM_SUCCESS_RESPONSE, PASSWORD_RESET_INVALID_TOKEN_ERROR, PASSWORD_RESET_EXPIRED_TOKEN_ERROR, \
-    PASSWORD_RESET_TOKEN_NOT_FOUND_ERROR, PASSWORD_RESET_CONFIRM_VALIDATION_ERROR, \
-    PASSWORD_RESET_CONFIRM_WEAK_PASSWORD_ERROR, PASSWORD_RESET_SERVER_ERROR, PASSWORD_RESET_CONFIRM_EXAMPLE
+from apps.accounts.schemas.examples.password_reset import (
+    PASSWORD_RESET_REQUEST_SUCCESS_RESPONSE,
+    PASSWORD_RESET_REQUEST_VALIDATION_ERROR,
+    PASSWORD_RESET_EMAIL_ERROR,
+    PASSWORD_RESET_REQUEST_EXAMPLE,
+    PASSWORD_RESET_CONFIRM_SUCCESS_RESPONSE,
+    PASSWORD_RESET_INVALID_TOKEN_ERROR,
+    PASSWORD_RESET_EXPIRED_TOKEN_ERROR,
+    PASSWORD_RESET_TOKEN_NOT_FOUND_ERROR,
+    PASSWORD_RESET_CONFIRM_VALIDATION_ERROR,
+    PASSWORD_RESET_CONFIRM_WEAK_PASSWORD_ERROR,
+    PASSWORD_RESET_SERVER_ERROR,
+    PASSWORD_RESET_CONFIRM_EXAMPLE,
+    PASSWORD_CHANGE_SUCCESS_RESPONSE,
+    PASSWORD_CHANGE_SAME_PASSWORD_ERROR
+)
 from apps.accounts.schemas.examples.user import (
     CREATE_USER_SUCCESS_RESPONSE,
     LOGIN_RESPONSE_EXAMPLE,
@@ -62,8 +76,14 @@ from apps.accounts.schemas.examples.activation import (
     RESEND_USER_NOT_FOUND_ERROR,
     RESEND_RATE_LIMIT_ERROR
 )
-from apps.accounts.schemas.password_reset import PasswordResetRequestResponseSchema, PasswordResetRequestSchema, \
-    PasswordResetConfirmResponseSchema, PasswordResetConfirmSchema
+from apps.accounts.schemas.password_reset import (
+    PasswordResetRequestResponseSchema,
+    PasswordResetRequestSchema,
+    PasswordResetConfirmResponseSchema,
+    PasswordResetConfirmSchema,
+    PasswordChangeResponseSchema,
+    PasswordChangeSchema
+)
 from apps.accounts.schemas.user import (
     CreateUserSchema,
     CreateUserResponseSchema,
@@ -89,6 +109,7 @@ API_PATHS: dict[str, str] = {
     "resend_activation": "/resend-activation",
     "password_reset_request": "/password-reset/request",
     "password_reset_confirm": "/password-reset/confirm",
+    "password_change": "/password-change",
     "me": "/me",
 }
 
@@ -1045,3 +1066,138 @@ async def confirm_password_reset_route(
         confirm_data=confirm_data,
         account_service=account_service
     )
+
+
+@router.post(
+    API_PATHS["password_change"],
+    response_model=PasswordChangeResponseSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Change password",
+    description="Change password for authenticated user using access token",
+    responses={
+        200: {
+            "description": "Password changed successfully",
+            "content": {
+                "application/json": {
+                    "example": PASSWORD_CHANGE_SUCCESS_RESPONSE
+                }
+            }
+        },
+        400: {
+            "description": "Password validation errors",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "same_password": {
+                            "summary": "Same password error",
+                            "value": PASSWORD_CHANGE_SAME_PASSWORD_ERROR
+                        },
+                        "incorrect_current_password": {
+                            "summary": "Incorrect current password",
+                            "value": {"detail": "Current password is incorrect"}
+                        },
+                        "weak_password": {
+                            "summary": "Weak password",
+                            "value": {"detail": "Password must be at least 8 characters long"}
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Invalid or expired access token",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid or expired access token"}
+                }
+            }
+        },
+        404: {
+            "description": "User not found",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "User not found"}
+                }
+            }
+        },
+        422: {
+            "description": "Validation error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "password_required": {
+                            "summary": "Password required",
+                            "value": {
+                                "detail": [
+                                    {
+                                        "type": "value_error",
+                                        "loc": ["body", "old_password"],
+                                        "msg": "Current password is required"
+                                    }
+                                ]
+                            }
+                        },
+                        "passwords_same": {
+                            "summary": "Passwords must be different",
+                            "value": {
+                                "detail": [
+                                    {
+                                        "type": "value_error",
+                                        "loc": ["body"],
+                                        "msg": "New password must be different from current password"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Internal server error occurred during password change"}
+                }
+            }
+        }
+    },
+    tags=["Authentication"]
+)
+async def change_password_route(
+        change_data: PasswordChangeSchema,
+        access_token: JWTTokenDependency,
+        account_service: AccountServiceInterface = Depends(get_account_service)
+) -> PasswordChangeResponseSchema:
+    """
+    Change password for authenticated user
+
+    This endpoint allows authenticated users to change their password by providing
+    their current password and the new password. The user must be authenticated
+    with a valid access token.
+
+    **Request Body:**
+    - old_password: Current password of the user
+    - new_password: New password that meets security requirements
+
+    **Authentication:**
+    - Requires valid Bearer token in Authorization header
+
+    **Security Requirements:**
+    - New password must be different from current password
+    - New password must meet strength requirements
+    - Current password must be correct
+
+    **Response:**
+    - 200: Password changed successfully
+    - 400: Password validation errors (same password, incorrect current password, weak password)
+    - 401: Invalid or expired access token
+    - 404: User not found
+    - 422: Request validation errors
+    - 500: Internal server error
+
+    **Email Notification:**
+    - User will receive an email notification about the password change
+    - Email failure won't prevent password change but will be logged
+    """
+    return await change_password_controller(change_data, access_token, account_service)

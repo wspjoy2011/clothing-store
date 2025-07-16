@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from apps.accounts.dto.password_reset import PasswordResetRequestDTO, PasswordResetConfirmDTO
+from apps.accounts.dto.password_reset import PasswordResetRequestDTO, PasswordResetConfirmDTO, PasswordChangeDTO
 from apps.accounts.dto.users import UserDTO, CreateUserDTO, UserLoginDTO, LoginResponseDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 
@@ -152,6 +152,27 @@ class AccountServiceInterface(ABC):
             InvalidPasswordResetTokenError: If token is invalid
             ExpiredPasswordResetTokenError: If token has expired
             PasswordResetTokenNotFoundError: If token not found
+            UserPasswordError: If password processing fails
+        """
+        pass
+
+    @abstractmethod
+    async def change_password(self, access_token: str, change_data: PasswordChangeDTO) -> None:
+        """
+        Change user password using access token and password change data
+
+        Args:
+            access_token: Valid access token of the authenticated user
+            change_data: Password change data containing old and new passwords
+
+        Returns:
+            None - succeeds silently or raises exception
+
+        Raises:
+            InvalidAccessTokenError: If access token is invalid or expired
+            UserNotFoundError: If user associated with token is not found
+            IncorrectCurrentPasswordError: If current password is incorrect
+            SamePasswordError: If new password is the same as current password
             UserPasswordError: If password processing fails
         """
         pass

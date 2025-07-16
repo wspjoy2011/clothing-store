@@ -31,6 +31,7 @@ class EmailSender(EmailSenderInterface):
             activation_complete_email_template_name: str,
             password_email_template_name: str,
             password_complete_email_template_name: str,
+            password_change_notification_template_name: str,
             timeout: int = 30,
     ):
         self._hostname = hostname
@@ -45,6 +46,7 @@ class EmailSender(EmailSenderInterface):
         self._activation_complete_email_template_name = activation_complete_email_template_name
         self._password_email_template_name = password_email_template_name
         self._password_complete_email_template_name = password_complete_email_template_name
+        self._password_change_notification_template_name = password_change_notification_template_name
 
         try:
             self._env = Environment(loader=FileSystemLoader(template_dir))
@@ -284,5 +286,32 @@ class EmailSender(EmailSenderInterface):
             raise
         except Exception as e:
             error_msg = f"Unexpected error sending password reset complete email to {email}"
+            self._logger.error(f"{error_msg}: {e}")
+            raise BaseEmailError(error_msg, e)
+
+    async def send_password_change_notification_email(self, email: str, login_link: str, change_time: str) -> None:
+        """
+        Send a password change notification email asynchronously.
+
+        Args:
+            email (str): The recipient's email address.
+            login_link (str): The login link to be included in the email.
+            change_time (str): The time when the password was changed.
+        """
+        self._logger.info(f"Preparing password change notification email for {email}")
+
+        try:
+            html_content = self._render_template(
+                self._password_change_notification_template_name,
+                email=email,
+                login_link=login_link,
+                change_time=change_time
+            )
+            subject = "Password Changed Successfully"
+            await self._send_email(email, subject, html_content)
+        except (EmailTemplateError, BaseEmailError):
+            raise
+        except Exception as e:
+            error_msg = f"Unexpected error sending password change notification email to {email}"
             self._logger.error(f"{error_msg}: {e}")
             raise BaseEmailError(error_msg, e)

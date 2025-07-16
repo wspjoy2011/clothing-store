@@ -117,3 +117,23 @@ class PasswordResetTokenNotFoundError(PasswordResetError):
 class PasswordResetEmailError(PasswordResetError):
     """Raised when password reset email sending fails"""
     pass
+
+
+class PasswordChangeError(AccountServiceError):
+    """Base exception for password change operations"""
+    pass
+
+
+class InvalidAccessTokenError(PasswordChangeError):
+    """Raised when access token is invalid or expired"""
+    pass
+
+
+class IncorrectCurrentPasswordError(PasswordChangeError):
+    """Raised when current password is incorrect during password change"""
+    pass
+
+
+class SamePasswordError(PasswordChangeError):
+    """Raised when new password is the same as current password"""
+    pass

@@ -38,6 +38,7 @@ def get_email_sender() -> EmailSenderInterface:
         activation_complete_email_template_name="activation_complete.html",
         password_email_template_name="password_reset_request.html",
         password_complete_email_template_name="password_reset_complete.html",
+        password_change_notification_template_name="password_change_notification.html",
         timeout=email_config.get("timeout", 30),
     )
 
