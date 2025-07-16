@@ -591,6 +591,89 @@ export const useAccountStore = defineStore('accounts', {
             }
         },
 
+
+        /**
+         * Refresh access token using refresh token
+         * @returns {Promise<Object>} - Token refresh result
+         */
+        async refreshTokens() {
+            if (!this.refreshToken) {
+                return createErrorResult(
+                    createErrorObject(null, 'No refresh token available'),
+                    'refresh'
+                );
+            }
+
+            try {
+                const response = await accountService.refreshTokens(this.refreshToken);
+
+                if (response.access_token) {
+                    this.accessToken = response.access_token;
+                }
+
+                return createSuccessResult(response, 'Tokens refreshed successfully');
+
+            } catch (err) {
+                const errorObj = createErrorObject(err, 'Failed to refresh tokens');
+
+                if (err.status === 401) {
+                    console.warn('Refresh token expired, clearing auth state');
+                    this.clearLocalState();
+                }
+
+                return createErrorResult(errorObj, 'refresh');
+            }
+        },
+
+        /**
+         * Execute API call with automatic token rotation on 401 error
+         * @param {Function} apiCall - Function that makes the API call
+         * @param {Object} options - Options object
+         * @param {boolean} options.requireAuth - Whether authentication is required
+         * @returns {Promise<Object>} - API call result
+         */
+        async executeWithTokenRotation(apiCall, options = {requireAuth: true}) {
+            if (options.requireAuth && !this.accessToken) {
+                throw new Error('Authentication required');
+            }
+
+            try {
+                return await apiCall();
+            } catch (error) {
+                if (error.response?.status === 401 && this.refreshToken) {
+                    try {
+                        const refreshResult = await this.refreshTokens();
+
+                        if (refreshResult.success) {
+                            return await apiCall();
+                        } else {
+                            await this.logout();
+                            throw new Error('Your session has expired. Please log in again.');
+                        }
+                    } catch (refreshError) {
+                        await this.logout();
+                        throw new Error('Your session has expired. Please log in again.');
+                    }
+                }
+
+                throw error;
+            }
+        },
+
+        /**
+         * Change user password with automatic token rotation
+         * @param {Object} passwordData - Password change data
+         * @param {string} passwordData.old_password - Current password
+         * @param {string} passwordData.new_password - New password
+         * @returns {Promise<Object>} - Password change result
+         */
+        async changePassword(passwordData) {
+            return await this.executeWithTokenRotation(
+                () => accountService.changePassword(this.accessToken, passwordData),
+                {requireAuth: true}
+            );
+        },
+
         /**
          * Clear registration state
          */

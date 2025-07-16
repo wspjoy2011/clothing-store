@@ -10,7 +10,7 @@ export function useNavigation() {
     const router = useRouter()
     const legalStore = useLegalStore()
     const accountStore = useAccountStore()
-    const { handleFacebookSuccess, handleFacebookError, HFaceBookLogin } = useFacebookAuth()
+    const {handleFacebookSuccess, handleFacebookError, HFaceBookLogin} = useFacebookAuth()
 
     const goToLogin = () => {
         router.push({name: 'login'})
@@ -46,6 +46,10 @@ export function useNavigation() {
 
     const goToLogout = () => {
         router.push({name: 'logout'})
+    }
+
+    const goToChangePassword = () => {
+        router.push({name: 'change-password'})
     }
 
     const goToAccountSettings = () => {
@@ -157,6 +161,7 @@ export function useNavigation() {
         goToProfile,
         goToOrderHistory,
         goToCart,
+        goToChangePassword,
         handleLogout,
 
         // Social auth

@@ -14,6 +14,7 @@ import ActivatePage from '@/views/ActivatePage.vue'
 import ResendActivationPage from '@/views/ResendActivationPage.vue'
 import PasswordResetRequestPage from '@/views/PasswordResetRequestPage.vue'
 import PasswordResetConfirmPage from '@/views/PasswordResetConfirmPage.vue'
+import PasswordChangePage from '@/views/PasswordChangePage.vue'
 import LogoutPage from '@/views/LogoutPage.vue'
 
 const processCatalogRouteProps = (route) => {
@@ -182,6 +183,15 @@ const routes = [
         component: LogoutPage,
         meta: {
             title: 'StyleShop - Logout',
+            requiresAuth: true
+        }
+    },
+    {
+        path: '/accounts/change-password',
+        name: 'change-password',
+        component: PasswordChangePage,
+        meta: {
+            title: 'StyleShop - Change Password',
             requiresAuth: true
         }
     },

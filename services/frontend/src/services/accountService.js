@@ -99,6 +99,35 @@ export default {
     async confirmPasswordReset(confirmData) {
         const response = await api.post(`${BASE_URL}/password-reset/confirm`, confirmData);
         return response.data;
-    }
+    },
+
+    /**
+     * Change user password
+     * @param {string} accessToken - User access token
+     * @param {Object} passwordData - Password change data
+     * @param {string} passwordData.old_password - Current password
+     * @param {string} passwordData.new_password - New password
+     * @returns {Promise<Object>} - Password change response data
+     */
+    async changePassword(accessToken, passwordData) {
+        const response = await api.post(`${BASE_URL}/password-change`, passwordData, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+        return response.data;
+    },
+
+    /**
+     * Refresh access token
+     * @param {string} refreshToken - User refresh token
+     * @returns {Promise<Object>} - Token refresh response data
+     */
+    async refreshTokens(refreshToken) {
+        const response = await api.post(`${BASE_URL}/refresh`, {
+            refresh_token: refreshToken
+        });
+        return response.data;
+    },
 
 }

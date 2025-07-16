@@ -118,6 +118,13 @@
                   ></v-list-item>
 
                   <v-list-item
+                      prepend-icon="mdi-lock-reset"
+                      title="Change Password"
+                      subtitle="Update your password"
+                      @click="goToChangePassword"
+                  ></v-list-item>
+
+                  <v-list-item
                       prepend-icon="mdi-heart"
                       title="Wishlist"
                       subtitle="Your saved items"
@@ -324,6 +331,12 @@
         ></v-list-item>
 
         <v-list-item
+            title="Change Password"
+            prepend-icon="mdi-lock-reset"
+            @click="goToChangePassword"
+        ></v-list-item>
+
+        <v-list-item
             title="Wishlist"
             prepend-icon="mdi-heart"
             @click="goToWishlist"
@@ -470,6 +483,7 @@ const {
   goToOrderHistory,
   goToCart,
   goToHome,
+  goToChangePassword,
   handleLogout
 } = useNavigation();
 
