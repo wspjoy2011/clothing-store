@@ -1,3 +1,6 @@
+import random
+from decimal import Decimal
+
 from async_lru import alru_cache
 from psycopg_pool import AsyncConnectionPool
 from tqdm.asyncio import tqdm_asyncio
@@ -27,6 +30,7 @@ class DatabaseSeeder:
             await self._seed_seasons(conn)
             await self._seed_usage_types(conn)
             await self._seed_products(conn)
+            await self._seed_product_inventory(conn)
         logger.info("Database seeding completed successfully.")
 
     async def is_database_empty(self):
@@ -45,7 +49,6 @@ class DatabaseSeeder:
                     logger.info(f"Table '{self.APP_NAME}_{table}' is empty.")
         logger.info("All critical tables are empty.")
         return True
-
 
     async def _seed_master_categories(self, conn):
         query = f"INSERT INTO {self.APP_NAME}_master_category (name) VALUES (%s) ON CONFLICT DO NOTHING;"
@@ -116,6 +119,53 @@ class DatabaseSeeder:
             for row in batch:
                 args.extend(row)
             await conn.execute(sql, args)
+
+    async def _seed_product_inventory(self, conn):
+        """Seed product inventory with random prices and stock quantities."""
+        logger.info("Seeding product inventory...")
+
+        query = f"SELECT product_id FROM {self.APP_NAME}_products ORDER BY product_id;"
+        result = await conn.execute(query)
+        product_ids = [row[0] for row in await result.fetchall()]
+
+        logger.info(f"Found {len(product_ids)} products to create inventory for")
+
+        inventory_params = []
+        for product_id in tqdm_asyncio(product_ids, desc="Generate inventory"):
+            base_price = Decimal(str(random.uniform(5.0, 300.0))).quantize(Decimal('0.01'))
+
+            sale_price = None
+            if random.random() < 0.3:
+                discount_percent = random.uniform(0.05, 0.20)
+                sale_price = (base_price * Decimal(str(1 - discount_percent))).quantize(Decimal('0.01'))
+
+            stock_quantity = random.randint(0, 10)
+
+            reserved_quantity = 0
+
+            is_active = True
+
+            inventory_params.append((
+                product_id, base_price, sale_price, 'USD',
+                stock_quantity, reserved_quantity, is_active
+            ))
+
+        batch_indices = range(0, len(inventory_params), self.BATCH_SIZE)
+        for i in tqdm_asyncio(batch_indices, desc="Bulk insert inventory"):
+            batch = inventory_params[i: i + self.BATCH_SIZE]
+            sql = f"""
+                  INSERT INTO {self.APP_NAME}_product_inventory 
+                  (product_id, base_price, sale_price, currency, stock_quantity, reserved_quantity, is_active)
+                  VALUES """
+            values_part = ', '.join(['(%s,%s,%s,%s,%s,%s,%s)'] * len(batch))
+            sql += values_part
+            sql += " ON CONFLICT (product_id) DO NOTHING"
+            args = []
+            for row in batch:
+                args.extend(row)
+            await conn.execute(sql, args)
+
+        logger.info(f"Product inventory seeded successfully for {len(product_ids)} products")
 
     @alru_cache(maxsize=128)
     async def _get_master_category_id(self, conn, name: str) -> int:
