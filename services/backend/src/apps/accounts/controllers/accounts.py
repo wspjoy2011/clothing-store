@@ -61,6 +61,7 @@ from apps.accounts.services.exceptions import (
     SamePasswordError,
     PasswordChangeError
 )
+from security.dto import JWTPayloadDTO
 from settings.config import config
 
 
@@ -432,7 +433,7 @@ async def confirm_password_reset_controller(
 
 async def change_password_controller(
         change_data: PasswordChangeSchema,
-        access_token: str,
+        jwt_payload: JWTPayloadDTO,
         account_service: AccountServiceInterface,
 ) -> PasswordChangeResponseSchema:
     """
@@ -440,14 +441,14 @@ async def change_password_controller(
 
     Args:
         change_data: Password change data from request
-        access_token: JWT access token from Authorization header
+        jwt_payload: JWT payload from verified access token
         account_service: Account service for business logic
 
     Returns:
         PasswordChangeResponseSchema with success message
 
     Raises:
-        HTTPException: 401 for invalid/expired tokens, 400 for password errors, 500 for server errors
+        HTTPException: 400 for password errors, 404 for user not found, 500 for server errors
     """
     change_dto = PasswordChangeDTO(
         old_password=change_data.old_password,
@@ -455,12 +456,7 @@ async def change_password_controller(
     )
 
     try:
-        await account_service.change_password(access_token, change_dto)
-    except InvalidAccessTokenError as e:
-        raise HTTPException(
-            status_code=401,
-            detail=str(e)
-        )
+        await account_service.change_password(jwt_payload.email, change_dto)
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,

@@ -101,7 +101,7 @@ from apps.accounts.schemas.activation import (
     ResendActivationSchema,
     ResendActivationResponseSchema
 )
-from security.http import JWTTokenDependency
+from security.http import JWTTokenDependency, AccessTokenDependency
 
 API_PATHS: dict[str, str] = {
     "register": "/register",
@@ -1169,7 +1169,7 @@ async def confirm_password_reset_route(
 )
 async def change_password_route(
         change_data: PasswordChangeSchema,
-        access_token: JWTTokenDependency,
+        jwt_payload: AccessTokenDependency,
         account_service: AccountServiceInterface = Depends(get_account_service)
 ) -> PasswordChangeResponseSchema:
     """
@@ -1181,7 +1181,7 @@ async def change_password_route(
 
     Args:
         change_data: Password change data containing old and new passwords
-        access_token: JWT access token from Authorization header
+        jwt_payload: JWT payload from verified access token
         account_service: Account service for business logic
 
     Returns:
@@ -1199,7 +1199,7 @@ async def change_password_route(
         User will receive an email notification about the password change.
         Email failure won't prevent password change but will be logged.
     """
-    return await change_password_controller(change_data, access_token, account_service)
+    return await change_password_controller(change_data, jwt_payload, account_service)
 
 
 @router.post(

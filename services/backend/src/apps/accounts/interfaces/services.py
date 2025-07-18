@@ -157,23 +157,23 @@ class AccountServiceInterface(ABC):
         pass
 
     @abstractmethod
-    async def change_password(self, access_token: str, change_data: PasswordChangeDTO) -> None:
+    async def change_password(self, email: str, change_data: PasswordChangeDTO) -> None:
         """
-        Change user password using access token and password change data
+        Change user password using email and password change data
 
         Args:
-            access_token: Valid access token of the authenticated user
+            email: User email from verified JWT token
             change_data: Password change data containing old and new passwords
 
         Returns:
             None - succeeds silently or raises exception
 
         Raises:
-            InvalidAccessTokenError: If access token is invalid or expired
-            UserNotFoundError: If user associated with token is not found
+            UserNotFoundError: If user with given email is not found
             IncorrectCurrentPasswordError: If current password is incorrect
             SamePasswordError: If new password is the same as current password
             UserPasswordError: If password processing fails
+            PasswordChangeError: If password change fails
         """
         pass
 

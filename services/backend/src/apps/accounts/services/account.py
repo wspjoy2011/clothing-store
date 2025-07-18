@@ -1,5 +1,3 @@
-"""Account service implementation"""
-
 import secrets
 import datetime as datetime_lib
 from datetime import datetime, timedelta
@@ -62,7 +60,6 @@ from security.exceptions import (
     HashingError,
     VerificationError,
     TokenCreationError as SecurityTokenCreationError,
-    TokenVerificationError,
     InvalidTokenError,
     ExpiredTokenError, TokenSignatureError, InvalidTokenTypeError, EmptyTokenError
 )
@@ -552,70 +549,58 @@ class AccountService(AccountServiceInterface):
         return True
 
     @atomic(['_user_repository'])
-    async def change_password(self, access_token: str, change_data: PasswordChangeDTO) -> None:
+    async def change_password(self, email: str, change_data: PasswordChangeDTO) -> None:
         """
-        Change user password using access token and password change data
+        Change user password using email and password change data
 
         Args:
-            access_token: Valid access token of the authenticated user
+            email: User email from verified JWT token
             change_data: Password change data containing old and new passwords
 
         Returns:
             None - succeeds silently or raises exception
 
         Raises:
-            InvalidAccessTokenError: If access token is invalid or expired
-            UserNotFoundError: If user associated with token is not found
+            UserNotFoundError: If user with given email is not found
             IncorrectCurrentPasswordError: If current password is incorrect
             SamePasswordError: If new password is the same as current password
             UserPasswordError: If password processing fails
+            PasswordChangeError: If password change fails
         """
-        logger.info("Starting password change process")
+        logger.info(f"Starting password change process for user: {email}")
 
-        try:
-            token_payload = self._jwt_manager.verify_access_token(access_token)
-            logger.debug(f"Access token verified successfully for email: {token_payload.get('email')}")
-        except (TokenVerificationError, InvalidTokenError, ExpiredTokenError) as e:
-            logger.warning(f"Invalid access token provided: {e}")
-            raise InvalidAccessTokenError("Invalid or expired access token")
-
-        user_email = token_payload.get('email')
-        if not user_email:
-            logger.error("Email not found in access token payload")
-            raise InvalidAccessTokenError("Invalid token payload: missing email")
-
-        user = await self._user_repository.get_user_by_email(user_email)
+        user = await self._user_repository.get_user_by_email(email)
         if not user:
-            logger.warning(f"User with email {user_email} not found")
-            raise UserNotFoundError(f"User with email '{user_email}' not found")
+            logger.warning(f"User with email {email} not found")
+            raise UserNotFoundError(f"User with email '{email}' not found")
 
-        current_password_hash = await self._user_repository.get_hashed_password_by_email(user_email)
+        current_password_hash = await self._user_repository.get_hashed_password_by_email(email)
         if not current_password_hash:
-            logger.error(f"Could not retrieve current password for user {user_email}")
+            logger.error(f"Could not retrieve current password for user {email}")
             raise PasswordChangeError("Failed to retrieve current password")
 
         try:
             password_valid = self._password_manager.verify_password(change_data.old_password, current_password_hash)
             if not password_valid:
-                logger.warning(f"Password change failed: Incorrect current password for user {user_email}")
+                logger.warning(f"Password change failed: Incorrect current password for user {email}")
                 raise IncorrectCurrentPasswordError("Current password is incorrect")
         except (EmptyPasswordError, VerificationError) as e:
-            logger.error(f"Password verification failed for user {user_email}: {e}")
+            logger.error(f"Password verification failed for user {email}: {e}")
             raise IncorrectCurrentPasswordError("Current password is incorrect")
 
         try:
             same_password = self._password_manager.verify_password(change_data.new_password, current_password_hash)
             if same_password:
-                logger.warning(f"Password change failed: New password is the same as current for user {user_email}")
+                logger.warning(f"Password change failed: New password is the same as current for user {email}")
                 raise SamePasswordError("New password must be different from current password")
         except (EmptyPasswordError, VerificationError):
             pass
 
         try:
             new_password_hash = self._password_manager.hash_password(change_data.new_password)
-            logger.debug(f"New password hashed successfully for user: {user_email}")
+            logger.debug(f"New password hashed successfully for user: {email}")
         except (EmptyPasswordError, PasswordTooLongError, HashingError) as e:
-            logger.error(f"Password hashing failed for user {user_email}: {e}")
+            logger.error(f"Password hashing failed for user {email}: {e}")
             raise UserPasswordError(f"Password processing failed: {e}", e)
 
         try:
@@ -630,12 +615,12 @@ class AccountService(AccountServiceInterface):
             raise PasswordChangeError(f"Failed to update password: {e}", e)
 
         try:
-            await self._send_password_change_notification_email(user_email)
-            logger.info(f"Password change notification email sent to {user_email}")
+            await self._send_password_change_notification_email(email)
+            logger.info(f"Password change notification email sent to {email}")
         except BaseEmailError as e:
-            logger.warning(f"Failed to send password change notification email to {user_email}: {e}")
+            logger.warning(f"Failed to send password change notification email to {email}: {e}")
 
-        logger.info(f"Password change completed successfully for user: {user_email}")
+        logger.info(f"Password change completed successfully for user: {email}")
 
     async def refresh_access_token(self, refresh_token: str) -> str:
         """
