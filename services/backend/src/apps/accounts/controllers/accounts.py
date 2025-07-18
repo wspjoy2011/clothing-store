@@ -56,13 +56,15 @@ from apps.accounts.services.exceptions import (
     ExpiredPasswordResetTokenError,
     PasswordResetTokenNotFoundError,
     PasswordResetError,
-    InvalidAccessTokenError,
     IncorrectCurrentPasswordError,
     SamePasswordError,
     PasswordChangeError
 )
 from security.dto import JWTPayloadDTO
 from settings.config import config
+from settings.logging_config import get_logger
+
+logger = get_logger(__name__, "accounts_controller")
 
 
 async def create_user_controller(
@@ -100,6 +102,7 @@ async def create_user_controller(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Unexpected error during user creation for email {user_data.email}: {e}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during user creation"
@@ -157,6 +160,7 @@ async def activate_account_controller(
             detail=str(e)
         )
     except (UserCreationError, Exception) as e:
+        logger.error(f"Unexpected error during account activation for email {activation_data.email}: {e}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during account activation"
@@ -199,6 +203,7 @@ async def resend_activation_controller(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Unexpected error during activation email resend for email {resend_data.email}: {e}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during activation email resend"
@@ -260,6 +265,7 @@ async def login_user_controller(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Unexpected error during user login for email {login_data.email}: {e}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during user login"
@@ -324,6 +330,7 @@ async def get_user_by_refresh_token_controller(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Unexpected error during user retrieval by refresh token: {e}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during user retrieval"
@@ -365,6 +372,7 @@ async def request_password_reset_controller(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Unexpected error during password reset request for email {request_data.email}: {e}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during password reset request"
@@ -421,6 +429,7 @@ async def confirm_password_reset_controller(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Unexpected error during password reset confirmation with token {confirm_data.token}: {e}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during password reset confirmation"
@@ -483,6 +492,7 @@ async def change_password_controller(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Unexpected error during password change for user {jwt_payload.email}: {e}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during password change"
@@ -533,6 +543,7 @@ async def refresh_access_token_controller(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Unexpected error during token refresh: {e}")
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during token refresh"

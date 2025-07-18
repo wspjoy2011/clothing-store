@@ -56,7 +56,6 @@ def get_verified_access_token(
     """
     try:
         payload = jwt_manager.verify_access_token(token)
-        return JWTPayloadDTO.from_payload(payload)
     except EmptyTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -87,6 +86,8 @@ def get_verified_access_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Token verification failed: {str(e)}"
         )
+    else:
+        return JWTPayloadDTO.from_payload(payload)
 
 
 JWTTokenDependency = Annotated[str, Depends(get_token)]
