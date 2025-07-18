@@ -30,6 +30,7 @@ class DatabaseSeeder:
             await self._seed_seasons(conn)
             await self._seed_usage_types(conn)
             await self._seed_products(conn)
+            await self._generate_product_slugs(conn)
             await self._seed_product_inventory(conn)
         logger.info("Database seeding completed successfully.")
 
@@ -106,7 +107,7 @@ class DatabaseSeeder:
             ))
 
         batch_indices = range(0, len(params), self.BATCH_SIZE)
-        for i in tqdm_asyncio(batch_indices, desc="Bulk insert"):
+        for i in tqdm_asyncio(batch_indices, desc="Bulk insert products"):
             batch = params[i: i + self.BATCH_SIZE]
             sql = f"""
                   INSERT INTO {self.APP_NAME}_products (product_id, gender, year, product_display_name, article_type_id,
@@ -119,6 +120,27 @@ class DatabaseSeeder:
             for row in batch:
                 args.extend(row)
             await conn.execute(sql, args)
+
+        logger.info("Generating slugs for products...")
+        await self._generate_product_slugs(conn)
+
+    async def _generate_product_slugs(self, conn):
+        """Generate slugs for all products using the create_slug function from migration."""
+        logger.info("Updating product slugs using create_slug function...")
+
+        update_query = f"""
+            UPDATE {self.APP_NAME}_products 
+            SET slug = create_slug(product_display_name, product_id)
+            WHERE slug IS NULL OR slug = '';
+        """
+
+        await conn.execute(update_query)
+        logger.info(f"Updated slugs for products")
+
+        count_query = f"SELECT COUNT(*) FROM {self.APP_NAME}_products WHERE slug IS NOT NULL AND slug != '';"
+        count_result = await conn.execute(count_query)
+        count = await count_result.fetchone()
+        logger.info(f"Total products with slugs: {count[0]}")
 
     async def _seed_product_inventory(self, conn):
         """Seed product inventory with random prices and stock quantities."""
