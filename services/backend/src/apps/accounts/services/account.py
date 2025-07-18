@@ -41,7 +41,6 @@ from apps.accounts.services.exceptions import (
     ExpiredPasswordResetTokenError,
     PasswordResetTokenNotFoundError,
     PasswordResetEmailError,
-    InvalidAccessTokenError,
     IncorrectCurrentPasswordError,
     SamePasswordError,
     PasswordChangeError
