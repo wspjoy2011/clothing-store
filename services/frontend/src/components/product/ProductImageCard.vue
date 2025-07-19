@@ -1,5 +1,5 @@
 <template>
-  <v-card class="product-image-card" elevation="2">
+  <v-card :class="['product-image-card', { 'out-of-stock': !isAvailable }]" elevation="2">
     <div class="position-relative">
       <div v-if="imageLoading" class="image-loader">
         <v-progress-circular color="primary" indeterminate size="40"/>
@@ -13,11 +13,25 @@
           @load="handleImageLoaded"
           @error="handleImageLoaded"
       />
+
+      <!-- Out of Stock Overlay -->
+      <div v-if="!isAvailable" class="out-of-stock-overlay">
+        <v-chip
+            color="error"
+            variant="elevated"
+            size="x-large"
+            class="font-weight-bold"
+        >
+          Out of Stock
+        </v-chip>
+      </div>
     </div>
   </v-card>
 </template>
 
 <script setup>
+import {computed} from 'vue';
+
 const props = defineProps({
   product: {
     type: Object,
@@ -30,6 +44,10 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['image-loaded']);
+
+const isAvailable = computed(() =>
+  props.product.inventory?.is_in_stock && props.product.inventory?.is_active
+);
 
 const handleImageLoaded = () => {
   emit('image-loaded');
@@ -65,5 +83,22 @@ const handleImageLoaded = () => {
 
 .product-detail-image:hover {
   transform: scale(1.05);
+}
+
+.out-of-stock {
+  filter: grayscale(100%);
+  opacity: 0.6;
+}
+
+.out-of-stock-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+.out-of-stock .product-detail-image:hover {
+  transform: none;
 }
 </style>

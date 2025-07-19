@@ -1,7 +1,8 @@
 <template>
   <div class="action-buttons">
     <v-btn
-        color="primary"
+        :disabled="!isAvailable"
+        :color="isAvailable ? 'primary' : 'grey'"
         size="large"
         variant="flat"
         block
@@ -9,11 +10,12 @@
         prepend-icon="mdi-cart-plus"
         @click="handleAddToCart"
     >
-      Add to Cart
+      {{ isAvailable ? 'Add to Cart' : 'Out of Stock' }}
     </v-btn>
 
     <v-btn
-        color="secondary"
+        :disabled="!isAvailable"
+        :color="isAvailable ? 'secondary' : 'grey'"
         size="large"
         variant="outlined"
         block
@@ -37,14 +39,29 @@
 </template>
 
 <script setup>
+import {computed} from 'vue';
+
+const props = defineProps({
+  product: {
+    type: Object,
+    required: true
+  }
+});
+
 const emit = defineEmits(['go-back', 'add-to-cart', 'add-to-wishlist']);
 
+const isAvailable = computed(() =>
+    props.product.inventory?.is_in_stock && props.product.inventory?.is_active
+);
+
 const handleAddToCart = () => {
+  if (!isAvailable.value) return;
   emit('add-to-cart');
   // TODO: Implement cart functionality
 };
 
 const handleAddToWishlist = () => {
+  if (!isAvailable.value) return;
   emit('add-to-wishlist');
   // TODO: Implement wishlist functionality
 };
