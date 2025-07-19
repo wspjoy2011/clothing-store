@@ -1,7 +1,7 @@
 from typing import Optional, List, Any, Tuple
 from decimal import Decimal
 
-from apps.catalog.dto.filters import FiltersDTO, CheckboxFilterDTO, RangeFilterDTO
+from apps.catalog.dto.filters import FiltersDTO, CheckboxFilterDTO, RangeFilterDTO, AvailabilityFilterDTO
 from apps.catalog.dto.products import ProductDTO, InventoryDTO
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.specifications import (
@@ -253,7 +253,11 @@ class ProductRepository(ProductRepositoryInterface):
         """
         category_sql, category_params = category_spec.to_sql()
 
-        count_query = f"SELECT COUNT(*) FROM {self.APP_NAME}_products " + category_sql
+        count_query = f"""
+            SELECT COUNT(*) FROM {self.APP_NAME}_products p
+            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+            {category_sql.replace(f'{self.APP_NAME}_products', 'p')}
+        """
         logger.info(f"Category filters count query: {count_query}")
         logger.info(f"Category filters count params: {category_params}")
 
@@ -262,14 +266,22 @@ class ProductRepository(ProductRepositoryInterface):
         if not count_result or count_result[0] == 0:
             return None
 
-        gender_query = f"SELECT DISTINCT gender FROM {self.APP_NAME}_products " + category_sql
+        gender_query = f"""
+            SELECT DISTINCT p.gender FROM {self.APP_NAME}_products p
+            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+            {category_sql.replace(f'{self.APP_NAME}_products', 'p')}
+        """
         logger.info(f"Category filters gender query: {gender_query}")
         logger.info(f"Category filters gender params: {category_params}")
 
         gender_result = await self._dao.execute(gender_query, category_params)
         gender_values = [row[0] for row in gender_result] if gender_result else []
 
-        year_query = f"SELECT MIN(year), MAX(year) FROM {self.APP_NAME}_products " + category_sql + " AND year IS NOT NULL"
+        year_query = f"""
+            SELECT MIN(p.year), MAX(p.year) FROM {self.APP_NAME}_products p
+            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+            {category_sql.replace(f'{self.APP_NAME}_products', 'p')} AND p.year IS NOT NULL
+        """
         logger.info(f"Category filters year query: {year_query}")
         logger.info(f"Category filters year params: {category_params}")
 
@@ -278,7 +290,8 @@ class ProductRepository(ProductRepositoryInterface):
 
         return FiltersDTO(
             gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
-            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None
+            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
+            is_available=AvailabilityFilterDTO()
         )
 
     async def _get_products_with_specs(
@@ -337,18 +350,22 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             Number of products matching the criteria
         """
-        self._query_builder.reset().select("COUNT(*)")
+        self._query_builder.reset().select("COUNT(*)").from_table(f"{self.APP_NAME}_products p").join(
+            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
+        )
 
         if category_spec and not category_spec.is_empty():
-            self._apply_category_spec(category_spec)
+            self._apply_category_spec_with_alias(category_spec)
 
         if filter_spec and not filter_spec.is_empty():
             filter_sql, filter_params = filter_spec.to_sql()
+            filter_sql = self._prefix_columns_with_alias(filter_sql, 'p')
             self._parse_sql_conditions(filter_sql, filter_params)
 
         if search_spec and not search_spec.is_empty():
             search_sql, search_params = search_spec.to_sql()
             where_sql, _ = self._split_search_sql(search_sql)
+            where_sql = where_sql.replace("product_display_name", "p.product_display_name")
             self._parse_sql_conditions(where_sql, search_params[:1])
 
         query, params = self._query_builder.build()
@@ -388,7 +405,8 @@ class ProductRepository(ProductRepositoryInterface):
 
         return FiltersDTO(
             gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
-            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None
+            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
+            is_available=AvailabilityFilterDTO()
         )
 
     async def _get_filtered_filters(self, search_spec: SearchSpecificationInterface) -> Optional[FiltersDTO]:
@@ -401,10 +419,13 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             FiltersDTO object with available filters for search results or None if no results
         """
-        self._query_builder.reset()
+        self._query_builder.reset().from_table(f"{self.APP_NAME}_products p").join(
+            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
+        )
 
         search_sql, search_params = search_spec.to_sql()
         where_sql, _ = self._split_search_sql(search_sql)
+        where_sql = where_sql.replace("product_display_name", "p.product_display_name")
         self._parse_sql_conditions(where_sql, search_params[:1])
 
         count_query, count_params = self._query_builder.build_count()
@@ -422,7 +443,8 @@ class ProductRepository(ProductRepositoryInterface):
 
         return FiltersDTO(
             gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
-            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None
+            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
+            is_available=AvailabilityFilterDTO()
         )
 
     async def _get_filtered_gender_values(self, where_sql: str, search_params: List[Any]) -> List[str]:
@@ -436,9 +458,12 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             List of available gender values
         """
-        self._query_builder.reset().select("DISTINCT gender")
+        self._query_builder.reset().select("DISTINCT p.gender").from_table(f"{self.APP_NAME}_products p").join(
+            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
+        )
+        where_sql = where_sql.replace("product_display_name", "p.product_display_name")
         self._parse_sql_conditions(where_sql, search_params[:1])
-        self._query_builder.where("gender IS NOT NULL")
+        self._query_builder.where("p.gender IS NOT NULL")
 
         gender_query, gender_params = self._query_builder.build()
         logger.info(f"Filtered filters gender query: {gender_query}")
@@ -462,9 +487,12 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             Tuple of (min_year, max_year) or (None, None) if no results
         """
-        self._query_builder.reset().select("MIN(year)", "MAX(year)")
+        self._query_builder.reset().select("MIN(p.year)", "MAX(p.year)").from_table(f"{self.APP_NAME}_products p").join(
+            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
+        )
+        where_sql = where_sql.replace("product_display_name", "p.product_display_name")
         self._parse_sql_conditions(where_sql, search_params[:1])
-        self._query_builder.where("year IS NOT NULL")
+        self._query_builder.where("p.year IS NOT NULL")
 
         year_query, year_params = self._query_builder.build()
         logger.info(f"Filtered filters year query: {year_query}")
@@ -592,7 +620,10 @@ class ProductRepository(ProductRepositoryInterface):
         replacements = {
             'year >=': f'{alias}.year >=',
             'year <=': f'{alias}.year <=',
-            'gender IN': f'{alias}.gender IN'
+            'gender IN': f'{alias}.gender IN',
+            'inventory.is_active': 'i.is_active',
+            'inventory.is_in_stock': 'i.is_in_stock',
+            'inventory.id': 'i.id'
         }
 
         for old, new in replacements.items():

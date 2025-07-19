@@ -5,7 +5,7 @@ from fastapi import HTTPException
 
 from apps.catalog.dto.products import ProductDTO, InventoryDTO
 from apps.catalog.interfaces.services import CatalogServiceInterface
-from apps.catalog.schemas.filters import FiltersResponseSchema, CheckboxFilterSchema, RangeFilterSchema
+from apps.catalog.schemas.filters import FiltersResponseSchema, CheckboxFilterSchema, RangeFilterSchema, AvailabilityFilterSchema
 from apps.catalog.schemas.responses import (
     ProductListResponseSchema,
     ProductSchema,
@@ -59,6 +59,7 @@ async def get_product_list_controller(
         min_year: Optional[int],
         max_year: Optional[int],
         gender: Optional[str],
+        is_available: Optional[bool],
         q: Optional[str],
         catalog_service: CatalogServiceInterface,
 ) -> ProductListResponseSchema:
@@ -69,6 +70,7 @@ async def get_product_list_controller(
         min_year=min_year,
         max_year=max_year,
         gender=gender,
+        is_available=is_available,
         q=q
     )
 
@@ -88,6 +90,8 @@ async def get_product_list_controller(
             params['max_year'] = max_year
         if gender:
             params['gender'] = gender
+        if is_available is not None:
+            params['is_available'] = is_available
         if q:
             params['q'] = q
         return f"{base_url}?{urlencode(params)}"
@@ -192,7 +196,8 @@ async def get_filters_controller(
         year=RangeFilterSchema(
             min=filters_dto.year.min,
             max=filters_dto.year.max
-        ) if filters_dto.year else None
+        ) if filters_dto.year else None,
+        is_available=AvailabilityFilterSchema() if filters_dto.is_available else None
     )
 
 
@@ -255,6 +260,7 @@ async def get_products_by_category_controller(
         min_year: Optional[int] = None,
         max_year: Optional[int] = None,
         gender: Optional[str] = None,
+        is_available: Optional[bool] = None,
         q: Optional[str] = None,
         catalog_service: CatalogServiceInterface = None,
 ) -> ProductListResponseSchema:
@@ -271,6 +277,7 @@ async def get_products_by_category_controller(
         min_year: Minimum year filter
         max_year: Maximum year filter
         gender: Gender filter
+        is_available: Availability filter (True for available only, False for unavailable only)
         q: Search query
         catalog_service: Catalog service instance
 
@@ -287,6 +294,7 @@ async def get_products_by_category_controller(
         min_year=min_year,
         max_year=max_year,
         gender=gender,
+        is_available=is_available,
         q=q
     )
 
@@ -314,6 +322,8 @@ async def get_products_by_category_controller(
             params['max_year'] = max_year
         if gender:
             params['gender'] = gender
+        if is_available is not None:
+            params['is_available'] = is_available
         if q:
             params['q'] = q
         return f"{base_url}?{urlencode(params)}"
@@ -370,7 +380,8 @@ async def get_filters_by_categories_controller(
         year=RangeFilterSchema(
             min=filters_dto.year.min,
             max=filters_dto.year.max
-        ) if filters_dto.year else None
+        ) if filters_dto.year else None,
+        is_available=AvailabilityFilterSchema() if filters_dto.is_available else None
     )
 
 

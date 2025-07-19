@@ -16,7 +16,14 @@ class CheckboxFilterSchema(BaseModel):
     type: str = "checkbox"
 
 
+class AvailabilityFilterSchema(BaseModel):
+    """Schema for availability filter data"""
+    type: str = "boolean"
+    default: bool = False
+
+
 class FiltersResponseSchema(BaseModel):
     """API response schema for filters data"""
     gender: Optional[CheckboxFilterSchema] = None
     year: Optional[RangeFilterSchema] = None
+    is_available: Optional[AvailabilityFilterSchema] = None

@@ -68,7 +68,8 @@ router = APIRouter(
             "<h3>This endpoint retrieves a paginated and filtered list of products from the database. "
             "Clients can specify the `page` number and the number of items per page using `per_page`. "
             "Optional parameter `ordering` allows sorting results by fields with direction (e.g., 'year,-product_id'). "
-            "Filtering is available by year range (`min_year`, `max_year`) and by gender (`gender`, which can be a comma-separated list). "
+            "Filtering is available by year range (`min_year`, `max_year`), by gender (`gender`, which can be a comma-separated list), "
+            "and by availability (`is_available` - True for available products only, False for unavailable only). "
             "The search parameter `q` allows for full-text search in product names with results sorted by relevance. "
             "The response includes details about the products, total pages, and total items, "
             "along with links to the previous and next pages if applicable.</h3>"
@@ -131,6 +132,7 @@ async def get_products_route(
         min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
         max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
         gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
+        is_available: Optional[bool] = Query(None, description="Availability filter (True for available only, False for unavailable only)"),
         q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
         catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
 ):
@@ -141,6 +143,7 @@ async def get_products_route(
         min_year=min_year,
         max_year=max_year,
         gender=gender,
+        is_available=is_available,
         q=q,
         catalog_service=catalog_service,
     )
@@ -153,10 +156,10 @@ async def get_products_route(
     summary="Get available product filters",
     description=(
             "<h3>This endpoint retrieves available filters for the product catalog based on the actual data. "
-            "It provides information about available filter options such as gender values and year ranges. "
+            "It provides information about available filter options such as gender values, year ranges, and availability options. "
             "Clients can use this information to build dynamic filter UIs that adapt to the current catalog state. "
-            "The endpoint returns filter metadata including possible values for checkbox filters and min/max ranges for "
-            "numeric filters.</h3>"
+            "The endpoint returns filter metadata including possible values for checkbox filters, min/max ranges for "
+            "numeric filters, and boolean options for availability.</h3>"
     ),
     responses={
         404: {
@@ -456,6 +459,7 @@ async def get_categories_route(
             "<h3>This endpoint retrieves a paginated and filtered list of products from a specific category. "
             "The master_category_id is required to filter products by main category. "
             "All the filtering, sorting and pagination features from the /products endpoint are also available here, "
+            "including availability filtering with is_available parameter, "
             "allowing for comprehensive data filtering based on your specific requirements.</h3>"
     ),
     responses={
@@ -497,6 +501,7 @@ async def get_products_by_category_route(
         min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
         max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
         gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
+        is_available: Optional[bool] = Query(None, description="Availability filter (True for available only, False for unavailable only)"),
         q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
         catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
 ):
@@ -511,6 +516,7 @@ async def get_products_by_category_route(
         min_year: Minimum year filter
         max_year: Maximum year filter
         gender: Gender filter
+        is_available: Availability filter
         q: Search query
         catalog_service: Catalog service
 
@@ -527,6 +533,7 @@ async def get_products_by_category_route(
         min_year=min_year,
         max_year=max_year,
         gender=gender,
+        is_available=is_available,
         q=q,
         catalog_service=catalog_service,
     )
@@ -541,6 +548,7 @@ async def get_products_by_category_route(
             "<h3>This endpoint retrieves a paginated and filtered list of products from a specific subcategory. "
             "Both master_category_id and subcategory_id are required to filter products precisely. "
             "All the filtering, sorting and pagination features from the /products endpoint are also available here, "
+            "including availability filtering with is_available parameter, "
             "allowing for comprehensive data filtering based on your specific requirements.</h3>"
     ),
     responses={
@@ -583,6 +591,7 @@ async def get_products_by_subcategory_route(
         min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
         max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
         gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
+        is_available: Optional[bool] = Query(None, description="Availability filter (True for available only, False for unavailable only)"),
         q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
         catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
 ):
@@ -598,6 +607,7 @@ async def get_products_by_subcategory_route(
         min_year: Minimum year filter
         max_year: Maximum year filter
         gender: Gender filter
+        is_available: Availability filter
         q: Search query
         catalog_service: Catalog service
 
@@ -614,6 +624,7 @@ async def get_products_by_subcategory_route(
         min_year=min_year,
         max_year=max_year,
         gender=gender,
+        is_available=is_available,
         q=q,
         catalog_service=catalog_service,
     )
@@ -628,6 +639,7 @@ async def get_products_by_subcategory_route(
             "<h3>This endpoint retrieves a paginated and filtered list of products from a specific article type. "
             "All three IDs (master_category_id, subcategory_id, and article_type_id) are required to filter products precisely. "
             "All the filtering, sorting and pagination features from the /products endpoint are also available here, "
+            "including availability filtering with is_available parameter, "
             "allowing for comprehensive data filtering based on your specific requirements.</h3>"
     ),
     responses={
@@ -671,6 +683,7 @@ async def get_products_by_article_type_route(
         min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
         max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
         gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
+        is_available: Optional[bool] = Query(None, description="Availability filter (True for available only, False for unavailable only)"),
         q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
         catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
 ):
@@ -687,6 +700,7 @@ async def get_products_by_article_type_route(
         min_year: Minimum year filter
         max_year: Maximum year filter
         gender: Gender filter
+        is_available: Availability filter
         q: Search query
         catalog_service: Catalog service
 
@@ -703,6 +717,7 @@ async def get_products_by_article_type_route(
         min_year=min_year,
         max_year=max_year,
         gender=gender,
+        is_available=is_available,
         q=q,
         catalog_service=catalog_service,
     )
@@ -715,7 +730,7 @@ async def get_products_by_article_type_route(
     summary="Get available filters for master category",
     description=(
             "<h3>This endpoint retrieves available filters for products in a specific master category. "
-            "It provides information about available filter options such as gender values and year ranges "
+            "It provides information about available filter options such as gender values, year ranges, and availability options "
             "based only on products within the specified master category. "
             "Clients can use this information to build dynamic filter UIs that adapt to the current category state.</h3>"
     ),
@@ -777,7 +792,7 @@ async def get_filters_by_master_category_route(
     summary="Get available filters for subcategory",
     description=(
             "<h3>This endpoint retrieves available filters for products in a specific subcategory. "
-            "It provides information about available filter options such as gender values and year ranges "
+            "It provides information about available filter options such as gender values, year ranges, and availability options "
             "based only on products within the specified subcategory. "
             "Clients can use this information to build dynamic filter UIs that adapt to the current subcategory state.</h3>"
     ),
@@ -842,7 +857,7 @@ async def get_filters_by_subcategory_route(
     summary="Get available filters for article type",
     description=(
             "<h3>This endpoint retrieves available filters for products in a specific article type. "
-            "It provides information about available filter options such as gender values and year ranges "
+            "It provides information about available filter options such as gender values, year ranges, and availability options "
             "based only on products within the specified article type. "
             "Clients can use this information to build dynamic filter UIs that adapt to the current article type state.</h3>"
     ),

@@ -19,6 +19,7 @@ class CatalogServiceInterface(ABC):
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
             gender: Optional[str] = None,
+            is_available: Optional[bool] = None,
             q: Optional[str] = None
     ) -> CatalogDTO:
         """
@@ -31,6 +32,7 @@ class CatalogServiceInterface(ABC):
             min_year: Minimum year filter
             max_year: Maximum year filter
             gender: Gender filter (comma-separated list)
+            is_available: Availability filter (True for available only, False for unavailable only)
             q: Search query string
 
         Returns:
@@ -50,6 +52,7 @@ class CatalogServiceInterface(ABC):
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
             gender: Optional[str] = None,
+            is_available: Optional[bool] = None,
             q: Optional[str] = None
     ) -> CatalogDTO:
         """
@@ -65,6 +68,7 @@ class CatalogServiceInterface(ABC):
             min_year: Minimum year filter
             max_year: Maximum year filter
             gender: Gender filter (comma-separated list)
+            is_available: Availability filter (True for available only, False for unavailable only)
             q: Search query string
 
         Returns:

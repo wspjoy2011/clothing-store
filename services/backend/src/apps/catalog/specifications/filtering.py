@@ -6,6 +6,7 @@ from typing import (
     Union,
     Set
 )
+
 from apps.catalog.interfaces.specifications import FilterSpecificationInterface
 
 
@@ -16,6 +17,7 @@ class ProductFilterSpecification(FilterSpecificationInterface):
         self._min_year: Optional[int] = None
         self._max_year: Optional[int] = None
         self._genders: Optional[Set[str]] = None
+        self._is_available: Optional[bool] = None
 
     def set_year_range(self, min_year: Optional[int] = None, max_year: Optional[int] = None) -> None:
         """
@@ -41,6 +43,15 @@ class ProductFilterSpecification(FilterSpecificationInterface):
 
         self._genders = {self._capitalize_gender(gender) for gender in genders if gender}
 
+    def set_availability(self, is_available: bool) -> None:
+        """
+        Set availability filter
+
+        Args:
+            is_available: True to show only available products, False to show only unavailable
+        """
+        self._is_available = is_available
+
     @staticmethod
     def _capitalize_gender(gender: str) -> str:
         """
@@ -64,7 +75,8 @@ class ProductFilterSpecification(FilterSpecificationInterface):
         return (
                 self._min_year is None and
                 self._max_year is None and
-                (self._genders is None or len(self._genders) == 0)
+                (self._genders is None or len(self._genders) == 0) and
+                self._is_available is None
         )
 
     def to_sql(self) -> Tuple[str, List[Any]]:
@@ -90,6 +102,14 @@ class ProductFilterSpecification(FilterSpecificationInterface):
             conditions.append(f"gender IN ({placeholders})")
             params.extend(self._genders)
 
+        if self._is_available is not None:
+            if self._is_available:
+                conditions.append("inventory.is_active = %s AND inventory.is_in_stock = %s")
+                params.extend([True, True])
+            else:
+                conditions.append("(inventory.is_active = %s OR inventory.is_in_stock = %s OR inventory.id IS NULL)")
+                params.extend([False, False])
+
         if conditions:
             where_clause = "WHERE " + " AND ".join(conditions)
             return where_clause, params
@@ -110,3 +130,5 @@ class ProductFilterSpecification(FilterSpecificationInterface):
             self._max_year = int(value)
         elif field == 'gender' and value:
             self.set_genders(value)
+        elif field == 'is_available' and value is not None:
+            self.set_availability(bool(value))

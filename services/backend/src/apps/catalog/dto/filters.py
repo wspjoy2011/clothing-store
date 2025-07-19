@@ -18,7 +18,15 @@ class CheckboxFilterDTO:
 
 
 @dataclass
+class AvailabilityFilterDTO:
+    """DTO for availability filter data"""
+    type: str = "boolean"
+    default: bool = False
+
+
+@dataclass
 class FiltersDTO:
     """DTO containing all available filters"""
     gender: Optional[CheckboxFilterDTO] = None
     year: Optional[RangeFilterDTO] = None
+    is_available: Optional[AvailabilityFilterDTO] = None

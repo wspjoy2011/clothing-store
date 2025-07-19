@@ -20,7 +20,8 @@ from search.interfaces import AutocompleteClientInterface
 
 PaginationSpecificationFactory = Callable[[int, int], PaginationSpecificationInterface]
 OrderingSpecificationFactory = Callable[[Optional[str]], OrderingSpecificationInterface]
-FilterSpecificationFactory = Callable[[Optional[int], Optional[int], Optional[str]], FilterSpecificationInterface]
+FilterSpecificationFactory = Callable[
+    [Optional[int], Optional[int], Optional[str], Optional[bool]], FilterSpecificationInterface]
 SearchSpecificationFactory = Callable[[Optional[str]], SearchSpecificationInterface]
 CategorySpecificationFactory = Callable[[int, Optional[int], Optional[int]], CategorySpecificationInterface]
 
@@ -69,6 +70,7 @@ class CatalogService(CatalogServiceInterface):
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
             gender: Optional[str] = None,
+            is_available: Optional[bool] = None,
             q: Optional[str] = None
     ) -> CatalogDTO:
         """
@@ -81,6 +83,7 @@ class CatalogService(CatalogServiceInterface):
             min_year: Minimum year filter
             max_year: Maximum year filter
             gender: Gender filter (comma-separated list)
+            is_available: Availability filter (True for available only, False for unavailable only)
             q: Search query string
 
         Returns:
@@ -91,8 +94,8 @@ class CatalogService(CatalogServiceInterface):
         ordering_spec = self._ordering_specification_factory(ordering)
 
         filter_spec = None
-        if min_year is not None or max_year is not None or gender:
-            filter_spec = self._filter_specification_factory(min_year, max_year, gender)
+        if min_year is not None or max_year is not None or gender or is_available is not None:
+            filter_spec = self._filter_specification_factory(min_year, max_year, gender, is_available)
 
         search_spec = None
         if q:
@@ -130,6 +133,7 @@ class CatalogService(CatalogServiceInterface):
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
             gender: Optional[str] = None,
+            is_available: Optional[bool] = None,
             q: Optional[str] = None
     ) -> CatalogDTO:
         """
@@ -145,6 +149,7 @@ class CatalogService(CatalogServiceInterface):
             min_year: Minimum year filter
             max_year: Maximum year filter
             gender: Gender filter (comma-separated list)
+            is_available: Availability filter (True for available only, False for unavailable only)
             q: Search query string
 
         Returns:
@@ -159,8 +164,8 @@ class CatalogService(CatalogServiceInterface):
         ordering_spec = self._ordering_specification_factory(ordering)
 
         filter_spec = None
-        if min_year is not None or max_year is not None or gender:
-            filter_spec = self._filter_specification_factory(min_year, max_year, gender)
+        if min_year is not None or max_year is not None or gender or is_available is not None:
+            filter_spec = self._filter_specification_factory(min_year, max_year, gender, is_available)
 
         search_spec = None
         if q:

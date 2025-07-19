@@ -25,7 +25,8 @@ def create_ordering_specification(ordering: Optional[str] = None) -> OrderingSpe
 def create_product_filter_specification(
         min_year: Optional[int] = None,
         max_year: Optional[int] = None,
-        gender: Optional[str] = None
+        gender: Optional[str] = None,
+        is_available: Optional[bool] = None
 ) -> FilterSpecificationInterface:
     """
     Create a product filter specification
@@ -34,6 +35,7 @@ def create_product_filter_specification(
         min_year: Minimum year (inclusive)
         max_year: Maximum year (inclusive)
         gender: Gender(s) to filter by (comma-separated list)
+        is_available: True to show only available products, False to show only unavailable
 
     Returns:
         Initialized filter specification
@@ -45,6 +47,9 @@ def create_product_filter_specification(
 
     if gender:
         spec.set_genders(gender)
+
+    if is_available is not None:
+        spec.set_availability(is_available)
 
     return spec
 

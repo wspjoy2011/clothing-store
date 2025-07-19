@@ -7,5 +7,9 @@ FILTERS_FULL_EXAMPLE = {
         "min": 2020,
         "max": 2023,
         "type": "range"
+    },
+    "is_available": {
+        "type": "boolean",
+        "default": False
     }
 }
