@@ -1,3 +1,4 @@
+import re
 from typing import Optional, List, Any, Tuple
 from decimal import Decimal
 
@@ -641,15 +642,9 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             Modified ordering SQL with table prefixes
         """
-        replacements = {
-            'id ': 'p.product_id ',
-            'id,': 'p.product_id,',
-            'year ': 'p.year ',
-            'year,': 'p.year,'
-        }
-
-        for old, new in replacements.items():
-            ordering_sql = ordering_sql.replace(old, new)
+        ordering_sql = re.sub(r'\bproduct_id\b', 'p.product_id', ordering_sql)
+        ordering_sql = re.sub(r'\byear\b', 'p.year', ordering_sql)
+        ordering_sql = re.sub(r'\bid\b', 'p.product_id', ordering_sql)
 
         return ordering_sql
 

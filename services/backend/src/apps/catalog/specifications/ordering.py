@@ -7,7 +7,7 @@ class OrderingSpecification(OrderingSpecificationInterface):
     """Specification for ordering results"""
 
     def __init__(self, ordering: Optional[str] = None):
-        self._allowed_fields = ["id", "year"]
+        self._allowed_fields = ["id", "year", "product_id"]
 
         self._ordering_fields = self._parse_ordering(ordering)
 
@@ -24,6 +24,10 @@ class OrderingSpecification(OrderingSpecificationInterface):
 
         if not processed_fields:
             return ["-id"]
+
+        has_product_id = any(field.lstrip('-') == 'product_id' for field in processed_fields)
+        if not has_product_id:
+            processed_fields.append("product_id")
 
         return processed_fields
 
