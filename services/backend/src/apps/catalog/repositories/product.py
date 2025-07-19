@@ -1,7 +1,8 @@
 from typing import Optional, List, Any, Tuple
+from decimal import Decimal
 
 from apps.catalog.dto.filters import FiltersDTO, CheckboxFilterDTO, RangeFilterDTO
-from apps.catalog.dto.products import ProductDTO
+from apps.catalog.dto.products import ProductDTO, InventoryDTO
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
@@ -43,9 +44,14 @@ class ProductRepository(ProductRepositoryInterface):
             ProductDTO if found, None otherwise
         """
         query = f"""
-            SELECT product_id, gender, year, product_display_name, image_url, slug
-            FROM {self.APP_NAME}_products 
-            WHERE product_id = %s
+            SELECT 
+                p.product_id, p.gender, p.year, p.product_display_name, p.image_url, p.slug,
+                i.id, i.base_price, i.sale_price, i.currency, i.stock_quantity, 
+                i.reserved_quantity, i.available_quantity, i.is_active, i.is_in_stock,
+                i.created_at, i.updated_at
+            FROM {self.APP_NAME}_products p
+            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+            WHERE p.product_id = %s
         """
 
         logger.info(f"Get product by ID query: {query}")
@@ -56,14 +62,11 @@ class ProductRepository(ProductRepositoryInterface):
         if not result:
             return None
 
-        return ProductDTO(
-            product_id=int(result[0]),
-            gender=result[1],
-            year=int(result[2]),
-            product_display_name=result[3],
-            image_url=result[4],
-            slug=result[5],
-        )
+        if isinstance(result, (list, tuple)):
+            return self._build_product_dto_from_row(tuple(result))
+        else:
+            logger.error(f"Unexpected result type: {type(result)}")
+            return None
 
     async def get_product_by_slug(self, slug: str) -> Optional[ProductDTO]:
         """
@@ -76,9 +79,14 @@ class ProductRepository(ProductRepositoryInterface):
             ProductDTO if found, None otherwise
         """
         query = f"""
-            SELECT product_id, gender, year, product_display_name, image_url, slug
-            FROM {self.APP_NAME}_products 
-            WHERE slug = %s
+            SELECT 
+                p.product_id, p.gender, p.year, p.product_display_name, p.image_url, p.slug,
+                i.id, i.base_price, i.sale_price, i.currency, i.stock_quantity, 
+                i.reserved_quantity, i.available_quantity, i.is_active, i.is_in_stock,
+                i.created_at, i.updated_at
+            FROM {self.APP_NAME}_products p
+            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+            WHERE p.slug = %s
         """
 
         logger.info(f"Get product by slug query: {query}")
@@ -89,14 +97,11 @@ class ProductRepository(ProductRepositoryInterface):
         if not result:
             return None
 
-        return ProductDTO(
-            product_id=int(result[0]),
-            gender=result[1],
-            year=int(result[2]),
-            product_display_name=result[3],
-            image_url=result[4],
-            slug=result[5],
-        )
+        if isinstance(result, (list, tuple)):
+            return self._build_product_dto_from_row(tuple(result))
+        else:
+            logger.error(f"Unexpected result type: {type(result)}")
+            return None
 
     async def get_products_with_specifications(
             self,
@@ -299,7 +304,7 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             List of product DTOs matching the specifications
         """
-        self._prepare_query_builder(filter_spec, search_spec, ordering_spec, category_spec)
+        self._prepare_query_builder_with_inventory(filter_spec, search_spec, ordering_spec, category_spec)
         self._query_builder.limit(pagination_spec.get_limit()).offset(pagination_spec.get_offset())
 
         query, params = self._query_builder.build()
@@ -308,17 +313,10 @@ class ProductRepository(ProductRepositoryInterface):
 
         result = await self._dao.execute(query, params)
 
-        return [
-            ProductDTO(
-                product_id=int(row[0]),
-                gender=row[1],
-                year=int(row[2]),
-                product_display_name=row[3],
-                image_url=row[4],
-                slug=row[5],
-            )
-            for row in (result or [])
-        ]
+        if not result:
+            return []
+
+        return [self._build_product_dto_from_row(tuple(row)) for row in result]
 
     async def _get_products_count(
             self,
@@ -475,7 +473,7 @@ class ProductRepository(ProductRepositoryInterface):
         year_result = await self._dao.execute(year_query, year_params, fetch_one=True)
         return year_result if year_result else (None, None)
 
-    def _prepare_query_builder(
+    def _prepare_query_builder_with_inventory(
             self,
             filter_spec: Optional[FilterSpecificationInterface],
             search_spec: Optional[SearchSpecificationInterface],
@@ -483,7 +481,7 @@ class ProductRepository(ProductRepositoryInterface):
             category_spec: Optional[CategorySpecificationInterface] = None
     ) -> None:
         """
-        Prepare query builder with all specifications
+        Prepare query builder with all specifications including inventory join
 
         Args:
             filter_spec: Optional specification for filtering results
@@ -492,14 +490,20 @@ class ProductRepository(ProductRepositoryInterface):
             category_spec: Optional specification for category filtering
         """
         self._query_builder.reset().select(
-            "product_id", "gender", "year", "product_display_name", "image_url", "slug"
+            "p.product_id", "p.gender", "p.year", "p.product_display_name", "p.image_url", "p.slug",
+            "i.id", "i.base_price", "i.sale_price", "i.currency", "i.stock_quantity",
+            "i.reserved_quantity", "i.available_quantity", "i.is_active", "i.is_in_stock",
+            "i.created_at", "i.updated_at"
+        ).from_table(f"{self.APP_NAME}_products p").join(
+            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
         )
 
         if category_spec and not category_spec.is_empty():
-            self._apply_category_spec(category_spec)
+            self._apply_category_spec_with_alias(category_spec)
 
         if filter_spec and not filter_spec.is_empty():
             filter_sql, filter_params = filter_spec.to_sql()
+            filter_sql = self._prefix_columns_with_alias(filter_sql, 'p')
             self._parse_sql_conditions(filter_sql, filter_params)
 
         order_by_clauses = []
@@ -508,6 +512,10 @@ class ProductRepository(ProductRepositoryInterface):
         if search_spec and not search_spec.is_empty():
             search_sql, search_params = search_spec.to_sql()
             where_sql, search_order_sql = self._split_search_sql(search_sql)
+            where_sql = where_sql.replace("product_display_name", "p.product_display_name")
+            search_order_sql = search_order_sql.replace("product_display_name",
+                                                        "p.product_display_name") if search_order_sql else ""
+
             self._parse_sql_conditions(where_sql, search_params[:1])
 
             if search_order_sql:
@@ -518,15 +526,34 @@ class ProductRepository(ProductRepositoryInterface):
             ordering_sql, _ = ordering_spec.to_sql()
             ordering_sql_cleaned = ordering_sql.replace("ORDER BY", "").strip()
             if ordering_sql_cleaned:
+                ordering_sql_cleaned = self._prefix_ordering_fields(ordering_sql_cleaned)
                 order_by_clauses.append(ordering_sql_cleaned)
 
         if order_by_clauses:
             final_ordering = ", ".join(order_by_clauses)
             self._query_builder.order_by(final_ordering, *order_by_params)
 
-    def _apply_category_spec(self, category_spec: CategorySpecificationInterface) -> None:
+    def _prepare_query_builder(
+            self,
+            filter_spec: Optional[FilterSpecificationInterface],
+            search_spec: Optional[SearchSpecificationInterface],
+            ordering_spec: Optional[OrderingSpecificationInterface] = None,
+            category_spec: Optional[CategorySpecificationInterface] = None
+    ) -> None:
         """
-        Apply category specification to query builder
+        Prepare query builder with all specifications (legacy method for backward compatibility)
+
+        Args:
+            filter_spec: Optional specification for filtering results
+            search_spec: Optional specification for search
+            ordering_spec: Optional specification for ordering results
+            category_spec: Optional specification for category filtering
+        """
+        self._prepare_query_builder_with_inventory(filter_spec, search_spec, ordering_spec, category_spec)
+
+    def _apply_category_spec_with_alias(self, category_spec: CategorySpecificationInterface) -> None:
+        """
+        Apply category specification to query builder with proper table aliases
 
         Args:
             category_spec: Category specification with joins and filters
@@ -534,11 +561,110 @@ class ProductRepository(ProductRepositoryInterface):
         category_sql, category_params = category_spec.to_sql()
         joins_part, where_part = category_sql.split("WHERE", 1)
 
+        joins_part = joins_part.replace(f"{self.APP_NAME}_products.article_type_id", "p.article_type_id")
+
         for join_clause in joins_part.strip().split("JOIN"):
             if join_clause.strip():
                 self._query_builder.join(f"JOIN {join_clause.strip()}")
 
         self._query_builder.where(where_part.strip(), *category_params)
+
+    def _apply_category_spec(self, category_spec: CategorySpecificationInterface) -> None:
+        """
+        Apply category specification to query builder (legacy method)
+
+        Args:
+            category_spec: Category specification with joins and filters
+        """
+        self._apply_category_spec_with_alias(category_spec)
+
+    def _prefix_columns_with_alias(self, sql: str, alias: str) -> str:
+        """
+        Add table alias prefix to column names in SQL
+
+        Args:
+            sql: SQL string to modify
+            alias: Table alias to use
+
+        Returns:
+            Modified SQL string with prefixed columns
+        """
+        replacements = {
+            'year >=': f'{alias}.year >=',
+            'year <=': f'{alias}.year <=',
+            'gender IN': f'{alias}.gender IN'
+        }
+
+        for old, new in replacements.items():
+            sql = sql.replace(old, new)
+
+        return sql
+
+    def _prefix_ordering_fields(self, ordering_sql: str) -> str:
+        """
+        Add table alias prefix to ordering fields
+
+        Args:
+            ordering_sql: Ordering SQL to modify
+
+        Returns:
+            Modified ordering SQL with table prefixes
+        """
+        replacements = {
+            'id ': 'p.product_id ',
+            'id,': 'p.product_id,',
+            'year ': 'p.year ',
+            'year,': 'p.year,'
+        }
+
+        for old, new in replacements.items():
+            ordering_sql = ordering_sql.replace(old, new)
+
+        return ordering_sql
+
+    def _build_product_dto_from_row(self, row: tuple) -> ProductDTO:
+        """
+        Build ProductDTO from database row including inventory data
+
+        Args:
+            row: Database result row
+
+        Returns:
+            ProductDTO with inventory data if available
+        """
+        product_id = int(row[0])
+        gender = row[1]
+        year = int(row[2])
+        product_display_name = row[3]
+        image_url = row[4]
+        slug = row[5]
+
+        inventory = None
+        if row[6] is not None:
+            inventory = InventoryDTO(
+                id=int(row[6]),
+                product_id=product_id,
+                base_price=Decimal(str(row[7])),
+                sale_price=Decimal(str(row[8])) if row[8] is not None else None,
+                currency=row[9],
+                stock_quantity=int(row[10]),
+                reserved_quantity=int(row[11]),
+                available_quantity=int(row[12]),
+                is_active=bool(row[13]),
+                is_in_stock=bool(row[14]),
+                created_at=row[15],
+                updated_at=row[16]
+            )
+
+        return ProductDTO(
+            product_id=product_id,
+            gender=gender,
+            year=year,
+            product_display_name=product_display_name,
+            image_url=image_url,
+            slug=slug,
+            inventory=inventory
+        )
 
     def _parse_sql_conditions(self, sql_conditions: str, params: List[Any]) -> None:
         """

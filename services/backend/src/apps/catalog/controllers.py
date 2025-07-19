@@ -1,19 +1,55 @@
-from dataclasses import asdict
 from typing import Optional
 from urllib.parse import urlencode
 
 from fastapi import HTTPException
 
+from apps.catalog.dto.products import ProductDTO, InventoryDTO
 from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.schemas.filters import FiltersResponseSchema, CheckboxFilterSchema, RangeFilterSchema
 from apps.catalog.schemas.responses import (
     ProductListResponseSchema,
     ProductSchema,
+    InventorySchema,
     CategoryMenuResponseSchema,
     MasterCategorySchema,
     SubCategorySchema,
     ArticleTypeSchema
 )
+
+
+def _convert_inventory_dto_to_schema(inventory_dto: InventoryDTO) -> InventorySchema:
+    """Convert InventoryDTO to InventorySchema"""
+    return InventorySchema(
+        id=inventory_dto.id,
+        product_id=inventory_dto.product_id,
+        base_price=inventory_dto.base_price,
+        sale_price=inventory_dto.sale_price,
+        currency=inventory_dto.currency,
+        stock_quantity=inventory_dto.stock_quantity,
+        reserved_quantity=inventory_dto.reserved_quantity,
+        available_quantity=inventory_dto.available_quantity,
+        is_active=inventory_dto.is_active,
+        is_in_stock=inventory_dto.is_in_stock,
+        created_at=inventory_dto.created_at,
+        updated_at=inventory_dto.updated_at
+    )
+
+
+def _convert_product_dto_to_schema(product_dto: ProductDTO) -> ProductSchema:
+    """Convert ProductDTO to ProductSchema with proper inventory conversion"""
+    inventory_schema = None
+    if product_dto.inventory:
+        inventory_schema = _convert_inventory_dto_to_schema(product_dto.inventory)
+
+    return ProductSchema(
+        product_id=product_dto.product_id,
+        gender=product_dto.gender,
+        year=product_dto.year,
+        product_display_name=product_dto.product_display_name,
+        image_url=product_dto.image_url,
+        slug=product_dto.slug,
+        inventory=inventory_schema
+    )
 
 
 async def get_product_list_controller(
@@ -36,7 +72,7 @@ async def get_product_list_controller(
         q=q
     )
 
-    products = [ProductSchema(**asdict(product)) for product in catalog_dto.products]
+    products = [_convert_product_dto_to_schema(product) for product in catalog_dto.products]
 
     total_pages = catalog_dto.pagination.total_pages
 
@@ -93,7 +129,7 @@ async def get_product_by_id_controller(
             detail=f"Product with ID {product_id} not found"
         )
 
-    return ProductSchema(**asdict(product_dto))
+    return _convert_product_dto_to_schema(product_dto)
 
 
 async def get_product_by_slug_controller(
@@ -121,7 +157,7 @@ async def get_product_by_slug_controller(
             detail=f"Product with slug '{slug}' not found"
         )
 
-    return ProductSchema(**asdict(product_dto))
+    return _convert_product_dto_to_schema(product_dto)
 
 
 async def get_filters_controller(
@@ -254,7 +290,7 @@ async def get_products_by_category_controller(
         q=q
     )
 
-    products = [ProductSchema(**asdict(product)) for product in catalog_dto.products]
+    products = [_convert_product_dto_to_schema(product) for product in catalog_dto.products]
 
     total_pages = catalog_dto.pagination.total_pages
 

@@ -1,6 +1,24 @@
+from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel
+
+
+class InventorySchema(BaseModel):
+    """Schema for product inventory information in API responses"""
+    id: int
+    product_id: int
+    base_price: Decimal
+    sale_price: Optional[Decimal] = None
+    currency: str
+    stock_quantity: int
+    reserved_quantity: int
+    available_quantity: int
+    is_active: bool
+    is_in_stock: bool
+    created_at: datetime
+    updated_at: datetime
 
 
 class ProductSchema(BaseModel):
@@ -11,6 +29,8 @@ class ProductSchema(BaseModel):
     product_display_name: str
     image_url: str
     slug: str
+    inventory: Optional[InventorySchema] = None
+
 
 class ProductListResponseSchema(BaseModel):
     """Schema for paginated product list response with navigation links"""
