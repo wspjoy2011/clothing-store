@@ -1,4 +1,28 @@
 /**
+ * Creates initial filters state
+ * @returns {Object} Initial filters state
+ */
+export function createInitialFiltersState() {
+    return {
+        activeFilters: {
+            gender: null,
+            min_year: null,
+            max_year: null,
+            is_available: null
+        },
+        availableFilters: {
+            gender: null,
+            year: null,
+            is_available: null
+        },
+        searchQuery: '',
+        filtersLoading: false,
+        filtersError: null,
+        isFilterDrawerOpen: false
+    };
+}
+
+/**
  * Creates filter actions for stores
  * @returns {Object} Filter actions
  */
@@ -17,7 +41,7 @@ export function createFiltersActions() {
          * @param {Object} filters - Available filters object
          */
         setAvailableFilters(filters) {
-            this.availableFilters = filters || {gender: null, year: null};
+            this.availableFilters = filters || {gender: null, year: null, is_available: null};
         },
 
         /**
@@ -28,6 +52,7 @@ export function createFiltersActions() {
             this.activeFilters.gender = query.gender || null;
             this.activeFilters.min_year = query.min_year ? parseInt(query.min_year) : null;
             this.activeFilters.max_year = query.max_year ? parseInt(query.max_year) : null;
+            this.activeFilters.is_available = query.is_available ? query.is_available === 'true' : null;
             this.searchQuery = query.q || '';
         },
 
@@ -47,6 +72,13 @@ export function createFiltersActions() {
         },
 
         /**
+         * Clear availability filter
+         */
+        clearAvailabilityFilter() {
+            this.activeFilters.is_available = null;
+        },
+
+        /**
          * Clear all filters
          */
         clearAllFilters() {
@@ -60,7 +92,8 @@ export function createFiltersActions() {
             this.activeFilters = {
                 gender: null,
                 min_year: null,
-                max_year: null
+                max_year: null,
+                is_available: null
             };
             this.searchQuery = '';
         },
@@ -115,35 +148,14 @@ export function createFiltersGetters() {
             let count = 0;
             if (state.activeFilters.gender) count++;
             if (state.activeFilters.min_year || state.activeFilters.max_year) count++;
+            if (state.activeFilters.is_available !== null) count++;
             if (state.searchQuery && state.searchQuery.trim()) count++;
             return count;
         },
 
         hasAvailableFilters(state) {
             return state.availableFilters &&
-                (state.availableFilters.gender || state.availableFilters.year);
+                (state.availableFilters.gender || state.availableFilters.year || state.availableFilters.is_available);
         }
-    };
-}
-
-/**
- * Creates initial filters state
- * @returns {Object} Initial filters state
- */
-export function createInitialFiltersState() {
-    return {
-        activeFilters: {
-            gender: null,
-            min_year: null,
-            max_year: null
-        },
-        availableFilters: {
-            gender: null,
-            year: null
-        },
-        searchQuery: '',
-        filtersLoading: false,
-        filtersError: null,
-        isFilterDrawerOpen: false
     };
 }

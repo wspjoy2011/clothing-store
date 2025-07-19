@@ -31,6 +31,16 @@
               }}
             </v-chip>
 
+            <v-chip
+                v-if="filterStore.activeFilters.is_available !== null"
+                size="small"
+                class="ml-2 mb-1"
+                closable
+                @click:close="clearAvailabilityFilter"
+            >
+              Available only
+            </v-chip>
+
             <v-progress-circular
                 v-if="filterStore.filtersLoading"
                 size="16"
@@ -74,6 +84,10 @@ const clearGenderFilter = () => {
 
 const clearYearFilter = () => {
   props.filterStore.clearYearFilter();
+};
+
+const clearAvailabilityFilter = () => {
+  props.filterStore.clearAvailabilityFilter();
 };
 
 const clearAllFilters = () => {

@@ -43,6 +43,12 @@ export function useFiltering(route, store, options = {}) {
             delete query.max_year;
         }
 
+        if (activeFilters.is_available !== null) {
+            query.is_available = activeFilters.is_available.toString();
+        } else {
+            delete query.is_available;
+        }
+
         if (store.searchQuery && store.searchQuery.trim()) {
             query.q = store.searchQuery.trim();
         } else {

@@ -165,7 +165,7 @@ export const useCatalogStore = defineStore('catalog', {
                 this.availableFilters = await catalogService.getFilters(this.searchQuery);
             } catch (err) {
                 this.filtersError = err.response?.data || {message: 'Error loading filters'};
-                this.availableFilters = {gender: null, year: null};
+                this.availableFilters = {gender: null, year: null, is_available: null};
             } finally {
                 this.filtersLoading = false;
             }

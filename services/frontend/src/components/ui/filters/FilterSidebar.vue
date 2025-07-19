@@ -26,6 +26,7 @@
       <v-expansion-panels variant="accordion" multiple>
         <gender-filter v-if="hasGenderFilter"></gender-filter>
         <year-range-filter v-if="hasYearFilter"></year-range-filter>
+        <availability-filter v-if="hasAvailabilityFilter"></availability-filter>
       </v-expansion-panels>
     </v-card-text>
   </v-card>
@@ -35,6 +36,7 @@
 import {computed, inject} from 'vue';
 import GenderFilter from './GenderFilter.vue';
 import YearRangeFilter from './YearRangeFilter.vue';
+import AvailabilityFilter from './AvailabilityFilter.vue';
 
 const clearAllFilters = inject('clearAllFilters', null);
 const availableFilters = inject('availableFilters', null);
@@ -56,6 +58,10 @@ const hasYearFilter = computed(() => {
   return currentAvailableFilters.value?.year &&
       currentAvailableFilters.value.year.min !== null &&
       currentAvailableFilters.value.year.max !== null;
+});
+
+const hasAvailabilityFilter = computed(() => {
+  return currentAvailableFilters.value?.is_available;
 });
 
 const clearFilters = () => {

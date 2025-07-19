@@ -30,6 +30,9 @@ export default {
         if (filters.max_year) {
             params.max_year = filters.max_year
         }
+        if (filters.is_available !== null && filters.is_available !== undefined) {
+            params.is_available = filters.is_available
+        }
 
         if (filters.q) {
             params.q = filters.q
@@ -95,7 +98,6 @@ export default {
             const response = await api.get(`${BASE_URL}/products/suggestions`, {params});
             return response.data || [];
         } catch (error) {
-            console.error('Error fetching product suggestions:', error);
             return [];
         }
     }
