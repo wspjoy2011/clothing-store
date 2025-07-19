@@ -1,8 +1,8 @@
 <template>
   <div class="action-buttons">
     <v-btn
-        :disabled="!isAvailable"
-        :color="isAvailable ? 'primary' : 'grey'"
+        :disabled="!canAddToCart"
+        :color="getActionButtonColor()"
         size="large"
         variant="flat"
         block
@@ -10,12 +10,12 @@
         prepend-icon="mdi-cart-plus"
         @click="handleAddToCart"
     >
-      {{ isAvailable ? 'Add to Cart' : 'Out of Stock' }}
+      {{ getActionButtonText() }}
     </v-btn>
 
     <v-btn
         :disabled="!isAvailable"
-        :color="isAvailable ? 'secondary' : 'grey'"
+        :color="getActionButtonColor('secondary')"
         size="large"
         variant="outlined"
         block
@@ -39,7 +39,8 @@
 </template>
 
 <script setup>
-import {computed} from 'vue';
+import {toRef} from 'vue';
+import {useProductInventory} from '@/composables/product/useProductInventory';
 
 const props = defineProps({
   product: {
@@ -50,12 +51,16 @@ const props = defineProps({
 
 const emit = defineEmits(['go-back', 'add-to-cart', 'add-to-wishlist']);
 
-const isAvailable = computed(() =>
-    props.product.inventory?.is_in_stock && props.product.inventory?.is_active
-);
+const productRef = toRef(props, 'product');
+const {
+  isAvailable,
+  canAddToCart,
+  getActionButtonText,
+  getActionButtonColor
+} = useProductInventory(productRef);
 
 const handleAddToCart = () => {
-  if (!isAvailable.value) return;
+  if (!canAddToCart.value) return;
   emit('add-to-cart');
   // TODO: Implement cart functionality
 };

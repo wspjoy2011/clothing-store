@@ -11,17 +11,17 @@
         <!-- Discount Price Display -->
         <div v-if="hasDiscount" class="price-container price-inline">
           <span class="original-price text-h5">
-            {{ product.inventory.base_price }} {{ product.inventory.currency }}
+            {{ formattedBasePrice }}
           </span>
           <span class="sale-price text-h4">
-            {{ product.inventory.sale_price }} {{ product.inventory.currency }}
+            {{ formattedSalePrice }}
           </span>
         </div>
 
         <!-- Regular Price Display -->
         <div v-else class="price-container">
           <span class="base-price text-h4">
-            {{ product.inventory.base_price }} {{ product.inventory.currency }}
+            {{ formattedBasePrice }}
           </span>
         </div>
       </div>
@@ -69,7 +69,7 @@
           <v-icon icon="mdi-package-variant" class="mr-2" color="primary"/>
           <span class="meta-label">Available:</span>
           <v-chip
-              :color="stockChipColor"
+              :color="stockColor"
               variant="outlined"
               size="small"
               class="ml-2"
@@ -89,7 +89,8 @@
 </template>
 
 <script setup>
-import {computed} from 'vue';
+import {toRef} from 'vue';
+import {useProductInventory} from '@/composables/product/useProductInventory';
 import ProductActionButtons from './ProductActionButtons.vue';
 
 const props = defineProps({
@@ -101,44 +102,14 @@ const props = defineProps({
 
 const emit = defineEmits(['go-back']);
 
-const hasDiscount = computed(() => {
-  if (!props.product.inventory?.sale_price || !props.product.inventory?.base_price) {
-    return false;
-  }
-  return parseFloat(props.product.inventory.sale_price) < parseFloat(props.product.inventory.base_price);
-});
-
-const stockText = computed(() => {
-  if (!props.product.inventory) return 'N/A';
-
-  const availableQty = props.product.inventory.available_quantity;
-
-  if (!props.product.inventory.is_active || !props.product.inventory.is_in_stock) {
-    return 'Out of Stock';
-  }
-
-  if (availableQty <= 0) {
-    return 'Out of Stock';
-  } else if (availableQty <= 5) {
-    return `${availableQty} left`;
-  } else {
-    return 'In Stock';
-  }
-});
-
-const stockChipColor = computed(() => {
-  if (!props.product.inventory) return 'grey';
-
-  const availableQty = props.product.inventory.available_quantity;
-
-  if (!props.product.inventory.is_active || !props.product.inventory.is_in_stock || availableQty <= 0) {
-    return 'error';
-  } else if (availableQty <= 5) {
-    return 'warning';
-  } else {
-    return 'success';
-  }
-});
+const productRef = toRef(props, 'product');
+const {
+  hasDiscount,
+  formattedBasePrice,
+  formattedSalePrice,
+  stockText,
+  stockColor
+} = useProductInventory(productRef);
 </script>
 
 <style scoped>

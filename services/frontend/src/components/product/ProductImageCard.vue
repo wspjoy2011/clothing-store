@@ -30,7 +30,8 @@
 </template>
 
 <script setup>
-import {computed} from 'vue';
+import {toRef} from 'vue';
+import {useProductInventory} from '@/composables/product/useProductInventory';
 
 const props = defineProps({
   product: {
@@ -45,9 +46,8 @@ const props = defineProps({
 
 const emit = defineEmits(['image-loaded']);
 
-const isAvailable = computed(() =>
-  props.product.inventory?.is_in_stock && props.product.inventory?.is_active
-);
+const productRef = toRef(props, 'product');
+const {isAvailable} = useProductInventory(productRef);
 
 const handleImageLoaded = () => {
   emit('image-loaded');

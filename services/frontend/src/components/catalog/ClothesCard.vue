@@ -45,17 +45,17 @@
       <div class="price-section">
         <div v-if="hasDiscount" class="price-container price-inline">
           <span class="original-price">
-            {{ product.inventory.base_price }} {{ product.inventory.currency }}
+            {{ formattedBasePrice }}
           </span>
           <span class="sale-price">
-            {{ product.inventory.sale_price }} {{ product.inventory.currency }}
+            {{ formattedSalePrice }}
           </span>
         </div>
 
         <!-- Regular Price Display -->
         <div v-else class="price-container">
           <span class="base-price">
-            {{ product.inventory.base_price }} {{ product.inventory.currency }}
+            {{ formattedBasePrice }}
           </span>
         </div>
       </div>
@@ -64,21 +64,22 @@
     <v-card-actions>
       <v-btn
           :disabled="!isAvailable"
-          :color="isAvailable ? 'primary' : 'grey'"
+          :color="getActionButtonColor()"
           variant="flat"
           class="text-none"
           block
           @click="goToProductDetail"
       >
-        {{ isAvailable ? 'View Details' : 'Unavailable' }}
+        {{ getActionButtonText('View Details') }}
       </v-btn>
     </v-card-actions>
   </v-card>
 </template>
 
 <script setup>
-import {ref, computed} from 'vue';
+import {ref, toRef} from 'vue';
 import {useRouter} from 'vue-router';
+import {useProductInventory} from '@/composables/product/useProductInventory';
 
 const props = defineProps({
   product: {
@@ -101,16 +102,15 @@ const router = useRouter();
 const hover = ref(false);
 const imageLoading = ref(true);
 
-const isAvailable = computed(() =>
-    props.product.inventory?.is_in_stock && props.product.inventory?.is_active
-);
-
-const hasDiscount = computed(() => {
-  if (!props.product.inventory?.sale_price || !props.product.inventory?.base_price) {
-    return false;
-  }
-  return parseFloat(props.product.inventory.sale_price) < parseFloat(props.product.inventory.base_price);
-});
+const productRef = toRef(props, 'product');
+const {
+  isAvailable,
+  hasDiscount,
+  formattedBasePrice,
+  formattedSalePrice,
+  getActionButtonText,
+  getActionButtonColor
+} = useProductInventory(productRef);
 
 const imageLoaded = () => {
   imageLoading.value = false;
