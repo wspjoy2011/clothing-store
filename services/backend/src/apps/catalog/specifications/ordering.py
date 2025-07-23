@@ -7,7 +7,7 @@ class OrderingSpecification(OrderingSpecificationInterface):
     """Specification for ordering results"""
 
     def __init__(self, ordering: Optional[str] = None):
-        self._allowed_fields = ["id", "year", "product_id"]
+        self._allowed_fields = ["id", "year", "product_id", "price"]
 
         self._ordering_fields = self._parse_ordering(ordering)
 
@@ -37,9 +37,16 @@ class OrderingSpecification(OrderingSpecificationInterface):
 
         for field in self._ordering_fields:
             if field.startswith('-'):
-                sql_parts.append(f"{field[1:]} DESC")
+                field_name = field[1:]
+                if field_name == 'price':
+                    sql_parts.append("COALESCE(i.sale_price, i.base_price) DESC")
+                else:
+                    sql_parts.append(f"{field_name} DESC")
             else:
-                sql_parts.append(f"{field} ASC")
+                if field == 'price':
+                    sql_parts.append("COALESCE(i.sale_price, i.base_price) ASC")
+                else:
+                    sql_parts.append(f"{field} ASC")
 
         sql = f"ORDER BY {', '.join(sql_parts)}"
         return sql, []

@@ -708,11 +708,36 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             Modified ordering SQL with table prefixes
         """
-        ordering_sql = re.sub(r'\bproduct_id\b', 'p.product_id', ordering_sql)
-        ordering_sql = re.sub(r'\byear\b', 'p.year', ordering_sql)
-        ordering_sql = re.sub(r'\bid\b', 'p.product_id', ordering_sql)
+        parts = []
 
-        return ordering_sql
+        current_part = ""
+        paren_count = 0
+
+        for char in ordering_sql:
+            if char == '(':
+                paren_count += 1
+            elif char == ')':
+                paren_count -= 1
+            elif char == ',' and paren_count == 0:
+                parts.append(current_part.strip())
+                current_part = ""
+                continue
+            current_part += char
+
+        if current_part.strip():
+            parts.append(current_part.strip())
+
+        processed_parts = []
+        for part in parts:
+            if 'COALESCE' in part:
+                processed_parts.append(part)
+            else:
+                part = re.sub(r'\bproduct_id\b', 'p.product_id', part)
+                part = re.sub(r'\byear\b', 'p.year', part)
+                part = re.sub(r'\bid\b', 'p.product_id', part)
+                processed_parts.append(part)
+
+        return ', '.join(processed_parts)
 
     def _build_product_dto_from_row(self, row: tuple) -> ProductDTO:
         """
