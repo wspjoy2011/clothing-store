@@ -32,6 +32,20 @@
             </v-chip>
 
             <v-chip
+                v-if="filterStore.activeFilters.min_price || filterStore.activeFilters.max_price"
+                size="small"
+                class="ml-2 mb-1"
+                closable
+                @click:close="clearPriceFilter"
+            >
+              Price: ${{
+                filterStore.activeFilters.min_price || filterStore.availableFilters.price?.min
+              }}-${{
+                filterStore.activeFilters.max_price || filterStore.availableFilters.price?.max
+              }}
+            </v-chip>
+
+            <v-chip
                 v-if="filterStore.activeFilters.is_available !== null"
                 size="small"
                 class="ml-2 mb-1"
@@ -86,6 +100,10 @@ const clearYearFilter = () => {
   props.filterStore.clearYearFilter();
 };
 
+const clearPriceFilter = () => {
+  props.filterStore.clearPriceFilter();
+};
+
 const clearAvailabilityFilter = () => {
   props.filterStore.clearAvailabilityFilter();
 };
@@ -93,8 +111,6 @@ const clearAvailabilityFilter = () => {
 const clearAllFilters = () => {
   if (clearAllFiltersFromProvider) {
     clearAllFiltersFromProvider();
-  } else {
-    props.filterStore.clearAllFilters();
   }
 };
 </script>

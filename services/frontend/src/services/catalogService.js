@@ -30,10 +30,15 @@ export default {
         if (filters.max_year) {
             params.max_year = filters.max_year
         }
+        if (filters.min_price) {
+            params.min_price = filters.min_price
+        }
+        if (filters.max_price) {
+            params.max_price = filters.max_price
+        }
         if (filters.is_available !== null && filters.is_available !== undefined) {
             params.is_available = filters.is_available
         }
-
         if (filters.q) {
             params.q = filters.q
         }

@@ -86,7 +86,8 @@ class SQLQueryBuilder(SQLQueryBuilderInterface):
 
     def build_count(self) -> Tuple[str, List[Any]]:
         """Build COUNT query with the same conditions"""
-        query = f"SELECT COUNT(*) FROM {self._base_table}"
+        table_name = self._from_table or self._base_table
+        query = f"SELECT COUNT(*) FROM {table_name}"
 
         if self._join_clauses:
             query += f" {' '.join(self._join_clauses)}"

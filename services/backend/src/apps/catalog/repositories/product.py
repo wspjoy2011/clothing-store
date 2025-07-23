@@ -2,7 +2,8 @@ import re
 from typing import Optional, List, Any, Tuple
 from decimal import Decimal
 
-from apps.catalog.dto.filters import FiltersDTO, CheckboxFilterDTO, RangeFilterDTO, AvailabilityFilterDTO, PriceRangeFilterDTO
+from apps.catalog.dto.filters import FiltersDTO, CheckboxFilterDTO, RangeFilterDTO, AvailabilityFilterDTO, \
+    PriceRangeFilterDTO
 from apps.catalog.dto.products import ProductDTO, InventoryDTO
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.specifications import (
@@ -382,7 +383,7 @@ class ProductRepository(ProductRepositoryInterface):
         if search_spec and not search_spec.is_empty():
             search_sql, search_params = search_spec.to_sql()
             where_sql, _ = self._split_search_sql(search_sql)
-            where_sql = where_sql.replace("product_display_name", "p.product_display_name")
+            where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
             self._parse_sql_conditions(where_sql, search_params[:1])
 
         query, params = self._query_builder.build()
@@ -456,7 +457,7 @@ class ProductRepository(ProductRepositoryInterface):
 
         search_sql, search_params = search_spec.to_sql()
         where_sql, _ = self._split_search_sql(search_sql)
-        where_sql = where_sql.replace("product_display_name", "p.product_display_name")
+        where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
         self._parse_sql_conditions(where_sql, search_params[:1])
 
         count_query, count_params = self._query_builder.build_count()
@@ -493,7 +494,8 @@ class ProductRepository(ProductRepositoryInterface):
         self._query_builder.reset().select("DISTINCT p.gender").from_table(f"{self.APP_NAME}_products p").join(
             f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
         )
-        where_sql = where_sql.replace("product_display_name", "p.product_display_name")
+
+        where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
         self._parse_sql_conditions(where_sql, search_params[:1])
         self._query_builder.where("p.gender IS NOT NULL")
 
@@ -522,7 +524,8 @@ class ProductRepository(ProductRepositoryInterface):
         self._query_builder.reset().select("MIN(p.year)", "MAX(p.year)").from_table(f"{self.APP_NAME}_products p").join(
             f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
         )
-        where_sql = where_sql.replace("product_display_name", "p.product_display_name")
+
+        where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
         self._parse_sql_conditions(where_sql, search_params[:1])
         self._query_builder.where("p.year IS NOT NULL")
 
@@ -554,7 +557,8 @@ class ProductRepository(ProductRepositoryInterface):
         ).from_table(f"{self.APP_NAME}_products p").join(
             f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
         )
-        where_sql = where_sql.replace("product_display_name", "p.product_display_name")
+
+        where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
         self._parse_sql_conditions(where_sql, search_params[:1])
         self._query_builder.where("i.id IS NOT NULL")
 
@@ -606,9 +610,9 @@ class ProductRepository(ProductRepositoryInterface):
         if search_spec and not search_spec.is_empty():
             search_sql, search_params = search_spec.to_sql()
             where_sql, search_order_sql = self._split_search_sql(search_sql)
-            where_sql = where_sql.replace("product_display_name", "p.product_display_name")
-            search_order_sql = search_order_sql.replace("product_display_name",
-                                                        "p.product_display_name") if search_order_sql else ""
+
+            where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
+            search_order_sql = self._safe_alias_replace(search_order_sql, "product_display_name", "p")
 
             self._parse_sql_conditions(where_sql, search_params[:1])
 
@@ -810,3 +814,22 @@ class ProductRepository(ProductRepositoryInterface):
             where_part, order_by_part = search_sql.split("ORDER BY", 1)
             return where_part.strip(), order_by_part.strip()
         return search_sql.strip(), ""
+
+    def _safe_alias_replace(self, sql: str, column_name: str, alias: str) -> str:
+        """
+        Safely replace column name with aliased version only if not already aliased
+
+        Args:
+            sql: SQL string to modify
+            column_name: Column name to replace (e.g., 'product_display_name')
+            alias: Table alias to add (e.g., 'p')
+
+        Returns:
+            Modified SQL string with safe alias replacement
+        """
+        aliased_column = f"{alias}.{column_name}"
+
+        if aliased_column not in sql and column_name in sql:
+            sql = sql.replace(column_name, aliased_column)
+
+        return sql

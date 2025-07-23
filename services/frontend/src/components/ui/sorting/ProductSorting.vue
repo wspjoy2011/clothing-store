@@ -21,7 +21,9 @@ const props = defineProps({
       {title: 'Newest first', value: '-id'},
       {title: 'Oldest first', value: 'id'},
       {title: 'Latest collections first', value: '-year'},
-      {title: 'Earliest collections first', value: 'year'}
+      {title: 'Earliest collections first', value: 'year'},
+      {title: 'Price: Low to High', value: 'price'},
+      {title: 'Price: High to Low', value: '-price'}
     ]
   }
 });
@@ -44,9 +46,3 @@ const selectedOrdering = computed({
   }
 });
 </script>
-
-<style scoped>
-.product-sorting-select {
-  margin-right: auto;
-}
-</style>

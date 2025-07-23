@@ -35,8 +35,8 @@ class ProductSearchSpecification(SearchSpecificationInterface):
             return "", []
 
         sql = """
-        WHERE to_tsvector('public.english_unaccent', product_display_name) @@ plainto_tsquery('public.english_unaccent', %s)
-        ORDER BY ts_rank(to_tsvector('public.english_unaccent', product_display_name), 
-                        plainto_tsquery('public.english_unaccent', %s)) DESC
-        """
+            WHERE to_tsvector('public.english_unaccent', p.product_display_name) @@ plainto_tsquery('public.english_unaccent', %s)
+            ORDER BY ts_rank(to_tsvector('public.english_unaccent', p.product_display_name), 
+                            plainto_tsquery('public.english_unaccent', %s)) DESC
+            """
         return sql, [self._query, self._query]

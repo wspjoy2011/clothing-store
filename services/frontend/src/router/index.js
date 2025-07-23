@@ -39,6 +39,14 @@ const processCatalogRouteProps = (route) => {
         catalogStore.activeFilters.max_year = parseInt(route.query.max_year);
     }
 
+    if (route.query.min_price) {
+        catalogStore.activeFilters.min_price = parseFloat(route.query.min_price);
+    }
+
+    if (route.query.max_price) {
+        catalogStore.activeFilters.max_price = parseFloat(route.query.max_price);
+    }
+
     if (route.query.q) {
         catalogStore.setSearchQuery(route.query.q);
     }

@@ -8,11 +8,14 @@ export function createInitialFiltersState() {
             gender: null,
             min_year: null,
             max_year: null,
+            min_price: null,
+            max_price: null,
             is_available: null
         },
         availableFilters: {
             gender: null,
             year: null,
+            price: null,
             is_available: null
         },
         searchQuery: '',
@@ -52,6 +55,8 @@ export function createFiltersActions() {
             this.activeFilters.gender = query.gender || null;
             this.activeFilters.min_year = query.min_year ? parseInt(query.min_year) : null;
             this.activeFilters.max_year = query.max_year ? parseInt(query.max_year) : null;
+            this.activeFilters.min_price = query.min_price ? parseFloat(query.min_price) : null;
+            this.activeFilters.max_price = query.max_price ? parseFloat(query.max_price) : null;
             this.activeFilters.is_available = query.is_available ? query.is_available === 'true' : null;
             this.searchQuery = query.q || '';
         },
@@ -78,6 +83,11 @@ export function createFiltersActions() {
             this.activeFilters.is_available = null;
         },
 
+        clearPriceFilter() {
+            this.activeFilters.min_price = null;
+            this.activeFilters.max_price = null;
+        },
+
         /**
          * Clear all filters
          */
@@ -93,6 +103,8 @@ export function createFiltersActions() {
                 gender: null,
                 min_year: null,
                 max_year: null,
+                min_price: null,
+                max_price: null,
                 is_available: null
             };
             this.searchQuery = '';
@@ -148,6 +160,7 @@ export function createFiltersGetters() {
             let count = 0;
             if (state.activeFilters.gender) count++;
             if (state.activeFilters.min_year || state.activeFilters.max_year) count++;
+            if (state.activeFilters.min_price || state.activeFilters.max_price) count++;
             if (state.activeFilters.is_available !== null) count++;
             if (state.searchQuery && state.searchQuery.trim()) count++;
             return count;
@@ -155,7 +168,11 @@ export function createFiltersGetters() {
 
         hasAvailableFilters(state) {
             return state.availableFilters &&
-                (state.availableFilters.gender || state.availableFilters.year || state.availableFilters.is_available);
+                (state.availableFilters.gender ||
+                 state.availableFilters.year ||
+                 state.availableFilters.price ||
+                 state.availableFilters.is_available);
         }
     };
 }
+
