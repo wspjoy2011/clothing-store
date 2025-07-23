@@ -5,7 +5,8 @@ from fastapi import HTTPException
 
 from apps.catalog.dto.products import ProductDTO, InventoryDTO
 from apps.catalog.interfaces.services import CatalogServiceInterface
-from apps.catalog.schemas.filters import FiltersResponseSchema, CheckboxFilterSchema, RangeFilterSchema, AvailabilityFilterSchema
+from apps.catalog.schemas.filters import FiltersResponseSchema, CheckboxFilterSchema, RangeFilterSchema, \
+    AvailabilityFilterSchema, PriceRangeFilterSchema
 from apps.catalog.schemas.responses import (
     ProductListResponseSchema,
     ProductSchema,
@@ -15,6 +16,60 @@ from apps.catalog.schemas.responses import (
     SubCategorySchema,
     ArticleTypeSchema
 )
+
+
+def _build_url_with_filters(
+        base_url: str,
+        page_num: int,
+        per_page: int,
+        ordering: Optional[str] = None,
+        min_year: Optional[int] = None,
+        max_year: Optional[int] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        gender: Optional[str] = None,
+        is_available: Optional[bool] = None,
+        q: Optional[str] = None
+) -> str:
+    """
+    Build URL with query parameters for catalog endpoints
+
+    Args:
+        base_url: Base URL without query parameters
+        page_num: Page number
+        per_page: Items per page
+        ordering: Ordering parameter
+        min_year: Minimum year filter
+        max_year: Maximum year filter
+        min_price: Minimum price filter
+        max_price: Maximum price filter
+        gender: Gender filter
+        is_available: Availability filter
+        q: Search query
+
+    Returns:
+        Complete URL with query parameters
+    """
+    params = {'page': page_num, 'per_page': per_page}
+
+    if ordering:
+        params['ordering'] = ordering
+    if min_year is not None:
+        params['min_year'] = min_year
+    if max_year is not None:
+        params['max_year'] = max_year
+    if min_price is not None:
+        params['min_price'] = min_price
+    if max_price is not None:
+        params['max_price'] = max_price
+    if gender:
+        params['gender'] = gender
+    if is_available is not None:
+        params['is_available'] = is_available
+    if q:
+        params['q'] = q
+
+    return f"{base_url}?{urlencode(params)}"
 
 
 def _convert_inventory_dto_to_schema(inventory_dto: InventoryDTO) -> InventorySchema:
@@ -58,6 +113,8 @@ async def get_product_list_controller(
         ordering: Optional[str],
         min_year: Optional[int],
         max_year: Optional[int],
+        min_price: Optional[float],
+        max_price: Optional[float],
         gender: Optional[str],
         is_available: Optional[bool],
         q: Optional[str],
@@ -69,6 +126,8 @@ async def get_product_list_controller(
         ordering=ordering,
         min_year=min_year,
         max_year=max_year,
+        min_price=min_price,
+        max_price=max_price,
         gender=gender,
         is_available=is_available,
         q=q
@@ -77,27 +136,17 @@ async def get_product_list_controller(
     products = [_convert_product_dto_to_schema(product) for product in catalog_dto.products]
 
     total_pages = catalog_dto.pagination.total_pages
-
     base_url = "/api/v1.0/catalog/products"
 
-    def build_url_with_params(page_num: int) -> str:
-        params = {'page': page_num, 'per_page': per_page}
-        if ordering:
-            params['ordering'] = ordering
-        if min_year is not None:
-            params['min_year'] = min_year
-        if max_year is not None:
-            params['max_year'] = max_year
-        if gender:
-            params['gender'] = gender
-        if is_available is not None:
-            params['is_available'] = is_available
-        if q:
-            params['q'] = q
-        return f"{base_url}?{urlencode(params)}"
+    prev_page = _build_url_with_filters(
+        base_url, page - 1, per_page, ordering, min_year, max_year,
+        min_price, max_price, gender, is_available, q
+    ) if page > 1 else None
 
-    prev_page = build_url_with_params(page - 1) if page > 1 else None
-    next_page = build_url_with_params(page + 1) if page < total_pages else None
+    next_page = _build_url_with_filters(
+        base_url, page + 1, per_page, ordering, min_year, max_year,
+        min_price, max_price, gender, is_available, q
+    ) if page < total_pages else None
 
     return ProductListResponseSchema(
         products=products,
@@ -197,6 +246,10 @@ async def get_filters_controller(
             min=filters_dto.year.min,
             max=filters_dto.year.max
         ) if filters_dto.year else None,
+        price=PriceRangeFilterSchema(
+            min=filters_dto.price.min,
+            max=filters_dto.price.max
+        ) if filters_dto.price else None,
         is_available=AvailabilityFilterSchema() if filters_dto.is_available else None
     )
 
@@ -259,6 +312,8 @@ async def get_products_by_category_controller(
         ordering: Optional[str] = None,
         min_year: Optional[int] = None,
         max_year: Optional[int] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
         gender: Optional[str] = None,
         is_available: Optional[bool] = None,
         q: Optional[str] = None,
@@ -276,6 +331,8 @@ async def get_products_by_category_controller(
         ordering: Ordering string
         min_year: Minimum year filter
         max_year: Maximum year filter
+        min_price: Minimum price filter
+        max_price: Maximum price filter
         gender: Gender filter
         is_available: Availability filter (True for available only, False for unavailable only)
         q: Search query
@@ -293,6 +350,8 @@ async def get_products_by_category_controller(
         ordering=ordering,
         min_year=min_year,
         max_year=max_year,
+        min_price=min_price,
+        max_price=max_price,
         gender=gender,
         is_available=is_available,
         q=q
@@ -302,34 +361,23 @@ async def get_products_by_category_controller(
 
     total_pages = catalog_dto.pagination.total_pages
 
-    def build_url_with_params(page_num: int) -> str:
-        base_path_parts = ["/api/v1/catalog/categories", str(master_category_id)]
+    base_path_parts = ["/api/v1/catalog/categories", str(master_category_id)]
+    if sub_category_id:
+        base_path_parts.append(str(sub_category_id))
+        if article_type_id:
+            base_path_parts.append(str(article_type_id))
+    base_path_parts.append("products")
+    base_url = "/".join(base_path_parts)
 
-        if sub_category_id:
-            base_path_parts.append(str(sub_category_id))
-            if article_type_id:
-                base_path_parts.append(str(article_type_id))
+    prev_page = _build_url_with_filters(
+        base_url, page - 1, per_page, ordering, min_year, max_year,
+        min_price, max_price, gender, is_available, q
+    ) if page > 1 else None
 
-        base_path_parts.append("products")
-        base_url = "/".join(base_path_parts)
-
-        params = {'page': page_num, 'per_page': per_page}
-        if ordering:
-            params['ordering'] = ordering
-        if min_year is not None:
-            params['min_year'] = min_year
-        if max_year is not None:
-            params['max_year'] = max_year
-        if gender:
-            params['gender'] = gender
-        if is_available is not None:
-            params['is_available'] = is_available
-        if q:
-            params['q'] = q
-        return f"{base_url}?{urlencode(params)}"
-
-    prev_page = build_url_with_params(page - 1) if page > 1 else None
-    next_page = build_url_with_params(page + 1) if page < total_pages else None
+    next_page = _build_url_with_filters(
+        base_url, page + 1, per_page, ordering, min_year, max_year,
+        min_price, max_price, gender, is_available, q
+    ) if page < total_pages else None
 
     return ProductListResponseSchema(
         products=products,
@@ -381,6 +429,10 @@ async def get_filters_by_categories_controller(
             min=filters_dto.year.min,
             max=filters_dto.year.max
         ) if filters_dto.year else None,
+        price=PriceRangeFilterSchema(
+            min=filters_dto.price.min,
+            max=filters_dto.price.max
+        ) if filters_dto.price else None,
         is_available=AvailabilityFilterSchema() if filters_dto.is_available else None
     )
 

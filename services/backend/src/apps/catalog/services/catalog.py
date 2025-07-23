@@ -21,7 +21,7 @@ from search.interfaces import AutocompleteClientInterface
 PaginationSpecificationFactory = Callable[[int, int], PaginationSpecificationInterface]
 OrderingSpecificationFactory = Callable[[Optional[str]], OrderingSpecificationInterface]
 FilterSpecificationFactory = Callable[
-    [Optional[int], Optional[int], Optional[str], Optional[bool]], FilterSpecificationInterface]
+    [Optional[int], Optional[int], Optional[float], Optional[float], Optional[str], Optional[bool]], FilterSpecificationInterface]
 SearchSpecificationFactory = Callable[[Optional[str]], SearchSpecificationInterface]
 CategorySpecificationFactory = Callable[[int, Optional[int], Optional[int]], CategorySpecificationInterface]
 
@@ -69,6 +69,8 @@ class CatalogService(CatalogServiceInterface):
             ordering: Optional[str] = None,
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
+            min_price: Optional[float] = None,
+            max_price: Optional[float] = None,
             gender: Optional[str] = None,
             is_available: Optional[bool] = None,
             q: Optional[str] = None
@@ -82,6 +84,8 @@ class CatalogService(CatalogServiceInterface):
             ordering: Ordering string (comma-separated fields with optional "-" prefix for descending)
             min_year: Minimum year filter
             max_year: Maximum year filter
+            min_price: Minimum price filter
+            max_price: Maximum price filter
             gender: Gender filter (comma-separated list)
             is_available: Availability filter (True for available only, False for unavailable only)
             q: Search query string
@@ -94,8 +98,12 @@ class CatalogService(CatalogServiceInterface):
         ordering_spec = self._ordering_specification_factory(ordering)
 
         filter_spec = None
-        if min_year is not None or max_year is not None or gender or is_available is not None:
-            filter_spec = self._filter_specification_factory(min_year, max_year, gender, is_available)
+        if (min_year is not None or max_year is not None or
+            min_price is not None or max_price is not None or
+            gender or is_available is not None):
+            filter_spec = self._filter_specification_factory(
+                min_year, max_year, min_price, max_price, gender, is_available
+            )
 
         search_spec = None
         if q:
@@ -132,6 +140,8 @@ class CatalogService(CatalogServiceInterface):
             ordering: Optional[str] = None,
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
+            min_price: Optional[float] = None,
+            max_price: Optional[float] = None,
             gender: Optional[str] = None,
             is_available: Optional[bool] = None,
             q: Optional[str] = None
@@ -148,6 +158,8 @@ class CatalogService(CatalogServiceInterface):
             ordering: Ordering string (comma-separated fields with optional "-" prefix for descending)
             min_year: Minimum year filter
             max_year: Maximum year filter
+            min_price: Minimum price filter
+            max_price: Maximum price filter
             gender: Gender filter (comma-separated list)
             is_available: Availability filter (True for available only, False for unavailable only)
             q: Search query string
@@ -164,8 +176,12 @@ class CatalogService(CatalogServiceInterface):
         ordering_spec = self._ordering_specification_factory(ordering)
 
         filter_spec = None
-        if min_year is not None or max_year is not None or gender or is_available is not None:
-            filter_spec = self._filter_specification_factory(min_year, max_year, gender, is_available)
+        if (min_year is not None or max_year is not None or
+            min_price is not None or max_price is not None or
+            gender or is_available is not None):
+            filter_spec = self._filter_specification_factory(
+                min_year, max_year, min_price, max_price, gender, is_available
+            )
 
         search_spec = None
         if q:

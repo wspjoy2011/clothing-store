@@ -25,8 +25,17 @@ class AvailabilityFilterDTO:
 
 
 @dataclass
+class PriceRangeFilterDTO:
+    """DTO for price range filter data"""
+    min: float
+    max: float
+    type: str = "range"
+
+
+@dataclass
 class FiltersDTO:
     """DTO containing all available filters"""
     gender: Optional[CheckboxFilterDTO] = None
     year: Optional[RangeFilterDTO] = None
+    price: Optional[PriceRangeFilterDTO] = None
     is_available: Optional[AvailabilityFilterDTO] = None

@@ -126,15 +126,17 @@ router = APIRouter(
     }
 )
 async def get_products_route(
-        page: int = Query(1, ge=1, description="Page number (1-based index)"),
-        per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
-        ordering: Optional[str] = Query(None, description="Ordering fields (e.g., 'year,-id')"),
+        page: int = Query(1, description="Page number (1-based)", ge=1),
+        per_page: int = Query(10, description="Number of items per page", ge=1, le=100),
+        ordering: Optional[str] = Query(None, description="Ordering field (prefix with '-' for descending)"),
         min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
         max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
-        gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
-        is_available: Optional[bool] = Query(None, description="Availability filter (True for available only, False for unavailable only)"),
-        q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
-        catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
+        min_price: Optional[float] = Query(None, description="Minimum price filter (inclusive)", ge=0),
+        max_price: Optional[float] = Query(None, description="Maximum price filter (inclusive)", ge=0),
+        gender: Optional[str] = Query(None, description="Gender filter (comma-separated list)"),
+        is_available: Optional[bool] = Query(None, description="Availability filter"),
+        q: Optional[str] = Query(None, description="Search query"),
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
 ):
     return await get_product_list_controller(
         page=page,
@@ -142,10 +144,12 @@ async def get_products_route(
         ordering=ordering,
         min_year=min_year,
         max_year=max_year,
+        min_price=min_price,
+        max_price=max_price,
         gender=gender,
         is_available=is_available,
         q=q,
-        catalog_service=catalog_service,
+        catalog_service=catalog_service
     )
 
 
@@ -500,8 +504,11 @@ async def get_products_by_category_route(
         ordering: Optional[str] = Query(None, description="Ordering fields (e.g., 'year,-id')"),
         min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
         max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
+        min_price: Optional[float] = Query(None, description="Minimum price filter (inclusive)", ge=0),
+        max_price: Optional[float] = Query(None, description="Maximum price filter (inclusive)", ge=0),
         gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
-        is_available: Optional[bool] = Query(None, description="Availability filter (True for available only, False for unavailable only)"),
+        is_available: Optional[bool] = Query(None,
+                                             description="Availability filter (True for available only, False for unavailable only)"),
         q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
         catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
 ):
@@ -515,6 +522,8 @@ async def get_products_by_category_route(
         ordering: Ordering string
         min_year: Minimum year filter
         max_year: Maximum year filter
+        min_price: Minimum price
+        max_price: Maximum price
         gender: Gender filter
         is_available: Availability filter
         q: Search query
@@ -532,6 +541,8 @@ async def get_products_by_category_route(
         ordering=ordering,
         min_year=min_year,
         max_year=max_year,
+        min_price=min_price,
+        max_price=max_price,
         gender=gender,
         is_available=is_available,
         q=q,
@@ -590,8 +601,11 @@ async def get_products_by_subcategory_route(
         ordering: Optional[str] = Query(None, description="Ordering fields (e.g., 'year,-id')"),
         min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
         max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
+        min_price: Optional[float] = Query(None, description="Minimum price filter (inclusive)", ge=0),
+        max_price: Optional[float] = Query(None, description="Maximum price filter (inclusive)", ge=0),
         gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
-        is_available: Optional[bool] = Query(None, description="Availability filter (True for available only, False for unavailable only)"),
+        is_available: Optional[bool] = Query(None,
+                                             description="Availability filter (True for available only, False for unavailable only)"),
         q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
         catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
 ):
@@ -606,6 +620,8 @@ async def get_products_by_subcategory_route(
         ordering: Ordering string
         min_year: Minimum year filter
         max_year: Maximum year filter
+        min_price: Minimum price filter
+        max_price: Maximum price filter
         gender: Gender filter
         is_available: Availability filter
         q: Search query
@@ -623,6 +639,8 @@ async def get_products_by_subcategory_route(
         ordering=ordering,
         min_year=min_year,
         max_year=max_year,
+        min_price=min_price,
+        max_price=max_price,
         gender=gender,
         is_available=is_available,
         q=q,
@@ -682,8 +700,11 @@ async def get_products_by_article_type_route(
         ordering: Optional[str] = Query(None, description="Ordering fields (e.g., 'year,-id')"),
         min_year: Optional[int] = Query(None, description="Minimum year filter (inclusive)"),
         max_year: Optional[int] = Query(None, description="Maximum year filter (inclusive)"),
+        min_price: Optional[float] = Query(None, description="Minimum price filter (inclusive)", ge=0),
+        max_price: Optional[float] = Query(None, description="Maximum price filter (inclusive)", ge=0),
         gender: Optional[str] = Query(None, description="Gender filter (comma-separated list, e.g., 'men,women')"),
-        is_available: Optional[bool] = Query(None, description="Availability filter (True for available only, False for unavailable only)"),
+        is_available: Optional[bool] = Query(None,
+                                             description="Availability filter (True for available only, False for unavailable only)"),
         q: Optional[str] = Query(None, description="Search query for full-text search in product names"),
         catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
 ):
@@ -699,6 +720,8 @@ async def get_products_by_article_type_route(
         ordering: Ordering string
         min_year: Minimum year filter
         max_year: Maximum year filter
+        min_price: Minimum price filter
+        max_price: Maximum price filter
         gender: Gender filter
         is_available: Availability filter
         q: Search query
@@ -716,6 +739,8 @@ async def get_products_by_article_type_route(
         ordering=ordering,
         min_year=min_year,
         max_year=max_year,
+        min_price=min_price,
+        max_price=max_price,
         gender=gender,
         is_available=is_available,
         q=q,

@@ -8,6 +8,11 @@ FILTERS_FULL_EXAMPLE = {
         "max": 2023,
         "type": "range"
     },
+    "price": {
+        "min": 29.99,
+        "max": 299.99,
+        "type": "price_range"
+    },
     "is_available": {
         "type": "boolean",
         "default": False

@@ -16,6 +16,8 @@ class ProductFilterSpecification(FilterSpecificationInterface):
     def __init__(self):
         self._min_year: Optional[int] = None
         self._max_year: Optional[int] = None
+        self._min_price: Optional[float] = None
+        self._max_price: Optional[float] = None
         self._genders: Optional[Set[str]] = None
         self._is_available: Optional[bool] = None
 
@@ -29,6 +31,17 @@ class ProductFilterSpecification(FilterSpecificationInterface):
         """
         self._min_year = min_year
         self._max_year = max_year
+
+    def set_price_range(self, min_price: Optional[float] = None, max_price: Optional[float] = None) -> None:
+        """
+        Set price range filter
+
+        Args:
+            min_price: Minimum price (inclusive)
+            max_price: Maximum price (inclusive)
+        """
+        self._min_price = min_price
+        self._max_price = max_price
 
     def set_genders(self, genders: Union[str, List[str]]) -> None:
         """
@@ -75,6 +88,8 @@ class ProductFilterSpecification(FilterSpecificationInterface):
         return (
                 self._min_year is None and
                 self._max_year is None and
+                self._min_price is None and
+                self._max_price is None and
                 (self._genders is None or len(self._genders) == 0) and
                 self._is_available is None
         )
@@ -96,6 +111,14 @@ class ProductFilterSpecification(FilterSpecificationInterface):
         if self._max_year is not None:
             conditions.append("year <= %s")
             params.append(self._max_year)
+
+        if self._min_price is not None:
+            conditions.append("COALESCE(inventory.sale_price, inventory.base_price) >= %s")
+            params.append(self._min_price)
+
+        if self._max_price is not None:
+            conditions.append("COALESCE(inventory.sale_price, inventory.base_price) <= %s")
+            params.append(self._max_price)
 
         if self._genders and len(self._genders) > 0:
             placeholders = ', '.join(['%s'] * len(self._genders))
@@ -128,6 +151,10 @@ class ProductFilterSpecification(FilterSpecificationInterface):
             self._min_year = int(value)
         elif field == 'max_year' and value is not None:
             self._max_year = int(value)
+        elif field == 'min_price' and value is not None:
+            self._min_price = float(value)
+        elif field == 'max_price' and value is not None:
+            self._max_price = float(value)
         elif field == 'gender' and value:
             self.set_genders(value)
         elif field == 'is_available' and value is not None:

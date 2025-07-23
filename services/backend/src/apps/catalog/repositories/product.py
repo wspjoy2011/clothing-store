@@ -2,7 +2,7 @@ import re
 from typing import Optional, List, Any, Tuple
 from decimal import Decimal
 
-from apps.catalog.dto.filters import FiltersDTO, CheckboxFilterDTO, RangeFilterDTO, AvailabilityFilterDTO
+from apps.catalog.dto.filters import FiltersDTO, CheckboxFilterDTO, RangeFilterDTO, AvailabilityFilterDTO, PriceRangeFilterDTO
 from apps.catalog.dto.products import ProductDTO, InventoryDTO
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.specifications import (
@@ -289,9 +289,25 @@ class ProductRepository(ProductRepositoryInterface):
         year_result = await self._dao.execute(year_query, category_params, fetch_one=True)
         min_year, max_year = year_result if year_result else (None, None)
 
+        price_query = f"""
+            SELECT 
+                MIN(COALESCE(i.sale_price, i.base_price)), 
+                MAX(COALESCE(i.sale_price, i.base_price))
+            FROM {self.APP_NAME}_products p
+            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+            {category_sql.replace(f'{self.APP_NAME}_products', 'p')} 
+            AND i.id IS NOT NULL
+        """
+        logger.info(f"Category filters price query: {price_query}")
+        logger.info(f"Category filters price params: {category_params}")
+
+        price_result = await self._dao.execute(price_query, category_params, fetch_one=True)
+        min_price, max_price = price_result if price_result else (None, None)
+
         return FiltersDTO(
             gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
             year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
+            price=PriceRangeFilterDTO(min=float(min_price), max=float(max_price)) if min_price and max_price else None,
             is_available=AvailabilityFilterDTO()
         )
 
@@ -404,9 +420,23 @@ class ProductRepository(ProductRepositoryInterface):
         year_result = await self._dao.execute(year_query, [], fetch_one=True)
         min_year, max_year = year_result if year_result else (None, None)
 
+        price_query = f"""
+            SELECT 
+                MIN(COALESCE(i.sale_price, i.base_price)), 
+                MAX(COALESCE(i.sale_price, i.base_price))
+            FROM {self.APP_NAME}_products p
+            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+            WHERE i.id IS NOT NULL
+        """
+        logger.info(f"Filters price query: {price_query}")
+
+        price_result = await self._dao.execute(price_query, [], fetch_one=True)
+        min_price, max_price = price_result if price_result else (None, None)
+
         return FiltersDTO(
             gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
             year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
+            price=PriceRangeFilterDTO(min=float(min_price), max=float(max_price)) if min_price and max_price else None,
             is_available=AvailabilityFilterDTO()
         )
 
@@ -439,12 +469,13 @@ class ProductRepository(ProductRepositoryInterface):
             return None
 
         gender_values = await self._get_filtered_gender_values(where_sql, search_params)
-
         min_year, max_year = await self._get_filtered_year_range(where_sql, search_params)
+        min_price, max_price = await self._get_filtered_price_range(where_sql, search_params)
 
         return FiltersDTO(
             gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
             year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
+            price=PriceRangeFilterDTO(min=min_price, max=max_price) if min_price and max_price else None,
             is_available=AvailabilityFilterDTO()
         )
 
@@ -501,6 +532,40 @@ class ProductRepository(ProductRepositoryInterface):
 
         year_result = await self._dao.execute(year_query, year_params, fetch_one=True)
         return year_result if year_result else (None, None)
+
+    async def _get_filtered_price_range(
+            self,
+            where_sql: str,
+            search_params: List[Any]
+    ) -> Tuple[Optional[float], Optional[float]]:
+        """
+        Get available price range for filtered search results
+
+        Args:
+            where_sql: WHERE clause SQL for filtering
+            search_params: Parameters for the WHERE clause
+
+        Returns:
+            Tuple of (min_price, max_price) or (None, None) if no results
+        """
+        self._query_builder.reset().select(
+            "MIN(COALESCE(i.sale_price, i.base_price))",
+            "MAX(COALESCE(i.sale_price, i.base_price))"
+        ).from_table(f"{self.APP_NAME}_products p").join(
+            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
+        )
+        where_sql = where_sql.replace("product_display_name", "p.product_display_name")
+        self._parse_sql_conditions(where_sql, search_params[:1])
+        self._query_builder.where("i.id IS NOT NULL")
+
+        price_query, price_params = self._query_builder.build()
+        logger.info(f"Filtered filters price query: {price_query}")
+        logger.info(f"Filtered filters price params: {price_params}")
+
+        price_result = await self._dao.execute(price_query, price_params, fetch_one=True)
+        if price_result and price_result[0] is not None and price_result[1] is not None:
+            return float(price_result[0]), float(price_result[1])
+        return None, None
 
     def _prepare_query_builder_with_inventory(
             self,
@@ -624,7 +689,8 @@ class ProductRepository(ProductRepositoryInterface):
             'gender IN': f'{alias}.gender IN',
             'inventory.is_active': 'i.is_active',
             'inventory.is_in_stock': 'i.is_in_stock',
-            'inventory.id': 'i.id'
+            'inventory.id': 'i.id',
+            'COALESCE(inventory.sale_price, inventory.base_price)': 'COALESCE(i.sale_price, i.base_price)'
         }
 
         for old, new in replacements.items():

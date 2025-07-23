@@ -4,7 +4,8 @@ from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
     OrderingSpecificationInterface,
     FilterSpecificationInterface,
-    SearchSpecificationInterface, CategorySpecificationInterface
+    SearchSpecificationInterface,
+    CategorySpecificationInterface
 )
 from apps.catalog.specifications.filtering import ProductFilterSpecification
 from apps.catalog.specifications.pagination import PaginationSpecification
@@ -25,6 +26,8 @@ def create_ordering_specification(ordering: Optional[str] = None) -> OrderingSpe
 def create_product_filter_specification(
         min_year: Optional[int] = None,
         max_year: Optional[int] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
         gender: Optional[str] = None,
         is_available: Optional[bool] = None
 ) -> FilterSpecificationInterface:
@@ -34,6 +37,8 @@ def create_product_filter_specification(
     Args:
         min_year: Minimum year (inclusive)
         max_year: Maximum year (inclusive)
+        min_price: Minimum price (inclusive)
+        max_price: Maximum price (inclusive)
         gender: Gender(s) to filter by (comma-separated list)
         is_available: True to show only available products, False to show only unavailable
 
@@ -44,6 +49,9 @@ def create_product_filter_specification(
 
     if min_year is not None or max_year is not None:
         spec.set_year_range(min_year, max_year)
+
+    if min_price is not None or max_price is not None:
+        spec.set_price_range(min_price, max_price)
 
     if gender:
         spec.set_genders(gender)

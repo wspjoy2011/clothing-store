@@ -18,6 +18,8 @@ class CatalogServiceInterface(ABC):
             ordering: Optional[str] = None,
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
+            min_price: Optional[float] = None,
+            max_price: Optional[float] = None,
             gender: Optional[str] = None,
             is_available: Optional[bool] = None,
             q: Optional[str] = None
@@ -31,6 +33,8 @@ class CatalogServiceInterface(ABC):
             ordering: Ordering string (comma-separated fields with optional "-" prefix for descending)
             min_year: Minimum year filter
             max_year: Maximum year filter
+            min_price: Minimum price filter
+            max_price: Maximum price filter
             gender: Gender filter (comma-separated list)
             is_available: Availability filter (True for available only, False for unavailable only)
             q: Search query string
@@ -51,6 +55,8 @@ class CatalogServiceInterface(ABC):
             ordering: Optional[str] = None,
             min_year: Optional[int] = None,
             max_year: Optional[int] = None,
+            min_price: Optional[float] = None,
+            max_price: Optional[float] = None,
             gender: Optional[str] = None,
             is_available: Optional[bool] = None,
             q: Optional[str] = None
@@ -67,6 +73,8 @@ class CatalogServiceInterface(ABC):
             ordering: Ordering string (comma-separated fields with optional "-" prefix for descending)
             min_year: Minimum year filter
             max_year: Maximum year filter
+            min_price: Minimum price filter
+            max_price: Maximum price filter
             gender: Gender filter (comma-separated list)
             is_available: Availability filter (True for available only, False for unavailable only)
             q: Search query string
