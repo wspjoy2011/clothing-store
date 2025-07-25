@@ -20,7 +20,7 @@
             :has-products="hasProducts"
             :items-per-page-options="itemsPerPageOptions"
             @clear-search="clearSearchHandler"
-            @update:ordering="handleOrderingChangeHandler"
+            @update:ordering="handleOrderingChange"
             @update:per-page="handleItemsPerPageChangeHandler"
         />
 
@@ -53,6 +53,7 @@ import {useCategoryStore} from '@/stores/categoryStore';
 import {useCategoryProducts} from '@/composables/catalog/useCategoryProducts';
 import {useCategoryMeta} from '@/composables/catalog/useCategoryMeta';
 import {useFiltering} from '@/composables/catalog/useFiltering';
+import {useProductSorting} from '@/composables/catalog/useProductSorting';
 
 import CategoryBreadcrumbs from '@/components/catalog/CategoryBreadcrumbs.vue';
 import HeaderComponent from '@/components/catalog/Header.vue';
@@ -87,7 +88,6 @@ const {
   itemsPerPageOptions,
   handlePageChange,
   handleItemsPerPageChange,
-  handleOrderingChange,
   clearSearch,
   initialize,
   cleanup,
@@ -99,9 +99,10 @@ const {createQueryFromFilters, disableFilterWatcher, enableFilterWatcher} = useF
   fetchProducts
 });
 
+const {handleOrderingChange} = useProductSorting(createQueryFromFilters);
+
 const handlePageChangeHandler = handlePageChange(createQueryFromFilters);
 const handleItemsPerPageChangeHandler = handleItemsPerPageChange(createQueryFromFilters);
-const handleOrderingChangeHandler = handleOrderingChange(createQueryFromFilters);
 const clearSearchHandler = clearSearch(createQueryFromFilters);
 
 const paginationData = computed(() => ({
@@ -140,6 +141,17 @@ watch(
 
         await initialize();
         enableFilterWatcher();
+      }
+    },
+    {immediate: false}
+);
+
+watch(
+    () => route.query.ordering,
+    async (newOrdering, oldOrdering) => {
+      if (newOrdering !== oldOrdering && !categoryStore.loading) {
+        const currentPageNum = parseInt(route.query.page) || 1;
+        await fetchProducts(currentPageNum, newOrdering);
       }
     },
     {immediate: false}

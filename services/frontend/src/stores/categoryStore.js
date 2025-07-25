@@ -24,6 +24,8 @@ import {
  * @returns {Object} - Initial state object
  */
 function createInitialCategoryState() {
+    const preferencesStore = useUserPreferencesStore();
+
     return {
         categories: [],
         loading: false,
@@ -32,7 +34,7 @@ function createInitialCategoryState() {
         mobileDrawerOpen: false,
 
         products: [],
-        currentOrdering: '-id',
+        currentOrdering: preferencesStore.productOrdering,
 
         ...createInitialFiltersState(),
         ...createPaginationState()
@@ -195,6 +197,10 @@ export const useCategoryStore = defineStore('category', {
                     totalItems: response.total_items
                 });
                 this.currentOrdering = effectiveOrdering;
+
+                if (effectiveOrdering !== preferencesStore.productOrdering) {
+                    preferencesStore.setProductOrdering(effectiveOrdering);
+                }
             } catch (err) {
                 this.error = err.response?.data || {message: 'Error loading products'};
                 this.products = [];
@@ -229,6 +235,9 @@ export const useCategoryStore = defineStore('category', {
         setOrdering(ordering) {
             if (ordering !== this.currentOrdering) {
                 this.currentOrdering = ordering;
+
+                const preferencesStore = useUserPreferencesStore();
+                preferencesStore.setProductOrdering(ordering);
             }
         },
 

@@ -11,8 +11,7 @@
 </template>
 
 <script setup>
-import {computed} from 'vue';
-import {useCatalogStore} from '@/stores/catalog';
+import {computed, inject} from 'vue';
 
 const props = defineProps({
   options: {
@@ -29,7 +28,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:ordering']);
-const catalogStore = useCatalogStore();
+
+const store = inject('filterStore');
 
 const sortOptions = computed(() => {
   return props.options.map(option => ({
@@ -39,9 +39,9 @@ const sortOptions = computed(() => {
 });
 
 const selectedOrdering = computed({
-  get: () => catalogStore.currentOrdering,
+  get: () => store.value.currentOrdering,
   set: (value) => {
-    catalogStore.setOrdering(value);
+    store.value.setOrdering(value);
     emit('update:ordering', value);
   }
 });

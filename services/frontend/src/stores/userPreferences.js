@@ -6,10 +6,17 @@ import {
 } from './composables';
 
 export const useUserPreferencesStore = defineStore('userPreferences', {
-    state: () => createInitialPreferencesState(),
+    state: () => ({
+        ...createInitialPreferencesState(),
+        productOrdering: '-id'
+    }),
 
     actions: {
-        ...createPreferencesActions()
+        ...createPreferencesActions(),
+
+        setProductOrdering(ordering) {
+            this.productOrdering = ordering || '-id';
+        }
     },
 
     persist: {

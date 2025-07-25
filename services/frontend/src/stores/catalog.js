@@ -16,9 +16,11 @@ import {
  * @returns {Object} - Initial state object
  */
 function createInitialCatalogState() {
+    const preferencesStore = useUserPreferencesStore();
+
     return {
         products: [],
-        currentOrdering: '-id',
+        currentOrdering: preferencesStore.productOrdering,
         loading: false,
         error: null,
 
@@ -86,6 +88,10 @@ export const useCatalogStore = defineStore('catalog', {
                     totalItems: response.total_items
                 });
                 this.currentOrdering = effectiveOrdering;
+
+                if (effectiveOrdering !== preferencesStore.productOrdering) {
+                    preferencesStore.setProductOrdering(effectiveOrdering);
+                }
             } catch (err) {
                 this.error = err.response?.data || {message: 'Error loading products'};
                 this.products = [];
@@ -177,6 +183,9 @@ export const useCatalogStore = defineStore('catalog', {
         setOrdering(ordering) {
             if (ordering !== this.currentOrdering) {
                 this.currentOrdering = ordering;
+
+                const preferencesStore = useUserPreferencesStore();
+                preferencesStore.setProductOrdering(ordering);
             }
         },
 
