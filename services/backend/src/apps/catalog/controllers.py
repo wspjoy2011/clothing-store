@@ -250,7 +250,10 @@ async def get_filters_controller(
             min=filters_dto.price.min,
             max=filters_dto.price.max
         ) if filters_dto.price else None,
-        is_available=AvailabilityFilterSchema() if filters_dto.is_available else None
+        is_available=AvailabilityFilterSchema(
+            available_count=filters_dto.is_available.available_count,
+            unavailable_count=filters_dto.is_available.unavailable_count
+        ) if filters_dto.is_available else None
     )
 
 
@@ -433,7 +436,10 @@ async def get_filters_by_categories_controller(
             min=filters_dto.price.min,
             max=filters_dto.price.max
         ) if filters_dto.price else None,
-        is_available=AvailabilityFilterSchema() if filters_dto.is_available else None
+        is_available=AvailabilityFilterSchema(
+            available_count=filters_dto.is_available.available_count,
+            unavailable_count=filters_dto.is_available.unavailable_count
+        ) if filters_dto.is_available else None
     )
 
 

@@ -20,6 +20,8 @@ class CheckboxFilterDTO:
 @dataclass
 class AvailabilityFilterDTO:
     """DTO for availability filter data"""
+    available_count: int
+    unavailable_count: int
     type: str = "boolean"
     default: bool = False
 

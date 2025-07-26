@@ -25,6 +25,8 @@ class CheckboxFilterSchema(BaseModel):
 
 class AvailabilityFilterSchema(BaseModel):
     """Schema for availability filter data"""
+    available_count: int
+    unavailable_count: int
     type: str = "boolean"
     default: bool = False
 

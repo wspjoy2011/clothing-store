@@ -14,6 +14,8 @@ FILTERS_FULL_EXAMPLE = {
         "type": "price_range"
     },
     "is_available": {
+        "available_count": 150,
+        "unavailable_count": 25,
         "type": "boolean",
         "default": False
     }

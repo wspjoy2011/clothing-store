@@ -2,8 +2,13 @@ import re
 from typing import Optional, List, Any, Tuple
 from decimal import Decimal
 
-from apps.catalog.dto.filters import FiltersDTO, CheckboxFilterDTO, RangeFilterDTO, AvailabilityFilterDTO, \
+from apps.catalog.dto.filters import (
+    FiltersDTO,
+    CheckboxFilterDTO,
+    RangeFilterDTO,
+    AvailabilityFilterDTO,
     PriceRangeFilterDTO
+)
 from apps.catalog.dto.products import ProductDTO, InventoryDTO
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.specifications import (
@@ -243,6 +248,89 @@ class ProductRepository(ProductRepositoryInterface):
 
         return await self._get_category_filters(category_spec)
 
+    async def _get_availability_counts(
+            self,
+            category_spec: Optional[CategorySpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None
+    ) -> Tuple[int, int]:
+        """
+        Get counts of available and unavailable products based on is_in_stock field
+
+        Args:
+            category_spec: Optional category specification to filter by
+            search_spec: Optional search specification to filter by
+
+        Returns:
+            Tuple of (available_count, unavailable_count)
+        """
+        base_query = f"""
+            SELECT COUNT(*) FROM {self.APP_NAME}_products p
+            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+        """
+
+        category_joins = ""
+        if category_spec and not category_spec.is_empty():
+            category_joins = f"""
+            JOIN {self.APP_NAME}_article_type at ON p.article_type_id = at.article_type_id 
+            JOIN {self.APP_NAME}_sub_category sc ON at.sub_category_id = sc.sub_category_id 
+            JOIN {self.APP_NAME}_master_category mc ON sc.master_category_id = mc.master_category_id
+            """
+
+        conditions = []
+        params = []
+
+        if category_spec and not category_spec.is_empty():
+            category_sql, category_params = category_spec.to_sql()
+            if "WHERE" in category_sql:
+                category_where = category_sql.split("WHERE", 1)[1].strip()
+                category_where = category_where.replace(f'{self.APP_NAME}_products', 'p')
+                conditions.append(category_where)
+                params.extend(category_params)
+
+        if search_spec and not search_spec.is_empty():
+            search_sql, search_params = search_spec.to_sql()
+            where_sql, _ = self._split_search_sql(search_sql)
+            where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
+
+            if where_sql.startswith("WHERE"):
+                search_condition = where_sql.replace("WHERE", "").strip()
+                conditions.append(search_condition)
+                params.append(search_params[0])
+
+        where_clause = ""
+        if conditions:
+            where_clause = " WHERE " + " AND ".join(conditions)
+
+        available_query = base_query + category_joins + where_clause
+        if where_clause:
+            available_query += " AND i.is_in_stock = %s"
+        else:
+            available_query += " WHERE i.is_in_stock = %s"
+
+        available_params = params + [True]
+
+        unavailable_query = base_query + category_joins + where_clause
+        if where_clause:
+            unavailable_query += " AND (i.is_in_stock = %s OR i.id IS NULL)"
+        else:
+            unavailable_query += " WHERE (i.is_in_stock = %s OR i.id IS NULL)"
+
+        unavailable_params = params + [False]
+
+        logger.info(f"Available count query: {available_query}")
+        logger.info(f"Available count params: {available_params}")
+
+        logger.info(f"Unavailable count query: {unavailable_query}")
+        logger.info(f"Unavailable count params: {unavailable_params}")
+
+        available_result = await self._dao.execute(available_query, available_params, fetch_one=True)
+        unavailable_result = await self._dao.execute(unavailable_query, unavailable_params, fetch_one=True)
+
+        available_count = available_result[0] if available_result else 0
+        unavailable_count = unavailable_result[0] if unavailable_result else 0
+
+        return available_count, unavailable_count
+
     async def _get_category_filters(self, category_spec: CategorySpecificationInterface) -> Optional[FiltersDTO]:
         """
         Get filters for specific categories
@@ -305,11 +393,16 @@ class ProductRepository(ProductRepositoryInterface):
         price_result = await self._dao.execute(price_query, category_params, fetch_one=True)
         min_price, max_price = price_result if price_result else (None, None)
 
+        available_count, unavailable_count = await self._get_availability_counts(category_spec=category_spec)
+
         return FiltersDTO(
             gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
             year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
             price=PriceRangeFilterDTO(min=float(min_price), max=float(max_price)) if min_price and max_price else None,
-            is_available=AvailabilityFilterDTO()
+            is_available=AvailabilityFilterDTO(
+                available_count=available_count,
+                unavailable_count=unavailable_count
+            )
         )
 
     async def _get_products_with_specs(
@@ -434,11 +527,16 @@ class ProductRepository(ProductRepositoryInterface):
         price_result = await self._dao.execute(price_query, [], fetch_one=True)
         min_price, max_price = price_result if price_result else (None, None)
 
+        available_count, unavailable_count = await self._get_availability_counts()
+
         return FiltersDTO(
             gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
             year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
             price=PriceRangeFilterDTO(min=float(min_price), max=float(max_price)) if min_price and max_price else None,
-            is_available=AvailabilityFilterDTO()
+            is_available=AvailabilityFilterDTO(
+                available_count=available_count,
+                unavailable_count=unavailable_count
+            )
         )
 
     async def _get_filtered_filters(self, search_spec: SearchSpecificationInterface) -> Optional[FiltersDTO]:
@@ -473,11 +571,16 @@ class ProductRepository(ProductRepositoryInterface):
         min_year, max_year = await self._get_filtered_year_range(where_sql, search_params)
         min_price, max_price = await self._get_filtered_price_range(where_sql, search_params)
 
+        available_count, unavailable_count = await self._get_availability_counts(search_spec=search_spec)
+
         return FiltersDTO(
             gender=CheckboxFilterDTO(values=gender_values) if gender_values else None,
             year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
             price=PriceRangeFilterDTO(min=min_price, max=max_price) if min_price and max_price else None,
-            is_available=AvailabilityFilterDTO()
+            is_available=AvailabilityFilterDTO(
+                available_count=available_count,
+                unavailable_count=unavailable_count
+            )
         )
 
     async def _get_filtered_gender_values(self, where_sql: str, search_params: List[Any]) -> List[str]:
