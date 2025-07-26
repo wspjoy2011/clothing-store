@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from pydantic import BaseModel
 
@@ -20,6 +20,7 @@ class PriceRangeFilterSchema(BaseModel):
 class CheckboxFilterSchema(BaseModel):
     """Schema for checkbox filter data"""
     values: List[str]
+    count: Dict[str, int]
     type: str = "checkbox"
 
 

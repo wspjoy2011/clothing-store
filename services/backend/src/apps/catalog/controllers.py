@@ -240,7 +240,8 @@ async def get_filters_controller(
 
     return FiltersResponseSchema(
         gender=CheckboxFilterSchema(
-            values=filters_dto.gender.values
+            values=filters_dto.gender.values,
+            count=filters_dto.gender.count
         ) if filters_dto.gender else None,
         year=RangeFilterSchema(
             min=filters_dto.year.min,
@@ -426,7 +427,8 @@ async def get_filters_by_categories_controller(
 
     return FiltersResponseSchema(
         gender=CheckboxFilterSchema(
-            values=filters_dto.gender.values
+            values=filters_dto.gender.values,
+            count=filters_dto.gender.count
         ) if filters_dto.gender else None,
         year=RangeFilterSchema(
             min=filters_dto.year.min,

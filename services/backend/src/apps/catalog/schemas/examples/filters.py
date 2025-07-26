@@ -1,6 +1,10 @@
 FILTERS_FULL_EXAMPLE = {
     "gender": {
         "values": ["men", "women"],
+        "count": {
+            "men": 57,
+            "women": 27
+        },
         "type": "checkbox"
     },
     "year": {

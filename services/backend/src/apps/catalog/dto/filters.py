@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 
 @dataclass
@@ -14,6 +14,7 @@ class RangeFilterDTO:
 class CheckboxFilterDTO:
     """DTO for checkbox filter data"""
     values: List[str]
+    count: Dict[str, int]
     type: str = "checkbox"
 
 
