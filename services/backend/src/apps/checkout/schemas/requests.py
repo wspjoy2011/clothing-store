@@ -3,6 +3,18 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class GetCartByTokenRequest(BaseModel):
+    """Schema for getting cart by token request"""
+    token: str = Field(..., description="Cart token for anonymous users")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "token": "abc123def456ghi789jkl012"
+            }
+        }
+
+
 class AddToCartRequest(BaseModel):
     """Schema for add to cart request"""
     product_id: int = Field(..., gt=0, description="ID of the product to add")
