@@ -10,7 +10,6 @@ from apps.checkout.dto import (
     CartSummaryDTO,
     AddToCartRequestDTO,
     UpdateCartItemRequestDTO,
-    CreateCartTokenRequestDTO
 )
 from apps.checkout.interfaces.repositories import (
     CartTokenRepositoryInterface,
@@ -52,14 +51,11 @@ class CartService(CartServiceInterface):
         self._cart_item_repository = cart_item_repository
         self._catalog_service = catalog_service
 
-    async def create_cart_token(self, request_data: CreateCartTokenRequestDTO) -> CartTokenResponseDTO:
+    async def create_cart_token(self) -> CartTokenResponseDTO:
         """
         Create a new cart token for anonymous users
 
         Business logic: Generate unique token, create token record, return token with expiration
-
-        Args:
-            request_data: Request data for creating cart token
 
         Returns:
             Cart token response with token and expiration date

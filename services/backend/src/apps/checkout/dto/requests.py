@@ -23,9 +23,3 @@ class RemoveFromCartRequestDTO:
     """Data transfer object for remove from cart request"""
     cart_item_id: int
     cart_token: Optional[str] = None
-
-
-@dataclass
-class CreateCartTokenRequestDTO:
-    """Data transfer object for creating anonymous cart token"""
-    pass

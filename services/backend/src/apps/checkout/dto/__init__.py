@@ -6,7 +6,6 @@ from apps.checkout.dto.requests import (
     AddToCartRequestDTO,
     UpdateCartItemRequestDTO,
     RemoveFromCartRequestDTO,
-    CreateCartTokenRequestDTO
 )
 from apps.checkout.dto.responses import (
     CartTokenResponseDTO,
@@ -27,7 +26,6 @@ __all__ = [
     'AddToCartRequestDTO',
     'UpdateCartItemRequestDTO',
     'RemoveFromCartRequestDTO',
-    'CreateCartTokenRequestDTO',
 
     # Responses
     'CartTokenResponseDTO',
