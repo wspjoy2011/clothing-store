@@ -1,13 +1,16 @@
 from fastapi import APIRouter, Depends, status
 
-from apps.checkout.controllers import create_cart_token_controller, get_cart_by_token_controller
+from apps.checkout.controllers import create_cart_token_controller, get_cart_by_token_controller, \
+    get_cart_for_user_controller
 from apps.checkout.dependencies import get_cart_service
 from apps.checkout.interfaces import CartServiceInterface
 from apps.checkout.schemas import CartTokenResponse, GetCartByTokenRequest, CartResponse
+from security.http import AccessTokenDependency
 
 API_PATHS: dict[str, str] = {
     "create_cart_token": "/cart/token",
     "get_cart_by_token": "/cart/token",
+    "get_cart": "/cart",
 }
 
 router = APIRouter(
@@ -71,9 +74,9 @@ async def create_cart_token_route(
     status_code=status.HTTP_200_OK,
     summary="Get cart by token",
     description=(
-        "Get or create cart for anonymous user by token. "
-        "If cart doesn't exist for the token, a new empty cart will be created. "
-        "Returns complete cart information including items, totals, and availability status."
+            "Get or create cart for anonymous user by token. "
+            "If cart doesn't exist for the token, a new empty cart will be created. "
+            "Returns complete cart information including items, totals, and availability status."
     ),
     responses={
         200: {
@@ -144,3 +147,75 @@ async def get_cart_by_token_route(
         - All cart items include availability status and pricing
     """
     return await get_cart_by_token_controller(request_data, cart_service)
+
+
+@router.get(
+    API_PATHS["get_cart"],
+    response_model=CartResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get cart for authenticated user",
+    description=(
+            "Get or create cart for authenticated user. "
+            "If cart doesn't exist for the user, a new empty cart will be created. "
+            "Returns complete cart information including items, totals, and availability status."
+    ),
+    responses={
+        200: {
+            "description": "Cart retrieved successfully",
+            "model": CartResponse
+        },
+        400: {
+            "description": "Cart validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Cart validation error: Invalid cart state"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Internal server error"
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_cart_route(
+        jwt_payload: AccessTokenDependency,
+        cart_service: CartServiceInterface = Depends(get_cart_service)
+) -> CartResponse:
+    """Get or create cart for authenticated user.
+
+    This endpoint retrieves an existing cart for the authenticated user or creates
+    a new empty cart if one doesn't exist. Authentication is required via Bearer token.
+
+    Args:
+        jwt_payload: JWT payload from verified access token.
+        cart_service: Cart service dependency for business logic operations.
+
+    Returns:
+        CartResponse: Complete cart information with items and totals.
+
+    Note:
+        - Requires valid Bearer token in Authorization header
+        - Creates new cart if user doesn't have one yet
+        - All cart items include availability status and pricing
+        - User-specific cart, isolated from anonymous carts
+    """
+    return await get_cart_for_user_controller(jwt_payload, cart_service)
