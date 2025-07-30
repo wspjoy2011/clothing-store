@@ -9,7 +9,7 @@ from security.http import AccessTokenDependency
 
 API_PATHS: dict[str, str] = {
     "create_cart_token": "/cart/token",
-    "get_cart_by_token": "/cart/token",
+    "get_cart_by_token": "/cart/token/get",
     "get_cart": "/cart",
 }
 
@@ -68,7 +68,7 @@ async def create_cart_token_route(
     return await create_cart_token_controller(cart_service)
 
 
-@router.get(
+@router.post(
     API_PATHS["get_cart_by_token"],
     response_model=CartResponse,
     status_code=status.HTTP_200_OK,
