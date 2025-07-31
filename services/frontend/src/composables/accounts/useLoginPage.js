@@ -1,12 +1,14 @@
-import {ref, computed, watch, onMounted} from 'vue';
-import {useTheme} from 'vuetify';
-import {useAccountStore} from '@/stores/accounts';
-import {useNavigation} from '@/composables/accounts/useNavigation';
-import {useNotifications} from '@/composables/accounts/useNotifications';
-import {useLoginAuth} from './useLoginAuth';
+import { ref, computed, watch, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { useTheme } from 'vuetify';
+import { useAccountStore } from '@/stores/accounts';
+import { useNavigation } from '@/composables/accounts/useNavigation';
+import { useNotifications } from '@/composables/accounts/useNotifications';
+import { useLoginAuth } from '@/composables/accounts/useLoginAuth';
 
 export function useLoginPage() {
   const theme = useTheme();
+  const route = useRoute();
   const accountStore = useAccountStore();
   const {goToRegister, goToActivation, goToHome, goToPasswordReset} = useNavigation();
   const notifications = useNotifications();
@@ -20,6 +22,30 @@ export function useLoginPage() {
 
   const formLoginError = ref('');
   const showFormLoginError = ref(false);
+
+  const nextPath = computed(() => route.query.next || null);
+  const reason = computed(() => route.query.reason || null);
+
+  const getReasonMessage = (reasonType) => {
+    switch(reasonType) {
+      case 'session_expired':
+        return 'Your session has expired. Please log in again to continue.';
+      case 'access_denied':
+        return 'Access denied. Please log in to access this page.';
+      case 'token_invalid':
+        return 'Your authentication token is invalid. Please log in again.';
+      default:
+        return null;
+    }
+  };
+
+  const redirectAfterLogin = () => {
+    if (nextPath.value) {
+      window.location.href = nextPath.value;
+    } else {
+      goToHome();
+    }
+  };
 
   const hideSocialSuccess = () => {
     showSocialSuccessMessage.value = false;
@@ -68,7 +94,7 @@ export function useLoginPage() {
       notifications.showSuccess('Login successful! Welcome back.');
       setTimeout(() => {
         hideSuccess();
-        goToHome();
+        redirectAfterLogin();
       }, 1500);
     }
   });
@@ -103,7 +129,7 @@ export function useLoginPage() {
 
       setTimeout(() => {
         hideSocialSuccess();
-        goToHome();
+        redirectAfterLogin();
       }, 3000);
     } else if (result && result.error) {
       notifications.showError(result.message || 'Google login failed. Please try again.');
@@ -124,7 +150,7 @@ export function useLoginPage() {
 
       setTimeout(() => {
         hideSocialSuccess();
-        goToHome();
+        redirectAfterLogin();
       }, 3000);
     } else if (result && result.error) {
       notifications.showError(result.message || 'Facebook login failed. Please try again.');
@@ -168,6 +194,13 @@ export function useLoginPage() {
     notifications.hideSuccess();
     notifications.hideWarning();
     clearFormLoginError();
+
+    if (reason.value) {
+      const reasonMessage = getReasonMessage(reason.value);
+      if (reasonMessage) {
+        notifications.showWarning(reasonMessage);
+      }
+    }
   });
 
   return {

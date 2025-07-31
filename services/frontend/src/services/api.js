@@ -107,11 +107,10 @@ const handleExpiredRefreshToken = async () => {
         const {useAccountStore} = await import('@/stores/accounts.js');
         const {useCartStore} = await import('@/stores/cart.js');
         const {createSuccessResult} = await import('@/stores/helpers/apiErrorParser.js');
-        const {useNavigation} = await import('@/composables/accounts/useNavigation.js');
+        const router = await import('@/router/index.js');
 
         const accountStore = useAccountStore();
         const cartStore = useCartStore();
-        const {goToLogin} = useNavigation();
 
         accountStore.clearLocalState();
 
@@ -120,7 +119,13 @@ const handleExpiredRefreshToken = async () => {
 
         console.log('User logged out and cart reinitialized as anonymous');
 
-        goToLogin();
+        router.default.push({
+            name: 'login',
+            query: {
+                next: router.default.currentRoute.value.fullPath,
+                reason: 'session_expired'
+            }
+        });
 
         return createSuccessResult(
             null,
