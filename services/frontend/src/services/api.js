@@ -99,24 +99,37 @@ const refreshAccessToken = async () => {
     return newAccessToken;
 };
 
+
 const handleExpiredRefreshToken = async () => {
     try {
         console.log('Performing logout due to expired refresh token');
 
         const {useAccountStore} = await import('@/stores/accounts.js');
         const {useCartStore} = await import('@/stores/cart.js');
+        const {createSuccessResult} = await import('@/stores/helpers/apiErrorParser.js');
+        const {useNavigation} = await import('@/composables/accounts/useNavigation.js');
 
         const accountStore = useAccountStore();
         const cartStore = useCartStore();
+        const {goToLogin} = useNavigation();
 
-        await accountStore.logout();
+        accountStore.clearLocalState();
 
         cartStore.resetInitialization();
         await cartStore.initializeCart();
 
         console.log('User logged out and cart reinitialized as anonymous');
+
+        goToLogin();
+
+        return createSuccessResult(
+            null,
+            'Session expired. You have been logged out automatically.'
+        );
+
     } catch (logoutError) {
         console.error('Error during logout process:', logoutError);
+        throw logoutError;
     }
 };
 
@@ -206,7 +219,7 @@ api.interceptors.response.use(
 
                 await handleExpiredRefreshToken();
 
-                return handleApiError(error);
+                throw new Error('Session expired, user logged out');
             } finally {
                 isRefreshing = false;
             }
