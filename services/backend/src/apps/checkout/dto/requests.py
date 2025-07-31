@@ -7,7 +7,6 @@ class AddToCartRequestDTO:
     """Data transfer object for add to cart request"""
     product_id: int
     quantity: int = 1
-    cart_token: Optional[str] = None
 
 
 @dataclass

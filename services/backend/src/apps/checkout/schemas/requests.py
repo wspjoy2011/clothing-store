@@ -19,14 +19,12 @@ class AddToCartRequest(BaseModel):
     """Schema for add to cart request"""
     product_id: int = Field(..., gt=0, description="ID of the product to add")
     quantity: int = Field(1, ge=1, le=999, description="Quantity to add")
-    cart_token: Optional[str] = Field(None, description="Cart token for anonymous users")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "product_id": 123,
                 "quantity": 2,
-                "cart_token": "abc123def456..."
             }
         }
 

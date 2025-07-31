@@ -1,9 +1,11 @@
 from fastapi import HTTPException, status
 
-from apps.checkout.dto import CartItemResponseDTO, CartResponseDTO
+from apps.checkout.dto import CartItemResponseDTO, CartResponseDTO, AddToCartRequestDTO
 from apps.checkout.interfaces import CartServiceInterface
-from apps.checkout.schemas import CartTokenResponse, CartResponse, CartItemResponse, GetCartByTokenRequest
-from apps.checkout.exceptions import CartTokenCreationError, CartNotFoundError, CartValidationError
+from apps.checkout.schemas import CartTokenResponse, CartResponse, CartItemResponse, GetCartByTokenRequest, \
+    AddToCartRequest
+from apps.checkout.exceptions import CartTokenCreationError, CartNotFoundError, CartValidationError, \
+    ProductNotFoundError, InsufficientStockError
 from security.dto import JWTPayloadDTO
 from settings.logging_config import get_logger
 
@@ -40,6 +42,14 @@ def _convert_cart_dto_to_schema(cart_dto: CartResponseDTO) -> CartResponse:
         final_amount=cart_dto.final_amount,
         created_at=cart_dto.created_at,
         updated_at=cart_dto.updated_at,
+    )
+
+
+def _convert_add_to_cart_request_to_dto(request: AddToCartRequest) -> AddToCartRequestDTO:
+    """Convert AddToCartRequest to AddToCartRequestDTO"""
+    return AddToCartRequestDTO(
+        product_id=request.product_id,
+        quantity=request.quantity
     )
 
 
@@ -159,3 +169,107 @@ async def get_cart_for_user_controller(
         )
     else:
         return _convert_cart_dto_to_schema(cart_dto)
+
+
+async def add_item_to_cart_by_token_controller(
+        token: str,
+        request_data: AddToCartRequest,
+        cart_service: CartServiceInterface,
+) -> CartItemResponse:
+    """
+    Controller for adding item to cart by token (anonymous user)
+
+    Args:
+        token: Cart token for anonymous user
+        request_data: Request data for adding item to cart
+        cart_service: Service for cart operations
+
+    Returns:
+        Added cart item response
+
+    Raises:
+        HTTPException: If adding item fails
+    """
+    logger.info(f"Adding item to cart by token: {token[:10]}..., product_id={request_data.product_id}")
+
+    try:
+        request_dto = _convert_add_to_cart_request_to_dto(request_data)
+        cart_item_dto = await cart_service.add_item_to_cart(request_dto, token=token)
+    except CartNotFoundError as e:
+        logger.warning(f"Cart not found for token {token[:10]}...: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Cart not found: {e.message}"
+        )
+    except ProductNotFoundError as e:
+        logger.warning(f"Product not found: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product not found: {e.message}"
+        )
+    except InsufficientStockError as e:
+        logger.warning(f"Insufficient stock: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient stock: {e.message}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error adding item to cart by token {token[:10]}...: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+    else:
+        return _convert_cart_item_dto_to_schema(cart_item_dto)
+
+
+async def add_item_to_cart_for_user_controller(
+        request_data: AddToCartRequest,
+        jwt_payload: JWTPayloadDTO,
+        cart_service: CartServiceInterface,
+) -> CartItemResponse:
+    """
+    Controller for adding item to cart for authenticated user
+
+    Args:
+        request_data: Request data for adding item to cart
+        jwt_payload: JWT payload from verified access token
+        cart_service: Service for cart operations
+
+    Returns:
+        Added cart item response
+
+    Raises:
+        HTTPException: If adding item fails
+    """
+    logger.info(f"Adding item to cart for user {jwt_payload.user_id}, product_id={request_data.product_id}")
+
+    try:
+        request_dto = _convert_add_to_cart_request_to_dto(request_data)
+        cart_item_dto = await cart_service.add_item_to_cart(request_dto, user_id=jwt_payload.user_id)
+    except ProductNotFoundError as e:
+        logger.warning(f"Product not found: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product not found: {e.message}"
+        )
+    except InsufficientStockError as e:
+        logger.warning(f"Insufficient stock: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient stock: {e.message}"
+        )
+    except CartValidationError as e:
+        logger.error(f"Cart validation error for user {jwt_payload.user_id}: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cart validation error: {e.message}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error adding item to cart for user {jwt_payload.user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+    else:
+        return _convert_cart_item_dto_to_schema(cart_item_dto)

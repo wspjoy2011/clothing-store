@@ -19,7 +19,7 @@ from apps.checkout.interfaces.repositories import (
 from apps.checkout.interfaces import CartServiceInterface
 from apps.checkout.exceptions import (
     CartTokenCreationError,
-    CartNotFoundError,
+    CartNotFoundError, ProductNotFoundError, InsufficientStockError,
 )
 from apps.catalog.interfaces.services import CatalogServiceInterface
 from settings.logging_config import get_logger
@@ -146,8 +146,52 @@ class CartService(CartServiceInterface):
             user_id: Optional[int] = None,
             token: Optional[str] = None
     ) -> CartItemResponseDTO:
-        """Not implemented yet"""
-        raise NotImplementedError("add_item_to_cart method is not implemented yet")
+        """
+        Add item to cart with business validation
+
+        Business logic: Validate product exists, check stock availability, get/create cart,
+        add item or update quantity, return item with product details and pricing
+
+        Args:
+            request_data: Data for adding item to cart
+            user_id: ID of authenticated user (mutually exclusive with token)
+            token: Cart token for anonymous user (mutually exclusive with user_id)
+
+        Returns:
+            Added cart item with complete product information
+
+        Raises:
+            CartNotFoundError: If cart cannot be found or created
+            ProductNotFoundError: If product does not exist
+            InsufficientStockError: If not enough stock available
+        """
+        logger.info(f"Adding item to cart: product_id={request_data.product_id}, quantity={request_data.quantity}")
+
+        if user_id:
+            cart_response = await self.get_or_create_cart_for_user(user_id)
+        elif token:
+            cart_response = await self.get_or_create_cart_for_token(token)
+        else:
+            raise CartNotFoundError("Either user_id or token must be provided")
+
+        product = await self._catalog_service.get_product_by_id(request_data.product_id)
+        if not product:
+            logger.warning(f"Product not found: {request_data.product_id}")
+            raise ProductNotFoundError(f"Product with ID {request_data.product_id} not found")
+
+        is_available = await self._catalog_service.check_product_availability(
+            request_data.product_id,
+            request_data.quantity
+        )
+        if not is_available:
+            logger.warning(f"Insufficient stock for product {request_data.product_id}, requested: {request_data.quantity}")
+            raise InsufficientStockError(f"Insufficient stock for product {request_data.product_id}")
+
+        cart_item = await self._cart_item_repository.add_item_to_cart(request_data, cart_response.id)
+
+        logger.info(f"Item added to cart successfully: cart_id={cart_response.id}, item_id={cart_item.id}")
+
+        return self._build_cart_item_response(cart_item, product)
 
     async def update_cart_item(
             self,
@@ -234,7 +278,7 @@ class CartService(CartServiceInterface):
         """Build cart item response with product details"""
         is_available = bool(product and product.inventory and product.inventory.is_in_stock)
 
-        unit_price = product.inventory.price if product and product.inventory else Decimal('0.00')
+        unit_price = product.inventory.base_price if product and product.inventory else Decimal('0.00')
         sale_price = None
         if product and product.inventory and product.inventory.sale_price:
             sale_price = product.inventory.sale_price

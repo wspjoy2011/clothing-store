@@ -167,3 +167,17 @@ class CatalogServiceInterface(ABC):
             List of product name suggestions
         """
         pass
+
+    @abstractmethod
+    async def check_product_availability(self, product_id: int, quantity: int) -> bool:
+        """
+        Check if product is available and has sufficient stock for requested quantity
+
+        Args:
+            product_id: ID of the product to check
+            quantity: Requested quantity
+
+        Returns:
+            True if product is available and has sufficient stock, False otherwise
+        """
+        pass

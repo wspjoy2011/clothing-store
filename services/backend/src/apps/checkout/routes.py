@@ -1,16 +1,29 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Path, Body
 
-from apps.checkout.controllers import create_cart_token_controller, get_cart_by_token_controller, \
-    get_cart_for_user_controller
+from apps.checkout.controllers import (
+    create_cart_token_controller,
+    get_cart_by_token_controller,
+    get_cart_for_user_controller,
+    add_item_to_cart_by_token_controller,
+    add_item_to_cart_for_user_controller
+)
 from apps.checkout.dependencies import get_cart_service
 from apps.checkout.interfaces import CartServiceInterface
-from apps.checkout.schemas import CartTokenResponse, GetCartByTokenRequest, CartResponse
+from apps.checkout.schemas import (
+    CartTokenResponse,
+    GetCartByTokenRequest,
+    CartResponse,
+    AddToCartRequest,
+    CartItemResponse
+)
 from security.http import AccessTokenDependency
 
 API_PATHS: dict[str, str] = {
     "create_cart_token": "/cart/token",
     "get_cart_by_token": "/cart/token/get",
     "get_cart": "/cart",
+    "add_item_to_cart_by_token": "/cart/token/{token}/items",
+    "add_item_to_cart": "/cart/items",
 }
 
 router = APIRouter(
@@ -219,3 +232,182 @@ async def get_cart_route(
         - User-specific cart, isolated from anonymous carts
     """
     return await get_cart_for_user_controller(jwt_payload, cart_service)
+
+
+@router.post(
+    API_PATHS["add_item_to_cart_by_token"],
+    response_model=CartItemResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add item to cart by token",
+    description=(
+            "Add item to cart for anonymous user using cart token. "
+            "Validates product availability and stock before adding. "
+            "If item already exists in cart, quantity will be updated."
+    ),
+    responses={
+        201: {
+            "description": "Item added to cart successfully",
+            "model": CartItemResponse
+        },
+        400: {
+            "description": "Insufficient stock or validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Insufficient stock for product 123"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Cart token or product not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Product with ID 123 not found"
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Quantity must be between 1 and 999"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Internal server error"
+                    }
+                }
+            }
+        }
+    }
+)
+async def add_item_to_cart_by_token_route(
+        token: str = Path(..., description="Cart token for anonymous user"),
+        request_data: AddToCartRequest = Body(...),
+        cart_service: CartServiceInterface = Depends(get_cart_service)
+) -> CartItemResponse:
+    """Add item to cart for anonymous user by token.
+
+    This endpoint adds a product to the cart associated with the provided token.
+    It validates product existence, availability, and stock before adding.
+
+    Args:
+        token: Cart token for anonymous user.
+        request_data: Request data containing product ID and quantity.
+        cart_service: Cart service dependency for business logic operations.
+
+    Returns:
+        CartItemResponse: Added cart item with product details and pricing.
+
+    Note:
+        - Validates product existence and availability
+        - Checks stock availability before adding
+        - Updates quantity if item already exists in cart
+        - Returns complete product information with current pricing
+    """
+    return await add_item_to_cart_by_token_controller(token, request_data, cart_service)
+
+
+@router.post(
+    API_PATHS["add_item_to_cart"],
+    response_model=CartItemResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add item to user cart",
+    description=(
+            "Add item to cart for authenticated user. "
+            "Validates product availability and stock before adding. "
+            "If item already exists in cart, quantity will be updated."
+    ),
+    responses={
+        201: {
+            "description": "Item added to cart successfully",
+            "model": CartItemResponse
+        },
+        400: {
+            "description": "Insufficient stock or validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Insufficient stock for product 123"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Product not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Product with ID 123 not found"
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Quantity must be between 1 and 999"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Internal server error"
+                    }
+                }
+            }
+        }
+    }
+)
+async def add_item_to_cart_route(
+        jwt_payload: AccessTokenDependency,
+        request_data: AddToCartRequest = Body(...),
+        cart_service: CartServiceInterface = Depends(get_cart_service)
+) -> CartItemResponse:
+    """Add item to cart for authenticated user.
+
+    This endpoint adds a product to the cart for the authenticated user.
+    It validates product existence, availability, and stock before adding.
+
+    Args:
+        request_data: Request data containing product ID and quantity.
+        jwt_payload: JWT payload from verified access token.
+        cart_service: Cart service dependency for business logic operations.
+
+    Returns:
+        CartItemResponse: Added cart item with product details and pricing.
+
+    Note:
+        - Requires valid Bearer token in Authorization header
+        - Validates product existence and availability
+        - Checks stock availability before adding
+        - Updates quantity if item already exists in cart
+        - Returns complete product information with current pricing
+    """
+    return await add_item_to_cart_for_user_controller(request_data, jwt_payload, cart_service)
