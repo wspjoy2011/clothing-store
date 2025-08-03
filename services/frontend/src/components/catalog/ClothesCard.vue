@@ -29,6 +29,18 @@
           Out of Stock
         </v-chip>
       </div>
+
+      <!-- Stock Badge -->
+      <div v-if="isAvailable" class="stock-badge">
+        <v-chip
+            color="success"
+            variant="elevated"
+            size="small"
+            class="font-weight-medium"
+        >
+          {{ availableQuantity }} in stock
+        </v-chip>
+      </div>
     </div>
 
     <v-card-title class="text-subtitle-1 font-weight-bold d-block text-truncate">
@@ -61,25 +73,95 @@
       </div>
     </v-card-text>
 
-    <v-card-actions>
-      <v-btn
-          :disabled="!isAvailable"
-          :color="getActionButtonColor()"
-          variant="flat"
-          class="text-none"
-          block
-          @click="goToProductDetail"
-      >
-        {{ getActionButtonText('View Details') }}
-      </v-btn>
+    <v-card-actions class="px-3 pb-3">
+      <div class="card-controls">
+        <!-- Quantity Controls -->
+        <div v-if="isAvailable" class="quantity-section">
+          <div class="quantity-row">
+            <span class="text-caption text-medium-emphasis">Quantity:</span>
+            <div class="quantity-controls">
+              <v-btn
+                  icon
+                  size="x-small"
+                  variant="outlined"
+                  color="primary"
+                  :disabled="quantity <= 1"
+                  @click="decreaseQuantity"
+              >
+                <v-icon size="14">mdi-minus</v-icon>
+              </v-btn>
+
+              <span class="quantity-display">{{ quantity }}</span>
+
+              <v-btn
+                  icon
+                  size="x-small"
+                  variant="outlined"
+                  color="primary"
+                  :disabled="quantity >= availableQuantity"
+                  @click="increaseQuantity"
+              >
+                <v-icon size="14">mdi-plus</v-icon>
+              </v-btn>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <!-- Add to Cart Button -->
+          <v-btn
+              v-if="isAvailable"
+              :loading="isAddingItem"
+              :disabled="!isAvailable || isAddingItem"
+              color="primary"
+              variant="flat"
+              class="text-none add-to-cart-btn"
+              block
+              @click="handleAddToCart"
+          >
+            <v-icon start>mdi-cart-plus</v-icon>
+            Add to Cart
+          </v-btn>
+
+          <!-- View Details Button -->
+          <v-btn
+              :disabled="!isAvailable"
+              :color="getActionButtonColor()"
+              variant="outlined"
+              class="text-none view-details-btn"
+              block
+              @click="goToProductDetail"
+          >
+            <v-icon start>mdi-eye</v-icon>
+            {{ getActionButtonText('View Details') }}
+          </v-btn>
+        </div>
+      </div>
     </v-card-actions>
+
+    <!-- Error Alert -->
+    <v-alert
+        v-if="addItemError"
+        type="error"
+        variant="tonal"
+        class="ma-3 mt-0"
+        closable
+        @click:close="clearAddItemError"
+    >
+      <template v-slot:title>
+        <span class="text-subtitle-2">Failed to add to cart</span>
+      </template>
+      <span class="text-body-2">{{ addItemError }}</span>
+    </v-alert>
   </v-card>
 </template>
 
 <script setup>
-import {ref, toRef} from 'vue';
+import {ref, toRef, computed} from 'vue';
 import {useRouter} from 'vue-router';
 import {useProductInventory} from '@/composables/product/useProductInventory';
+import {useCart} from '@/composables/cart/useCart.js';
 
 const props = defineProps({
   product: {
@@ -101,6 +183,7 @@ const props = defineProps({
 const router = useRouter();
 const hover = ref(false);
 const imageLoading = ref(true);
+const quantity = ref(1);
 
 const productRef = toRef(props, 'product');
 const {
@@ -112,8 +195,46 @@ const {
   getActionButtonColor
 } = useProductInventory(productRef);
 
+const {
+  isAddingItem,
+  addItemError,
+  addItemToCart,
+  clearAddItemError
+} = useCart();
+
+const availableQuantity = computed(() => {
+  return props.product.inventory?.available_quantity || 0;
+});
+
 const imageLoaded = () => {
   imageLoading.value = false;
+};
+
+const increaseQuantity = () => {
+  if (quantity.value < availableQuantity.value) {
+    quantity.value++;
+  }
+};
+
+const decreaseQuantity = () => {
+  if (quantity.value > 1) {
+    quantity.value--;
+  }
+};
+
+const handleAddToCart = async () => {
+  if (!isAvailable.value || isAddingItem.value) return;
+
+  try {
+    await addItemToCart({
+      product_id: props.product.product_id,
+      quantity: quantity.value
+    });
+
+    quantity.value = 1;
+  } catch (error) {
+    console.error('Failed to add item to cart:', error);
+  }
 };
 
 const goToProductDetail = () => {
@@ -163,6 +284,13 @@ const goToProductDetail = () => {
   align-items: center;
   background-color: rgba(245, 245, 245, 0.7);
   z-index: 1;
+}
+
+.stock-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
 }
 
 .out-of-stock {
@@ -220,6 +348,69 @@ const goToProductDetail = () => {
   color: #1976d2;
   font-size: 1.1rem;
   line-height: 1.2;
+}
+
+.card-controls {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 16px;
+}
+
+.quantity-section {
+  width: 100%;
+}
+
+.quantity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quantity-display {
+  min-width: 20px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+@media (min-width: 1450px) {
+  .card-controls {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .quantity-section {
+    flex: 0 0 auto;
+    min-width: 120px;
+    max-width: 120px;
+  }
+
+  .quantity-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .action-buttons {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 .out-of-stock:hover {

@@ -56,10 +56,11 @@
 </template>
 
 <script setup>
-import {computed} from 'vue'
+import { onMounted } from 'vue'
 import ThemeToggle from '@/components/ui/theme/ThemeToggle.vue'
 import SearchBar from '@/components/ui/search/SearchBar.vue'
-import {useCart} from '@/composables/cart/useCart.js'
+import { useCart } from '@/composables/cart/useCart.js'
+import { useCartUI } from '@/composables/cart/useCartUI.js'
 
 defineProps({
   showCategoryPath: {
@@ -70,16 +71,11 @@ defineProps({
 
 defineEmits(['go-to-cart', 'toggle-category-path', 'toggle-mobile-drawer'])
 
-const {hasItems, itemsCount, totalPrice, initializeCart} = useCart({showNotifications: false})
+const cartData = useCart({ showNotifications: false })
+const { hasItems, reloadCart } = cartData
+const { cartTooltipText } = useCartUI(cartData)
 
-initializeCart()
-
-const cartTooltipText = computed(() => {
-  if (!hasItems.value) {
-    return 'Your cart is empty'
-  }
-
-  const itemText = itemsCount.value === 1 ? 'item' : 'items'
-  return `${itemsCount.value} ${itemText} • $${totalPrice.value.toFixed(2)}`
+onMounted(() => {
+  reloadCart()
 })
 </script>

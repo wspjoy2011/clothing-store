@@ -187,9 +187,10 @@
 </template>
 
 <script setup>
-import {computed} from 'vue'
+import { onMounted } from 'vue'
 import CategoryMenu from '@/components/catalog/CategoryMenu.vue'
-import {useCart} from '@/composables/cart/useCart.js'
+import { useCart } from '@/composables/cart/useCart.js'
+import { useCartUI } from '@/composables/cart/useCartUI.js'
 
 defineProps({
   mobileDrawerOpen: {
@@ -233,21 +234,12 @@ defineEmits([
   'toggle-theme'
 ])
 
-const {hasItems, itemsCount, totalPrice, initializeCart} = useCart({showNotifications: false})
+const cartData = useCart({ showNotifications: false })
+const { hasItems, itemsCount, reloadCart } = cartData
+const { cartTitle, cartSubtitle } = useCartUI(cartData)
 
-initializeCart()
-
-const cartTitle = computed(() => {
-  return hasItems.value ? 'Shopping Cart' : 'Shopping Cart'
-})
-
-const cartSubtitle = computed(() => {
-  if (!hasItems.value) {
-    return 'Empty'
-  }
-
-  const itemText = itemsCount.value === 1 ? 'item' : 'items'
-  return `${itemsCount.value} ${itemText} • $${totalPrice.value.toFixed(2)}`
+onMounted(() => {
+  reloadCart()
 })
 
 function getCategoryIcon(type) {
