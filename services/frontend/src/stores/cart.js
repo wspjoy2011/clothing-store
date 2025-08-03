@@ -22,6 +22,67 @@ export const useCartStore = defineStore('cart', {
             const accountStore = useAccountStore()
             return accountStore.isAuthenticated
         },
+
+        /**
+         * Get all cart items as a Map for fast lookup by product_id
+         * @returns {Map<number, Object>} Map of product_id to cart item
+         */
+        cartItemsMap: (state) => {
+            if (!state.cart?.items) {
+                return new Map()
+            }
+
+            const itemsMap = new Map()
+            state.cart.items.forEach(item => {
+                itemsMap.set(item.product_id, item)
+            })
+            return itemsMap
+        },
+
+        /**
+         * Check if product is in cart
+         * @returns {Function} Function that takes product_id and returns boolean
+         */
+        isProductInCart: (state) => (productId) => {
+            if (!state.cart?.items) {
+                return false
+            }
+
+            return state.cart.items.some(item => item.product_id === productId)
+        },
+
+        /**
+         * Get cart item by product ID
+         * @returns {Function} Function that takes product_id and returns cart item or null
+         */
+        getCartItemByProductId: (state) => (productId) => {
+            if (!state.cart?.items) {
+                return null
+            }
+
+            return state.cart.items.find(item => item.product_id === productId) || null
+        },
+
+        /**
+         * Get quantity of specific product in cart
+         * @returns {Function} Function that takes product_id and returns quantity
+         */
+        getProductQuantityInCart: (state) => (productId) => {
+            const item = state.cart?.items?.find(item => item.product_id === productId)
+            return item ? item.quantity : 0
+        },
+
+        /**
+         * Get all product IDs that are in cart
+         * @returns {Array<number>} Array of product IDs in cart
+         */
+        cartProductIds: (state) => {
+            if (!state.cart?.items) {
+                return []
+            }
+
+            return state.cart.items.map(item => item.product_id)
+        }
     },
 
     actions: {
@@ -136,6 +197,46 @@ export const useCartStore = defineStore('cart', {
             } else {
                 await this.loadAnonymousCart()
             }
+        },
+
+        /**
+         * Check if specific product is in cart
+         * @param {number} productId - Product ID to check
+         * @returns {boolean} - True if product is in cart
+         */
+        checkProductInCart(productId) {
+            return this.isProductInCart(productId)
+        },
+
+        /**
+         * Get cart item information for specific product
+         * @param {number} productId - Product ID to get info for
+         * @returns {Object|null} - Cart item object or null if not found
+         */
+        getCartItemInfo(productId) {
+            return this.getCartItemByProductId(productId)
+        },
+
+        /**
+         * Get quantity of specific product in cart
+         * @param {number} productId - Product ID to get quantity for
+         * @returns {number} - Quantity in cart (0 if not in cart)
+         */
+        getProductQuantity(productId) {
+            return this.getProductQuantityInCart(productId)
+        },
+
+        /**
+         * Check if multiple products are in cart
+         * @param {Array<number>} productIds - Array of product IDs to check
+         * @returns {Object} - Object with productId as key and boolean as value
+         */
+        checkMultipleProductsInCart(productIds) {
+            const results = {}
+            productIds.forEach(productId => {
+                results[productId] = this.isProductInCart(productId)
+            })
+            return results
         },
 
         resetInitialization() {

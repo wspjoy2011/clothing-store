@@ -30,8 +30,8 @@
         </v-chip>
       </div>
 
-      <!-- Stock Badge -->
-      <div v-if="isAvailable" class="stock-badge">
+      <!-- Stock Badge - Show only if not in cart -->
+      <div v-if="isAvailable && !productInCart" class="stock-badge">
         <v-chip
             color="success"
             variant="elevated"
@@ -39,6 +39,19 @@
             class="font-weight-medium"
         >
           {{ availableQuantity }} in stock
+        </v-chip>
+      </div>
+
+      <!-- In Cart Badge - Show when product is in cart -->
+      <div v-if="productInCart" class="cart-badge">
+        <v-chip
+            color="success"
+            variant="elevated"
+            size="small"
+            class="font-weight-bold"
+        >
+          <v-icon start size="16">mdi-check-circle</v-icon>
+          In Cart
         </v-chip>
       </div>
     </div>
@@ -75,8 +88,8 @@
 
     <v-card-actions class="px-3 pb-3">
       <div class="card-controls">
-        <!-- Quantity Controls -->
-        <div v-if="isAvailable" class="quantity-section">
+        <!-- Quantity Controls - Only show if NOT in cart -->
+        <div v-if="isAvailable && !productInCart" class="quantity-section">
           <div class="quantity-row">
             <span class="text-caption text-medium-emphasis">Quantity:</span>
             <div class="quantity-controls">
@@ -107,11 +120,19 @@
           </div>
         </div>
 
+        <!-- In Cart Status - Show when product is in cart -->
+        <div v-if="productInCart" class="in-cart-indicator">
+          <v-icon color="success" size="24">mdi-check-circle</v-icon>
+          <span class="in-cart-text">
+            {{ cartDisplayInfo.displayText }}
+          </span>
+        </div>
+
         <!-- Action Buttons -->
         <div class="action-buttons">
-          <!-- Add to Cart Button -->
+          <!-- Add to Cart Button - Show only if NOT in cart -->
           <v-btn
-              v-if="isAvailable"
+              v-if="isAvailable && !productInCart"
               :loading="isAddingItem"
               :disabled="!isAvailable || isAddingItem"
               color="primary"
@@ -122,6 +143,20 @@
           >
             <v-icon start>mdi-cart-plus</v-icon>
             Add to Cart
+          </v-btn>
+
+          <!-- Remove from Cart Button - Show when in cart (placeholder) -->
+          <v-btn
+              v-if="productInCart"
+              color="error"
+              variant="flat"
+              class="text-none remove-from-cart-btn"
+              block
+              disabled
+              @click="handleRemoveFromCart"
+          >
+            <v-icon start>mdi-cart-remove</v-icon>
+            Remove from Cart
           </v-btn>
 
           <!-- View Details Button -->
@@ -158,7 +193,7 @@
 </template>
 
 <script setup>
-import {ref, toRef, computed} from 'vue';
+import {ref, toRef, computed, watch} from 'vue';
 import {useRouter} from 'vue-router';
 import {useProductInventory} from '@/composables/product/useProductInventory';
 import {useCart} from '@/composables/cart/useCart.js';
@@ -199,8 +234,13 @@ const {
   isAddingItem,
   addItemError,
   addItemToCart,
-  clearAddItemError
+  clearAddItemError,
+  isProductInCart,
+  getCartItemDisplayInfo
 } = useCart();
+
+const productInCart = isProductInCart(props.product.product_id);
+const cartDisplayInfo = getCartItemDisplayInfo(props.product.product_id);
 
 const availableQuantity = computed(() => {
   return props.product.inventory?.available_quantity || 0;
@@ -223,18 +263,21 @@ const decreaseQuantity = () => {
 };
 
 const handleAddToCart = async () => {
-  if (!isAvailable.value || isAddingItem.value) return;
+  if (!isAvailable.value || isAddingItem.value || productInCart.value) return;
 
   try {
     await addItemToCart({
       product_id: props.product.product_id,
       quantity: quantity.value
     });
-
     quantity.value = 1;
   } catch (error) {
     console.error('Failed to add item to cart:', error);
   }
+};
+
+const handleRemoveFromCart = () => {
+  console.log('Remove from cart functionality coming soon!');
 };
 
 const goToProductDetail = () => {
@@ -287,6 +330,13 @@ const goToProductDetail = () => {
 }
 
 .stock-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
+
+.cart-badge {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -381,11 +431,34 @@ const goToProductDetail = () => {
   font-size: 0.9rem;
 }
 
+.in-cart-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  width: 100%;
+}
+
+.in-cart-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+:deep(.v-theme--dark) .in-cart-text {
+  color: #4caf50;
+}
+
 .action-buttons {
   display: flex;
   flex-direction: column;
   gap: 8px;
   width: 100%;
+}
+
+.remove-from-cart-btn {
+  position: relative;
 }
 
 @media (min-width: 1450px) {
@@ -399,6 +472,13 @@ const goToProductDetail = () => {
     flex: 0 0 auto;
     min-width: 120px;
     max-width: 120px;
+  }
+
+  .in-cart-indicator {
+    flex: 0 0 auto;
+    min-width: 140px;
+    max-width: 140px;
+    justify-content: flex-start;
   }
 
   .quantity-row {

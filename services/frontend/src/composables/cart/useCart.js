@@ -1,6 +1,7 @@
 import {useCartState} from '@/composables/cart/useCartState.js';
 import {useCartActions} from '@/composables/cart/useCartActions.js';
 import {useCartErrorHandler} from '@/composables/cart/useCartErrorHandler.js';
+import {useCartItemChecker} from '@/composables/cart/useCartItemChecker.js';
 
 export function useCart(options = {}) {
     const {
@@ -40,6 +41,26 @@ export function useCart(options = {}) {
         getAddItemErrorDetails,
         getCartErrorDetails
     } = useCartErrorHandler();
+
+    const {
+        // Reactive methods for checking cart items
+        isProductInCart,
+        getCartItemInfo,
+        getProductQuantity,
+        getCartItemDisplayInfo,
+        checkMultipleProducts,
+
+        // Reactive properties
+        cartProductIds,
+        cartItemsMap,
+        hasCartItems,
+        totalItemsCount,
+
+        // Synchronous methods
+        checkProductInCartSync,
+        getCartItemInfoSync,
+        getProductQuantitySync
+    } = useCartItemChecker();
 
     const addItemToCart = async (itemData) => {
         if (isAddingItem.value) return;
@@ -82,6 +103,22 @@ export function useCart(options = {}) {
 
         // Error handling
         getAddItemErrorDetails,
-        getCartErrorDetails
+        getCartErrorDetails,
+
+        // Cart item checking (reactive)
+        isProductInCart,
+        getCartItemInfo,
+        getProductQuantity,
+        getCartItemDisplayInfo,
+        checkMultipleProducts,
+        cartProductIds,
+        cartItemsMap,
+        hasCartItems,
+        totalItemsCount,
+
+        // Cart item checking (synchronous)
+        checkProductInCartSync,
+        getCartItemInfoSync,
+        getProductQuantitySync
     };
 }
