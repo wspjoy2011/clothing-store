@@ -69,7 +69,7 @@ export function useNavigation() {
     }
 
     const goToCart = () => {
-        console.log('Navigate to cart')
+        router.push({name: 'cart'})
     }
 
     const handleLogout = () => {

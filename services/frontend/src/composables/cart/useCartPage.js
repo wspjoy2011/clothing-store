@@ -1,16 +1,21 @@
-import {onMounted} from 'vue';
-import {useCartState} from '@/composables/cart/useCartState.js';
-import {useCartActions} from '@/composables/cart/useCartActions.js';
-import {useCartErrorHandler} from '@/composables/cart/useCartErrorHandler.js';
-import {usePageTitle} from '@/composables/usePageTitle.js';
+import { computed, onMounted } from 'vue'
+import { useTheme } from 'vuetify'
+import { useCartState } from '@/composables/cart/useCartState.js'
+import { useCartActions } from '@/composables/cart/useCartActions.js'
+import { useCartErrorHandler } from '@/composables/cart/useCartErrorHandler.js'
+import { useCartFormatting } from '@/composables/cart/useCartFormatting.js'
+import { usePageTitle } from '@/composables/usePageTitle.js'
 
 export function useCartPage(options = {}) {
     const {
         autoInitialize = true,
         showNotifications = true
-    } = options;
+    } = options
 
-    usePageTitle('StyleShop - Shopping Cart');
+    const theme = useTheme()
+    const isDarkTheme = computed(() => theme.global.current.value.dark)
+
+    usePageTitle('StyleShop - Shopping Cart')
 
     const {
         // Local state
@@ -31,7 +36,7 @@ export function useCartPage(options = {}) {
         clearAddItemError,
         setAddingItem,
         setAddItemError
-    } = useCartState();
+    } = useCartState()
 
     const {
         initializeCart,
@@ -39,38 +44,57 @@ export function useCartPage(options = {}) {
         reloadCart,
         switchToUserCart,
         switchToAnonymousCart
-    } = useCartActions();
+    } = useCartActions()
 
     const {
         getAddItemErrorDetails,
         getCartErrorDetails
-    } = useCartErrorHandler();
+    } = useCartErrorHandler()
+
+    const {
+        // Formatted display values
+        formattedTotalAmount,
+        formattedTotalDiscount,
+        formattedFinalAmount,
+        hasDiscount,
+
+        // Utility functions
+        parsePrice,
+        formatItemPrice,
+        formatItemTotal,
+        formatItemSaleTotal,
+        getItemDiscount,
+        hasItemDiscount
+    } = useCartFormatting(cart)
 
     const addItemToCart = async (itemData) => {
-        if (isAddingItem.value) return;
+        if (isAddingItem.value) return
 
-        setAddingItem(true);
-        clearAddItemError();
+        setAddingItem(true)
+        clearAddItemError()
 
         try {
-            return await baseAddItemToCart(itemData, showNotifications);
+            return await baseAddItemToCart(itemData, showNotifications)
         } catch (error) {
-            setAddItemError(error.message);
-            throw error;
+            setAddItemError(error.message)
+            throw error
         } finally {
-            setAddingItem(false);
+            setAddingItem(false)
         }
-    };
+    }
 
     if (autoInitialize) {
         onMounted(async () => {
             if (!isInitialized.value) {
-                await initializeCart();
+                await initializeCart()
             }
-        });
+        })
     }
 
     return {
+        // Theme
+        isDarkTheme,
+
         // State
         cart,
         isLoading,
@@ -95,6 +119,18 @@ export function useCartPage(options = {}) {
 
         // Error handling
         getAddItemErrorDetails,
-        getCartErrorDetails
-    };
+        getCartErrorDetails,
+
+        // Price formatting and calculations
+        formattedTotalAmount,
+        formattedTotalDiscount,
+        formattedFinalAmount,
+        hasDiscount,
+        parsePrice,
+        formatItemPrice,
+        formatItemTotal,
+        formatItemSaleTotal,
+        getItemDiscount,
+        hasItemDiscount
+    }
 }

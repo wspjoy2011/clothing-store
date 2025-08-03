@@ -16,6 +16,7 @@ import PasswordResetRequestPage from '@/views/PasswordResetRequestPage.vue'
 import PasswordResetConfirmPage from '@/views/PasswordResetConfirmPage.vue'
 import PasswordChangePage from '@/views/PasswordChangePage.vue'
 import LogoutPage from '@/views/LogoutPage.vue'
+import CartPage from '@/views/CartPage.vue'
 
 const processCatalogRouteProps = (route) => {
     const preferencesStore = useUserPreferencesStore();
@@ -165,6 +166,14 @@ const routes = [
         props: processCategoryRouteProps,
         meta: {
             title: 'StyleShop - Category'
+        }
+    },
+    {
+        path: '/checkout/cart',
+        name: 'cart',
+        component: CartPage,
+        meta: {
+            title: 'StyleShop - Shopping Cart'
         }
     },
     {
