@@ -5,15 +5,29 @@
 
     <slot name="user-menu"></slot>
 
-    <v-btn icon @click="$emit('go-to-cart')">
-      <v-badge
-          color="error"
-          content="2"
-          dot
-      >
-        <v-icon>mdi-cart</v-icon>
-      </v-badge>
-    </v-btn>
+    <!-- Cart Button with Tooltip -->
+    <v-tooltip
+        :text="cartTooltipText"
+        location="bottom"
+        :disabled="!hasItems"
+    >
+      <template v-slot:activator="{ props }">
+        <v-btn
+            icon
+            @click="$emit('go-to-cart')"
+            v-bind="props"
+        >
+          <v-badge
+              v-if="hasItems"
+              color="error"
+              dot
+          >
+            <v-icon>mdi-cart</v-icon>
+          </v-badge>
+          <v-icon v-else>mdi-cart</v-icon>
+        </v-btn>
+      </template>
+    </v-tooltip>
 
     <!-- Category Path Indicator for Mobile -->
     <v-btn
@@ -42,8 +56,10 @@
 </template>
 
 <script setup>
+import {computed} from 'vue'
 import ThemeToggle from '@/components/ui/theme/ThemeToggle.vue'
 import SearchBar from '@/components/ui/search/SearchBar.vue'
+import {useCart} from '@/composables/cart/useCart.js'
 
 defineProps({
   showCategoryPath: {
@@ -53,4 +69,17 @@ defineProps({
 })
 
 defineEmits(['go-to-cart', 'toggle-category-path', 'toggle-mobile-drawer'])
+
+const {hasItems, itemsCount, totalPrice, initializeCart} = useCart({showNotifications: false})
+
+initializeCart()
+
+const cartTooltipText = computed(() => {
+  if (!hasItems.value) {
+    return 'Your cart is empty'
+  }
+
+  const itemText = itemsCount.value === 1 ? 'item' : 'items'
+  return `${itemsCount.value} ${itemText} • $${totalPrice.value.toFixed(2)}`
+})
 </script>

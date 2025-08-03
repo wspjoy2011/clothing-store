@@ -145,12 +145,37 @@
           prepend-icon="mdi-magnify"
       ></v-list-item>
 
+      <!-- Shopping Cart with dynamic info -->
       <v-list-item
-          title="Shopping Cart"
+          :title="cartTitle"
+          :subtitle="cartSubtitle"
           value="cart"
-          prepend-icon="mdi-cart"
           @click="$emit('go-to-cart')"
-      ></v-list-item>
+      >
+        <template v-slot:prepend>
+          <v-badge
+              v-if="hasItems"
+              color="error"
+              dot
+              offset-x="8"
+              offset-y="8"
+          >
+            <v-icon>mdi-cart</v-icon>
+          </v-badge>
+          <v-icon v-else>mdi-cart</v-icon>
+        </template>
+
+        <template v-if="hasItems" v-slot:append>
+          <v-chip
+              size="x-small"
+              color="error"
+              variant="elevated"
+              class="cart-chip"
+          >
+            {{ itemsCount }}
+          </v-chip>
+        </template>
+      </v-list-item>
 
       <v-list-item
           title="Toggle Theme"
@@ -162,7 +187,9 @@
 </template>
 
 <script setup>
+import {computed} from 'vue'
 import CategoryMenu from '@/components/catalog/CategoryMenu.vue'
+import {useCart} from '@/composables/cart/useCart.js'
 
 defineProps({
   mobileDrawerOpen: {
@@ -206,6 +233,23 @@ defineEmits([
   'toggle-theme'
 ])
 
+const {hasItems, itemsCount, totalPrice, initializeCart} = useCart({showNotifications: false})
+
+initializeCart()
+
+const cartTitle = computed(() => {
+  return hasItems.value ? 'Shopping Cart' : 'Shopping Cart'
+})
+
+const cartSubtitle = computed(() => {
+  if (!hasItems.value) {
+    return 'Empty'
+  }
+
+  const itemText = itemsCount.value === 1 ? 'item' : 'items'
+  return `${itemsCount.value} ${itemText} • $${totalPrice.value.toFixed(2)}`
+})
+
 function getCategoryIcon(type) {
   switch (type) {
     case 'master':
@@ -224,6 +268,12 @@ function getCategoryIcon(type) {
 .mobile-user-info {
   background-color: rgb(from rgb(25, 118, 210) r g b / 0.1);
   margin-bottom: 8px;
+}
+
+.cart-chip {
+  font-size: 10px;
+  min-width: 20px;
+  height: 20px;
 }
 
 :deep(.v-theme--dark) .mobile-user-info {

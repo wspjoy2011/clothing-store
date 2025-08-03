@@ -16,7 +16,7 @@ export const useCartStore = defineStore('cart', {
     getters: {
         hasItems: (state) => state.cart?.items?.length > 0,
         itemsCount: (state) => state.cart?.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
-        totalPrice: (state) => state.cart?.total_price || 0,
+        totalPrice: (state) => state.cart?.final_amount || 0,
 
         isAuthenticated: () => {
             const accountStore = useAccountStore()
@@ -72,6 +72,70 @@ export const useCartStore = defineStore('cart', {
         async createCartToken() {
             const response = await cartService.createCartToken()
             this.cartToken = response.token
+        },
+
+        /**
+         * Universal method to add item to cart
+         * Automatically chooses between authenticated and anonymous methods
+         * @param {Object} itemData - Item data {product_id, quantity}
+         * @returns {Promise<Object>} - Added cart item
+         */
+        async addItemToCart(itemData) {
+            this.isLoading = true
+            this.error = null
+
+            try {
+                let result
+
+                if (this.isAuthenticated) {
+                    result = await this.addItemToUserCart(itemData)
+                } else {
+                    result = await this.addItemToAnonymousCart(itemData)
+                }
+
+                await this.reloadCart()
+
+                return result
+            } catch (error) {
+                this.error = error.message
+                console.error('Failed to add item to cart:', error)
+                throw error
+            } finally {
+                this.isLoading = false
+            }
+        },
+
+        /**
+         * Add item to cart for authenticated user
+         * @param {Object} itemData - Item data {product_id, quantity}
+         * @returns {Promise<Object>} - Added cart item
+         */
+        async addItemToUserCart(itemData) {
+            return await cartService.addItemToCart(itemData)
+        },
+
+        /**
+         * Add item to cart for anonymous user
+         * @param {Object} itemData - Item data {product_id, quantity}
+         * @returns {Promise<Object>} - Added cart item
+         */
+        async addItemToAnonymousCart(itemData) {
+            if (!this.cartToken) {
+                await this.createCartToken()
+            }
+
+            return await cartService.addItemToCartByToken(this.cartToken, itemData)
+        },
+
+        /**
+         * Reload cart data from server
+         */
+        async reloadCart() {
+            if (this.isAuthenticated) {
+                await this.loadUserCart()
+            } else {
+                await this.loadAnonymousCart()
+            }
         },
 
         resetInitialization() {
