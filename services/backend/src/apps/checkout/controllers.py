@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Response
 
 from apps.checkout.dto import CartItemResponseDTO, CartResponseDTO, AddToCartRequestDTO
 from apps.checkout.interfaces import CartServiceInterface
@@ -273,3 +273,93 @@ async def add_item_to_cart_for_user_controller(
         )
     else:
         return _convert_cart_item_dto_to_schema(cart_item_dto)
+
+
+async def remove_cart_item_by_token_controller(
+        token: str,
+        item_id: int,
+        cart_service: CartServiceInterface
+):
+    """
+    Controller for removing cart item by token
+
+    Args:
+        token: Cart token for anonymous user
+        item_id: ID of the cart item to remove
+        cart_service: Cart service for business logic
+
+    Returns:
+        HTTP 204 No Content on success
+
+    Raises:
+        HTTPException: Various HTTP errors based on business logic results
+    """
+    try:
+        success = await cart_service.remove_cart_item(
+            item_id=item_id,
+            token=token
+        )
+    except CartNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error removing cart item {item_id} by token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+    else:
+        if success:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cart item with ID {item_id} not found in cart"
+            )
+
+
+async def remove_cart_item_for_user_controller(
+        item_id: int,
+        jwt_payload: JWTPayloadDTO,
+        cart_service: CartServiceInterface
+):
+    """
+    Controller for removing cart item for authenticated user
+
+    Args:
+        item_id: ID of the cart item to remove
+        jwt_payload: JWT payload with user information
+        cart_service: Cart service for business logic
+
+    Returns:
+        HTTP 204 No Content on success
+
+    Raises:
+        HTTPException: Various HTTP errors based on business logic results
+    """
+    try:
+        success = await cart_service.remove_cart_item(
+            item_id=item_id,
+            user_id=jwt_payload.user_id
+        )
+    except CartNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error removing cart item {item_id} for user: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+    else:
+        if success:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cart item with ID {item_id} not found in cart"
+            )

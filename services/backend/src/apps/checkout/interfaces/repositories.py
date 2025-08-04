@@ -243,15 +243,16 @@ class CartItemRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def remove_cart_item(self, item_id: int) -> bool:
+    async def remove_cart_item(self, item_id: int, cart_id: int) -> bool:
         """
-        Remove item from cart
+        Remove item from cart with cart ownership validation
 
         Args:
             item_id: ID of the cart item to remove
+            cart_id: ID of the cart (for ownership validation)
 
         Returns:
-            True if removed successfully, False otherwise
+            True if removed successfully, False if item not found or doesn't belong to cart
         """
         pass
 

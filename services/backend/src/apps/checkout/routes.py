@@ -5,7 +5,7 @@ from apps.checkout.controllers import (
     get_cart_by_token_controller,
     get_cart_for_user_controller,
     add_item_to_cart_by_token_controller,
-    add_item_to_cart_for_user_controller
+    add_item_to_cart_for_user_controller, remove_cart_item_by_token_controller, remove_cart_item_for_user_controller
 )
 from apps.checkout.dependencies import get_cart_service
 from apps.checkout.interfaces import CartServiceInterface
@@ -24,6 +24,8 @@ API_PATHS: dict[str, str] = {
     "get_cart": "/cart",
     "add_item_to_cart_by_token": "/cart/token/{token}/items",
     "add_item_to_cart": "/cart/items",
+    "remove_cart_item_by_token": "/cart/token/{token}/items/{item_id}",
+    "remove_cart_item": "/cart/items/{item_id}",
 }
 
 router = APIRouter(
@@ -411,3 +413,155 @@ async def add_item_to_cart_route(
         - Returns complete product information with current pricing
     """
     return await add_item_to_cart_for_user_controller(request_data, jwt_payload, cart_service)
+
+
+@router.delete(
+    API_PATHS["remove_cart_item_by_token"],
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove item from cart by token",
+    description=(
+            "Remove item from cart for anonymous user using cart token. "
+            "Validates ownership - item must belong to the cart associated with the provided token."
+    ),
+    responses={
+        204: {
+            "description": "Item removed successfully"
+        },
+        404: {
+            "description": "Cart token not found, expired, or item not found in cart",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Cart token not found or expired"
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Item ID must be a positive integer"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Internal server error"
+                    }
+                }
+            }
+        }
+    }
+)
+async def remove_cart_item_by_token_route(
+        token: str = Path(..., description="Cart token for anonymous user"),
+        item_id: int = Path(..., gt=0, description="ID of the cart item to remove"),
+        cart_service: CartServiceInterface = Depends(get_cart_service)
+):
+    """Remove item from cart for anonymous user by token.
+
+    This endpoint removes a specific item from the cart associated with the provided token.
+    The item must belong to the cart to be removed (ownership validation).
+
+    Args:
+        token: Cart token for anonymous user.
+        item_id: ID of the cart item to remove.
+        cart_service: Cart service dependency for business logic operations.
+
+    Returns:
+        HTTP 204 No Content on successful removal.
+
+    Note:
+        - Validates token existence and expiration
+        - Validates item ownership (item must belong to the token's cart)
+        - Returns 404 if token is invalid or item doesn't belong to cart
+        - Idempotent operation - returns 204 even if item was already removed
+    """
+    return await remove_cart_item_by_token_controller(token, item_id, cart_service)
+
+
+@router.delete(
+    API_PATHS["remove_cart_item"],
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove item from user cart",
+    description=(
+            "Remove item from cart for authenticated user. "
+            "Validates ownership - item must belong to the user's cart."
+    ),
+    responses={
+        204: {
+            "description": "Item removed successfully"
+        },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authorization header is missing"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Item not found in user's cart",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Cart item not found in your cart"
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Item ID must be a positive integer"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Internal server error"
+                    }
+                }
+            }
+        }
+    }
+)
+async def remove_cart_item_route(
+        jwt_payload: AccessTokenDependency,
+        item_id: int = Path(..., gt=0, description="ID of the cart item to remove"),
+        cart_service: CartServiceInterface = Depends(get_cart_service)
+):
+    """Remove item from cart for authenticated user.
+
+    This endpoint removes a specific item from the authenticated user's cart.
+    The item must belong to the user's cart to be removed (ownership validation).
+
+    Args:
+        item_id: ID of the cart item to remove.
+        jwt_payload: JWT payload from verified access token.
+        cart_service: Cart service dependency for business logic operations.
+
+    Returns:
+        HTTP 204 No Content on successful removal.
+
+    Note:
+        - Requires valid Bearer token in Authorization header
+        - Validates item ownership (item must belong to user's cart)
+        - Returns 404 if item doesn't belong to user's cart
+        - Idempotent operation - returns 204 even if item was already removed
+    """
+    return await remove_cart_item_for_user_controller(item_id, jwt_payload, cart_service)

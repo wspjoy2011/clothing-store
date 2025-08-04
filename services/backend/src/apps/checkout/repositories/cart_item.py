@@ -169,33 +169,44 @@ class CartItemRepository(CartItemRepositoryInterface):
 
         return result
 
-    async def remove_cart_item(self, item_id: int) -> bool:
+    async def remove_cart_item(self, item_id: int, cart_id: int) -> bool:
         """
-        Remove item from cart
+        Remove item from cart with cart ownership validation
 
         Args:
             item_id: ID of the cart item to remove
+            cart_id: ID of the cart (for ownership validation)
 
         Returns:
-            True if removed successfully, False otherwise
+            True if removed successfully, False if item not found or doesn't belong to cart
         """
-        query = f"DELETE FROM {self.APP_NAME}_cart_items WHERE id = %s"
+        query = f"""
+            DELETE FROM {self.APP_NAME}_cart_items 
+            WHERE id = %s AND cart_id = %s
+            RETURNING id
+        """
 
         try:
-            await self._dao.execute(
+            result = await self._dao.execute(
                 query=query,
-                params=[item_id],
-                fetch=False
+                params=[item_id, cart_id],
+                fetch=True,
+                fetch_one=True,
+                as_dict=True
             )
         except psycopg.Error as e:
-            logger.error(f"Database error removing cart item {item_id}: {e}")
+            logger.error(f"Database error removing cart item {item_id} from cart {cart_id}: {e}")
             return False
         except Exception as e:
-            logger.error(f"Failed to remove cart item {item_id}: {e}")
+            logger.error(f"Failed to remove cart item {item_id} from cart {cart_id}: {e}")
             return False
-
-        logger.info(f"Removed cart item with ID: {item_id}")
-        return True
+        else:
+            if result:
+                logger.info(f"Removed cart item {item_id} from cart {cart_id}")
+                return True
+            else:
+                logger.warning(f"Cart item {item_id} not found in cart {cart_id} or doesn't belong to this cart")
+                return False
 
     async def clear_cart_items(self, cart_id: int) -> bool:
         """

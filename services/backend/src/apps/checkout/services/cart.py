@@ -208,8 +208,40 @@ class CartService(CartServiceInterface):
             user_id: Optional[int] = None,
             token: Optional[str] = None
     ) -> bool:
-        """Not implemented yet"""
-        raise NotImplementedError("remove_cart_item method is not implemented yet")
+        """
+        Remove item from cart with ownership validation
+
+        Business logic: Validate ownership, remove item, return success status
+
+        Args:
+            item_id: ID of the cart item to remove
+            user_id: ID of authenticated user (mutually exclusive with token)
+            token: Cart token for anonymous user (mutually exclusive with user_id)
+
+        Returns:
+            True if removed successfully
+
+        Raises:
+            CartNotFoundError: If cart cannot be found
+        """
+        logger.info(f"Removing cart item: item_id={item_id}")
+
+        if not user_id and not token:
+            raise CartNotFoundError("Either user_id or token must be provided")
+
+        if user_id:
+            cart_response = await self.get_or_create_cart_for_user(user_id)
+        else:
+            cart_response = await self.get_or_create_cart_for_token(token)
+
+        success = await self._cart_item_repository.remove_cart_item(item_id, cart_response.id)
+
+        if success:
+            logger.info(f"Cart item {item_id} removed successfully from cart {cart_response.id}")
+        else:
+            logger.warning(f"Cart item {item_id} not found in cart {cart_response.id} or doesn't belong to user")
+
+        return success
 
     async def clear_cart(
             self,
