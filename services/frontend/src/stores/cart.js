@@ -188,6 +188,56 @@ export const useCartStore = defineStore('cart', {
             return await cartService.addItemToCartByToken(this.cartToken, itemData)
         },
 
+
+        /**
+         * Universal method to remove item from cart
+         * Automatically chooses between authenticated and anonymous methods
+         * @param {number} itemId - Cart item ID to remove
+         * @returns {Promise<void>}
+         */
+        async removeItemFromCart(itemId) {
+            this.isLoading = true
+            this.error = null
+
+            try {
+                if (this.isAuthenticated) {
+                    await this.removeItemFromUserCart(itemId)
+                } else {
+                    await this.removeItemFromAnonymousCart(itemId)
+                }
+
+                await this.reloadCart()
+            } catch (error) {
+                this.error = error.message
+                console.error('Failed to remove item from cart:', error)
+                throw error
+            } finally {
+                this.isLoading = false
+            }
+        },
+
+        /**
+         * Remove item from cart for authenticated user
+         * @param {number} itemId - Cart item ID to remove
+         * @returns {Promise<void>}
+         */
+        async removeItemFromUserCart(itemId) {
+            return await cartService.removeItemFromCart(itemId)
+        },
+
+        /**
+         * Remove item from cart for anonymous user
+         * @param {number} itemId - Cart item ID to remove
+         * @returns {Promise<void>}
+         */
+        async removeItemFromAnonymousCart(itemId) {
+            if (!this.cartToken) {
+                await this.createCartToken()
+            }
+
+            return await cartService.removeItemFromCartByToken(this.cartToken, itemId)
+        },
+
         /**
          * Reload cart data from server
          */

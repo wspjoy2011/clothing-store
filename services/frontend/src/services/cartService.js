@@ -55,5 +55,24 @@ export default {
     async addItemToCart(itemData) {
         const response = await api.post(`${BASE_URL}/cart/items`, itemData);
         return response.data;
+    },
+
+    /**
+     * Remove item from cart for anonymous user by token
+     * @param {string} token - Cart token
+     * @param {number} itemId - Cart item ID to remove
+     * @returns {Promise<void>} - Empty response (HTTP 204)
+     */
+    async removeItemFromCartByToken(token, itemId) {
+        await api.delete(`${BASE_URL}/cart/token/${token}/items/${itemId}`);
+    },
+
+    /**
+     * Remove item from cart for authenticated user
+     * @param {number} itemId - Cart item ID to remove
+     * @returns {Promise<void>} - Empty response (HTTP 204)
+     */
+    async removeItemFromCart(itemId) {
+        await api.delete(`${BASE_URL}/cart/items/${itemId}`);
     }
 }

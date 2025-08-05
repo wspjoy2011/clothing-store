@@ -1,10 +1,10 @@
-import { computed, onMounted } from 'vue'
-import { useTheme } from 'vuetify'
-import { useCartState } from '@/composables/cart/useCartState.js'
-import { useCartActions } from '@/composables/cart/useCartActions.js'
-import { useCartErrorHandler } from '@/composables/cart/useCartErrorHandler.js'
-import { useCartFormatting } from '@/composables/cart/useCartFormatting.js'
-import { usePageTitle } from '@/composables/usePageTitle.js'
+import {computed, onMounted} from 'vue'
+import {useTheme} from 'vuetify'
+import {useCartState} from '@/composables/cart/useCartState.js'
+import {useCartActions} from '@/composables/cart/useCartActions.js'
+import {useCartErrorHandler} from '@/composables/cart/useCartErrorHandler.js'
+import {useCartFormatting} from '@/composables/cart/useCartFormatting.js'
+import {usePageTitle} from '@/composables/usePageTitle.js'
 
 export function useCartPage(options = {}) {
     const {
@@ -18,11 +18,11 @@ export function useCartPage(options = {}) {
     usePageTitle('StyleShop - Shopping Cart')
 
     const {
-        // Local state
         isAddingItem,
         addItemError,
+        isRemovingItem,
+        removeItemError,
 
-        // Cart state
         cart,
         isLoading,
         error,
@@ -32,15 +32,18 @@ export function useCartPage(options = {}) {
         isAuthenticated,
         isInitialized,
 
-        // State actions
         clearAddItemError,
         setAddingItem,
-        setAddItemError
+        setAddItemError,
+        clearRemoveItemError,
+        setRemovingItem,
+        setRemoveItemError
     } = useCartState()
 
     const {
         initializeCart,
-        addItemToCart: baseAddItemToCart,
+        createAddItemHandler,
+        createRemoveItemHandler,
         reloadCart,
         switchToUserCart,
         switchToAnonymousCart
@@ -52,13 +55,11 @@ export function useCartPage(options = {}) {
     } = useCartErrorHandler()
 
     const {
-        // Formatted display values
         formattedTotalAmount,
         formattedTotalDiscount,
         formattedFinalAmount,
         hasDiscount,
 
-        // Utility functions
         parsePrice,
         formatItemPrice,
         formatItemTotal,
@@ -67,21 +68,19 @@ export function useCartPage(options = {}) {
         hasItemDiscount
     } = useCartFormatting(cart)
 
-    const addItemToCart = async (itemData) => {
-        if (isAddingItem.value) return
+    const addItemToCart = createAddItemHandler({
+        isAddingItem,
+        setAddingItem,
+        clearAddItemError,
+        setAddItemError
+    });
 
-        setAddingItem(true)
-        clearAddItemError()
-
-        try {
-            return await baseAddItemToCart(itemData, showNotifications)
-        } catch (error) {
-            setAddItemError(error.message)
-            throw error
-        } finally {
-            setAddingItem(false)
-        }
-    }
+    const removeItemFromCart = createRemoveItemHandler({
+        isRemovingItem,
+        setRemovingItem,
+        clearRemoveItemError,
+        setRemoveItemError
+    });
 
     if (autoInitialize) {
         onMounted(async () => {
@@ -109,13 +108,19 @@ export function useCartPage(options = {}) {
         isAddingItem,
         addItemError,
 
+        // Remove item state
+        isRemovingItem,
+        removeItemError,
+
         // Actions
         initializeCart,
-        addItemToCart,
+        addItemToCart: (itemData) => addItemToCart(itemData, showNotifications),
+        removeItemFromCart: (itemId) => removeItemFromCart(itemId, showNotifications),
         reloadCart,
         switchToUserCart,
         switchToAnonymousCart,
         clearAddItemError,
+        clearRemoveItemError,
 
         // Error handling
         getAddItemErrorDetails,

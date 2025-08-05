@@ -7,6 +7,9 @@ export function useCartState() {
     const isAddingItem = ref(false);
     const addItemError = ref(null);
 
+    const isRemovingItem = ref(false);
+    const removeItemError = ref(null);
+
     const cart = computed(() => cartStore.cart);
     const isLoading = computed(() => cartStore.isLoading);
     const error = computed(() => cartStore.error);
@@ -28,10 +31,24 @@ export function useCartState() {
         addItemError.value = error;
     };
 
+    const clearRemoveItemError = () => {
+        removeItemError.value = null;
+    };
+
+    const setRemovingItem = (value) => {
+        isRemovingItem.value = value;
+    };
+
+    const setRemoveItemError = (error) => {
+        removeItemError.value = error;
+    };
+
     return {
         // Local state
         isAddingItem,
         addItemError,
+        isRemovingItem,
+        removeItemError,
 
         // Cart state
         cart,
@@ -46,6 +63,9 @@ export function useCartState() {
         // Actions
         clearAddItemError,
         setAddingItem,
-        setAddItemError
+        setAddItemError,
+        clearRemoveItemError,
+        setRemovingItem,
+        setRemoveItemError
     };
 }

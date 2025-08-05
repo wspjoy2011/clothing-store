@@ -145,7 +145,6 @@ const props = defineProps({
 
 const {
   isDarkTheme,
-  token,
   password,
   confirmPassword,
   showPassword,

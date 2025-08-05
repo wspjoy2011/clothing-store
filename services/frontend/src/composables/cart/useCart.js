@@ -12,6 +12,8 @@ export function useCart(options = {}) {
         // Local state
         isAddingItem,
         addItemError,
+        isRemovingItem,
+        removeItemError,
 
         // Cart state
         cart,
@@ -26,12 +28,16 @@ export function useCart(options = {}) {
         // State actions
         clearAddItemError,
         setAddingItem,
-        setAddItemError
+        setAddItemError,
+        clearRemoveItemError,
+        setRemovingItem,
+        setRemoveItemError
     } = useCartState();
 
     const {
         initializeCart,
-        addItemToCart: baseAddItemToCart,
+        createAddItemHandler,
+        createRemoveItemHandler,
         reloadCart,
         switchToUserCart,
         switchToAnonymousCart
@@ -43,40 +49,35 @@ export function useCart(options = {}) {
     } = useCartErrorHandler();
 
     const {
-        // Reactive methods for checking cart items
         isProductInCart,
         getCartItemInfo,
         getProductQuantity,
         getCartItemDisplayInfo,
         checkMultipleProducts,
 
-        // Reactive properties
         cartProductIds,
         cartItemsMap,
         hasCartItems,
         totalItemsCount,
 
-        // Synchronous methods
         checkProductInCartSync,
         getCartItemInfoSync,
         getProductQuantitySync
     } = useCartItemChecker();
 
-    const addItemToCart = async (itemData) => {
-        if (isAddingItem.value) return;
+    const addItemToCart = createAddItemHandler({
+        isAddingItem,
+        setAddingItem,
+        clearAddItemError,
+        setAddItemError
+    });
 
-        setAddingItem(true);
-        clearAddItemError();
-
-        try {
-            return await baseAddItemToCart(itemData, showNotifications);
-        } catch (error) {
-            setAddItemError(error.message);
-            throw error;
-        } finally {
-            setAddingItem(false);
-        }
-    };
+    const removeItemFromCart = createRemoveItemHandler({
+        isRemovingItem,
+        setRemovingItem,
+        clearRemoveItemError,
+        setRemoveItemError
+    });
 
     return {
         // State
@@ -93,19 +94,25 @@ export function useCart(options = {}) {
         isAddingItem,
         addItemError,
 
+        // Remove item state
+        isRemovingItem,
+        removeItemError,
+
         // Actions
         initializeCart,
-        addItemToCart,
+        addItemToCart: (itemData) => addItemToCart(itemData, showNotifications),
+        removeItemFromCart: (itemId) => removeItemFromCart(itemId, showNotifications),
         reloadCart,
         switchToUserCart,
         switchToAnonymousCart,
         clearAddItemError,
+        clearRemoveItemError,
 
         // Error handling
         getAddItemErrorDetails,
         getCartErrorDetails,
 
-        // Cart item checking (reactive)
+        // Cart item checking
         isProductInCart,
         getCartItemInfo,
         getProductQuantity,
@@ -116,7 +123,7 @@ export function useCart(options = {}) {
         hasCartItems,
         totalItemsCount,
 
-        // Cart item checking (synchronous)
+        // Cart item checking
         checkProductInCartSync,
         getCartItemInfoSync,
         getProductQuantitySync

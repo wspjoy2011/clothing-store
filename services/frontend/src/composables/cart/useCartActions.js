@@ -14,7 +14,7 @@ export function useCartActions() {
         }
     };
 
-    const addItemToCart = async (itemData, showNotifications = true) => {
+    const baseAddItemToCart = async (itemData, showNotifications = true) => {
         try {
             const result = await cartStore.addItemToCart(itemData);
 
@@ -29,6 +29,61 @@ export function useCartActions() {
             }
             throw error;
         }
+    };
+
+    const baseRemoveItemFromCart = async (itemId, showNotifications = true) => {
+        try {
+            await cartStore.removeItemFromCart(itemId);
+
+            if (showNotifications) {
+                showSuccess(`Item removed from cart successfully!`);
+            }
+        } catch (error) {
+            if (showNotifications) {
+                showError(error.message || 'Failed to remove item from cart');
+            }
+            throw error;
+        }
+    };
+
+    const createAddItemHandler = (stateHandlers) => {
+        const { isAddingItem, setAddingItem, clearAddItemError, setAddItemError } = stateHandlers;
+
+        return async (itemData, showNotifications = true) => {
+            if (isAddingItem.value) return;
+
+            setAddingItem(true);
+            clearAddItemError();
+
+            try {
+                return await baseAddItemToCart(itemData, showNotifications);
+            } catch (error) {
+                setAddItemError(error.message);
+                throw error;
+            } finally {
+                setAddingItem(false);
+            }
+        };
+    };
+
+    const createRemoveItemHandler = (stateHandlers) => {
+        const { isRemovingItem, setRemovingItem, clearRemoveItemError, setRemoveItemError } = stateHandlers;
+
+        return async (itemId, showNotifications = true) => {
+            if (isRemovingItem.value) return;
+
+            setRemovingItem(true);
+            clearRemoveItemError();
+
+            try {
+                return await baseRemoveItemFromCart(itemId, showNotifications);
+            } catch (error) {
+                setRemoveItemError(error.message);
+                throw error;
+            } finally {
+                setRemovingItem(false);
+            }
+        };
     };
 
     const reloadCart = async () => {
@@ -60,7 +115,16 @@ export function useCartActions() {
 
     return {
         initializeCart,
-        addItemToCart,
+
+        addItemToCart: baseAddItemToCart,
+        removeItemFromCart: baseRemoveItemFromCart,
+
+        baseAddItemToCart,
+        baseRemoveItemFromCart,
+
+        createAddItemHandler,
+        createRemoveItemHandler,
+
         reloadCart,
         switchToUserCart,
         switchToAnonymousCart
