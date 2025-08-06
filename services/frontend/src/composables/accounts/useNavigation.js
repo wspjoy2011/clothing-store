@@ -146,6 +146,16 @@ export function useNavigation() {
         router.push({name: 'catalog'})
     }
 
+    const goToProductDetail = (productSlug, opts = {}) => {
+        if (opts.disabled) return
+        router.push({
+            name: 'product-detail',
+            params: {
+                productSlug
+            }
+        })
+    }
+
     return {
         // Auth navigation
         goToLogin,
@@ -180,5 +190,7 @@ export function useNavigation() {
         goToHome,
         goToCatalog,
 
+        // Catalog
+        goToProductDetail,
     }
 }
