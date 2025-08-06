@@ -259,6 +259,7 @@ const {
 
   // Actions
   reloadCart,
+  removeItemFromCart,
 
   // Error handling
   getCartErrorDetails,
@@ -289,12 +290,12 @@ const handleUpdateQuantity = async (itemId, newQuantity) => {
 
 const handleRemoveItem = async (itemId) => {
   try {
-    // TODO: Implement remove item functionality
-    console.log(`Remove item ${itemId}`)
+    await removeItemFromCart(itemId)
   } catch (error) {
     console.error('Failed to remove item:', error)
   }
 }
+
 
 const handleViewProduct = (productSlug) => {
   router.push({

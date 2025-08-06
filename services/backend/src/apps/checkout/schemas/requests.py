@@ -33,7 +33,6 @@ class UpdateCartItemRequest(BaseModel):
     """Schema for update cart item request"""
     cart_item_id: int = Field(..., gt=0, description="ID of the cart item to update")
     quantity: int = Field(..., ge=1, le=999, description="New quantity")
-    cart_token: Optional[str] = Field(None, description="Cart token for anonymous users")
 
     class Config:
         json_schema_extra = {

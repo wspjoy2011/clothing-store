@@ -14,7 +14,6 @@ class UpdateCartItemRequestDTO:
     """Data transfer object for update cart item request"""
     cart_item_id: int
     quantity: int
-    cart_token: Optional[str] = None
 
 
 @dataclass
