@@ -168,18 +168,6 @@
       </div>
     </div>
 
-    <!-- Updating Overlay -->
-    <v-overlay
-        :model-value="updating"
-        contained
-        class="updating-overlay"
-    >
-      <v-progress-circular
-          color="primary"
-          indeterminate
-          size="24"
-      />
-    </v-overlay>
   </div>
 </template>
 
@@ -463,10 +451,6 @@ const handleViewProduct = () => {
 
 .total-price-mobile .regular-total {
   color: #1976d2;
-}
-
-.updating-overlay {
-  background-color: rgba(255, 255, 255, 0.8);
 }
 
 /* Dark theme support */

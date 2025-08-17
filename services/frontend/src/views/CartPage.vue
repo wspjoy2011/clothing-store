@@ -29,7 +29,7 @@
         </v-row>
       </div>
 
-      <!-- Loading State -->
+      <!-- Initial Loading State -->
       <div v-if="isLoading && !isInitialized" class="loading-section">
         <v-row justify="center" class="py-12">
           <v-col cols="12" class="text-center">
@@ -54,7 +54,7 @@
           closable
           @click:close="error = null"
       >
-        <template v-slot:title>
+        <template #title>
           <span class="text-subtitle-1 font-weight-bold">Cart Error</span>
         </template>
         <div class="error-content">
@@ -106,7 +106,7 @@
       </div>
 
       <!-- Cart Content -->
-      <div v-if="hasItems && !isLoading" class="cart-content">
+      <div v-if="hasItems" class="cart-content">
         <v-row>
           <!-- Cart Items Section -->
           <v-col cols="12" lg="8">
@@ -118,12 +118,12 @@
 
               <v-divider/>
 
-              <v-card-text class="pa-0">
+              <v-card-text class="pa-0 position-relative">
                 <div class="cart-items-list">
                   <div
                       v-for="item in cart.items"
                       :key="item.id"
-                      class="cart-item"
+                      class="cart-item position-relative"
                   >
                     <cart-item-card
                         :item="item"
@@ -131,9 +131,23 @@
                         @remove="handleRemoveItem"
                         @view-product="handleViewProduct"
                     />
+
+                    <div v-if="processingItems.has(item.id)" class="item-overlay">
+                      <div class="item-overlay-content">
+                        <v-progress-circular
+                            color="primary"
+                            indeterminate
+                            size="56"
+                            width="5"
+                            class="mb-2"
+                        />
+                        <span class="text-caption text-medium-emphasis">Updating...</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </v-card-text>
+
             </v-card>
           </v-col>
 
@@ -239,9 +253,10 @@
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
-import { useCartPage } from '@/composables/cart/useCartPage.js'
+import {useRouter} from 'vue-router'
+import {useCartPage} from '@/composables/cart/useCartPage.js'
 import CartItemCard from '@/components/cart/CartItemCard.vue'
+import {ref} from "vue";
 
 const router = useRouter()
 
@@ -264,12 +279,14 @@ const {
   // Error handling
   getCartErrorDetails,
 
-  // Price formatting - now from composable
+  // Price formatting
   formattedTotalAmount,
   formattedTotalDiscount,
   formattedFinalAmount,
   hasDiscount
 } = useCartPage()
+
+const processingItems = ref(new Set())
 
 const handleReloadCart = async () => {
   try {
@@ -281,6 +298,8 @@ const handleReloadCart = async () => {
 
 const handleUpdateQuantity = async (itemId, newQuantity) => {
   try {
+    processingItems.value.add(itemId)
+
     // TODO: Implement update quantity functionality
     console.log(`Update item ${itemId} to quantity ${newQuantity}`)
   } catch (error) {
@@ -289,6 +308,7 @@ const handleUpdateQuantity = async (itemId, newQuantity) => {
 }
 
 const handleRemoveItem = async (itemId) => {
+  processingItems.value.add(itemId)
   try {
     await removeItemFromCart(itemId)
   } catch (error) {
@@ -300,7 +320,7 @@ const handleRemoveItem = async (itemId) => {
 const handleViewProduct = (productSlug) => {
   router.push({
     name: 'product-detail',
-    params: { productSlug }
+    params: {productSlug}
   })
 }
 
@@ -309,6 +329,7 @@ const handleCheckout = () => {
   console.log('Proceed to checkout')
 }
 </script>
+
 
 <style scoped>
 /* Light theme styles */
@@ -386,8 +407,12 @@ const handleCheckout = () => {
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .continue-shopping-btn {
@@ -425,6 +450,30 @@ const handleCheckout = () => {
 
 .cart-item:last-child {
   border-bottom: none;
+}
+
+.item-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 8px;
+  backdrop-filter: blur(3px);
+}
+
+.item-overlay-content {
+  text-align: center;
+  min-width: 160px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .cart-summary-sticky {
@@ -596,6 +645,15 @@ const handleCheckout = () => {
 
 .dark-theme .cart-item {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark-theme .item-overlay {
+  background-color: rgba(18, 18, 18, 0.9);
+}
+
+.dark-theme .item-overlay-content {
+  background: rgba(48, 48, 48, 0.95);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .dark-theme .cart-summary-card {
