@@ -199,8 +199,48 @@ class CartService(CartServiceInterface):
             user_id: Optional[int] = None,
             token: Optional[str] = None
     ) -> CartItemResponseDTO:
-        """Not implemented yet"""
-        raise NotImplementedError("update_cart_item method is not implemented yet")
+        """
+        Update cart item quantity with cart ownership validation
+
+        Args:
+            request_data: cart_item_id and new quantity
+            user_id: authenticated user id (mutually exclusive with token)
+            token: anonymous cart token (mutually exclusive with user_id)
+
+        Returns:
+            Updated cart item response with product details
+
+        Raises:
+            CartNotFoundError: if cart not found or item not in user's/token's cart
+            ProductNotFoundError: if related product not found (should not happen for existing items)
+        """
+        logger.info(f"Updating cart item: item_id={request_data.cart_item_id}, quantity={request_data.quantity}")
+
+        if not user_id and not token:
+            raise CartNotFoundError("Either user_id or token must be provided")
+
+        if user_id:
+            cart_response = await self.get_or_create_cart_for_user(user_id)
+        else:
+            cart_response = await self.get_or_create_cart_for_token(token)
+
+        updated_item = await self._cart_item_repository.update_cart_item(request_data, cart_response.id)
+        if not updated_item:
+            logger.warning(
+                f"Cart item {request_data.cart_item_id} not found or does not belong to cart {cart_response.id}"
+            )
+            raise CartNotFoundError("Cart item not found in your cart")
+
+        product = await self._catalog_service.get_product_by_id(updated_item.product_id)
+        if not product:
+            logger.warning(f"Product not found for updated cart item {updated_item.id}")
+            raise ProductNotFoundError(f"Product with ID {updated_item.product_id} not found")
+
+        logger.info(
+            f"Cart item {updated_item.id} updated successfully in cart {cart_response.id} to quantity {updated_item.quantity}"
+        )
+
+        return self._build_cart_item_response(updated_item, product)
 
     async def remove_cart_item(
             self,

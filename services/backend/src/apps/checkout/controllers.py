@@ -1,9 +1,9 @@
 from fastapi import HTTPException, status, Response
 
-from apps.checkout.dto import CartItemResponseDTO, CartResponseDTO, AddToCartRequestDTO
+from apps.checkout.dto import CartItemResponseDTO, CartResponseDTO, AddToCartRequestDTO, UpdateCartItemRequestDTO
 from apps.checkout.interfaces import CartServiceInterface
 from apps.checkout.schemas import CartTokenResponse, CartResponse, CartItemResponse, GetCartByTokenRequest, \
-    AddToCartRequest
+    AddToCartRequest, UpdateCartItemRequest
 from apps.checkout.exceptions import CartTokenCreationError, CartNotFoundError, CartValidationError, \
     ProductNotFoundError, InsufficientStockError
 from security.dto import JWTPayloadDTO
@@ -49,6 +49,14 @@ def _convert_add_to_cart_request_to_dto(request: AddToCartRequest) -> AddToCartR
     """Convert AddToCartRequest to AddToCartRequestDTO"""
     return AddToCartRequestDTO(
         product_id=request.product_id,
+        quantity=request.quantity
+    )
+
+
+def _convert_update_item_request_to_dto(request: UpdateCartItemRequest, item_id: int) -> UpdateCartItemRequestDTO:
+    """Convert UpdateCartItemRequest + path item_id to UpdateCartItemRequestDTO"""
+    return UpdateCartItemRequestDTO(
+        cart_item_id=item_id,
         quantity=request.quantity
     )
 
@@ -363,3 +371,74 @@ async def remove_cart_item_for_user_controller(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Cart item with ID {item_id} not found in cart"
             )
+
+
+async def update_cart_item_by_token_controller(
+        token: str,
+        item_id: int,
+        request_data: UpdateCartItemRequest,
+        cart_service: CartServiceInterface,
+) -> CartItemResponse:
+    """
+    Controller for updating cart item quantity by token (anonymous user)
+    """
+    logger.info(f"Updating cart item by token: {token[:10]}..., item_id={item_id}, quantity={request_data.quantity}")
+
+    request_dto = _convert_update_item_request_to_dto(request_data, item_id)
+
+    try:
+        updated_item_dto = await cart_service.update_cart_item(request_dto, token=token)
+    except CartNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ProductNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error updating cart item {item_id} by token {token[:10]}...: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+    else:
+        return _convert_cart_item_dto_to_schema(updated_item_dto)
+
+
+async def update_cart_item_for_user_controller(
+        item_id: int,
+        jwt_payload: JWTPayloadDTO,
+        request_data: UpdateCartItemRequest,
+        cart_service: CartServiceInterface,
+) -> CartItemResponse:
+    """
+    Controller for updating cart item quantity for authenticated user
+    """
+    logger.info(
+        f"Updating cart item for user {jwt_payload.user_id}: item_id={item_id}, quantity={request_data.quantity}")
+
+    request_dto = _convert_update_item_request_to_dto(request_data, item_id)
+
+    try:
+        updated_item_dto = await cart_service.update_cart_item(request_dto, user_id=jwt_payload.user_id)
+    except CartNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ProductNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error updating cart item {item_id} for user {jwt_payload.user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+    else:
+        return _convert_cart_item_dto_to_schema(updated_item_dto)

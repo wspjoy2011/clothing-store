@@ -230,12 +230,13 @@ class CartItemRepositoryInterface(ABC):
         pass
 
     @abstractmethod
-    async def update_cart_item(self, request_data: UpdateCartItemRequestDTO) -> Optional[CartItemDTO]:
+    async def update_cart_item(self, request_data: UpdateCartItemRequestDTO, cart_id: int) -> Optional[CartItemDTO]:
         """
-        Update cart item quantity
+        Update cart item quantity with cart ownership validation
 
         Args:
-            request_data: Data for updating cart item
+            request_data: Data for updating cart item (id, quantity)
+            cart_id: ID of the cart to which the item must belong
 
         Returns:
             Updated CartItemDTO if successful, None otherwise

@@ -5,7 +5,8 @@ from apps.checkout.controllers import (
     get_cart_by_token_controller,
     get_cart_for_user_controller,
     add_item_to_cart_by_token_controller,
-    add_item_to_cart_for_user_controller, remove_cart_item_by_token_controller, remove_cart_item_for_user_controller
+    add_item_to_cart_for_user_controller, remove_cart_item_by_token_controller, remove_cart_item_for_user_controller,
+    update_cart_item_for_user_controller, update_cart_item_by_token_controller
 )
 from apps.checkout.dependencies import get_cart_service
 from apps.checkout.interfaces import CartServiceInterface
@@ -14,7 +15,7 @@ from apps.checkout.schemas import (
     GetCartByTokenRequest,
     CartResponse,
     AddToCartRequest,
-    CartItemResponse
+    CartItemResponse, UpdateCartItemRequest
 )
 from security.http import AccessTokenDependency
 
@@ -26,6 +27,8 @@ API_PATHS: dict[str, str] = {
     "add_item_to_cart": "/cart/items",
     "remove_cart_item_by_token": "/cart/token/{token}/items/{item_id}",
     "remove_cart_item": "/cart/items/{item_id}",
+    "update_cart_item_by_token": "/cart/token/{token}/items/{item_id}",
+    "update_cart_item": "/cart/items/{item_id}",
 }
 
 router = APIRouter(
@@ -565,3 +568,101 @@ async def remove_cart_item_route(
         - Idempotent operation - returns 204 even if item was already removed
     """
     return await remove_cart_item_for_user_controller(item_id, jwt_payload, cart_service)
+
+
+@router.put(
+    API_PATHS["update_cart_item_by_token"],
+    response_model=CartItemResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update item quantity by token",
+    description=(
+        "Update quantity of a cart item for an anonymous user using a cart token. "
+        "Validates that the item belongs to the token's cart."
+    ),
+    responses={
+        200: {
+            "description": "Cart item updated successfully",
+            "model": CartItemResponse
+        },
+        404: {
+            "description": "Cart token not found/expired or item not found in token's cart",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Cart item not found in this cart"}
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Quantity must be between 1 and 999"}
+                }
+            }
+        },
+        500: {"description": "Internal server error"}
+    }
+)
+async def update_cart_item_by_token_route(
+    token: str = Path(..., description="Cart token for anonymous user"),
+    item_id: int = Path(..., gt=0, description="ID of the cart item to update"),
+    request_data: UpdateCartItemRequest = Body(...),
+    cart_service: CartServiceInterface = Depends(get_cart_service)
+) -> CartItemResponse:
+    """
+    Update cart item quantity for anonymous carts identified by token.
+    """
+    return await update_cart_item_by_token_controller(token, item_id, request_data, cart_service)
+
+
+@router.put(
+    API_PATHS["update_cart_item"],
+    response_model=CartItemResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update item quantity in user cart",
+    description=(
+        "Update quantity of a cart item for an authenticated user. "
+        "Validates that the item belongs to the user's cart."
+    ),
+    responses={
+        200: {
+            "description": "Cart item updated successfully",
+            "model": CartItemResponse
+        },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Authorization header is missing"}
+                }
+            }
+        },
+        404: {
+            "description": "Cart item not found in user's cart",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Cart item not found in your cart"}
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Quantity must be between 1 and 999"}
+                }
+            }
+        },
+        500: {"description": "Internal server error"}
+    }
+)
+async def update_cart_item_route(
+    jwt_payload: AccessTokenDependency,
+    item_id: int = Path(..., gt=0, description="ID of the cart item to update"),
+    request_data: UpdateCartItemRequest = Body(...),
+    cart_service: CartServiceInterface = Depends(get_cart_service)
+) -> CartItemResponse:
+    """
+    Update cart item quantity for authenticated users.
+    """
+    return await update_cart_item_for_user_controller(jwt_payload, item_id, request_data, cart_service)

@@ -139,12 +139,13 @@ class CartItemRepository(CartItemRepositoryInterface):
 
         return result
 
-    async def update_cart_item(self, request_data: UpdateCartItemRequestDTO) -> Optional[CartItemDTO]:
+    async def update_cart_item(self, request_data: UpdateCartItemRequestDTO, cart_id: int) -> Optional[CartItemDTO]:
         """
-        Update cart item quantity
+        Update cart item quantity with cart ownership validation
 
         Args:
             request_data: Data for updating cart item
+            cart_id: ID of the cart to which the item must belong
 
         Returns:
             Updated CartItemDTO if successful, None otherwise
@@ -152,20 +153,26 @@ class CartItemRepository(CartItemRepositoryInterface):
         query = f"""
             UPDATE {self.APP_NAME}_cart_items
             SET quantity = %s, updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s
+            WHERE id = %s AND cart_id = %s
             RETURNING id, cart_id, product_id, quantity, added_at, updated_at
         """
 
         result = await self._dao.execute(
             query=query,
-            params=[request_data.quantity, request_data.cart_item_id],
+            params=[request_data.quantity, request_data.cart_item_id, cart_id],
             fetch=True,
             fetch_one=True,
             model_class=CartItemDTO
         )
 
         if result:
-            logger.info(f"Updated cart item {request_data.cart_item_id} quantity to {request_data.quantity}")
+            logger.info(
+                f"Updated cart item {request_data.cart_item_id} quantity to {request_data.quantity} in cart {cart_id}"
+            )
+        else:
+            logger.warning(
+                f"Cart item {request_data.cart_item_id} not found in cart {cart_id} or ownership mismatch"
+            )
 
         return result
 
