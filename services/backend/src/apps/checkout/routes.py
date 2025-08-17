@@ -665,4 +665,4 @@ async def update_cart_item_route(
     """
     Update cart item quantity for authenticated users.
     """
-    return await update_cart_item_for_user_controller(jwt_payload, item_id, request_data, cart_service)
+    return await update_cart_item_for_user_controller(item_id, jwt_payload, request_data, cart_service)

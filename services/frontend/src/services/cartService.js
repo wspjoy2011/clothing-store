@@ -74,5 +74,36 @@ export default {
      */
     async removeItemFromCart(itemId) {
         await api.delete(`${BASE_URL}/cart/items/${itemId}`);
+    },
+
+    /**
+     * Update item quantity for anonymous user by token
+     * @param {string} token - Cart token
+     * @param {number} itemId - Cart item ID to update
+     * @param {Object} itemData - Update payload { quantity }
+     * @returns {Promise<Object>} - Updated cart item data
+     */
+    async updateItemInCartByToken(token, itemId, itemData) {
+        const payload = {
+            cart_item_id: itemId,
+            quantity: itemData.quantity
+        };
+        const response = await api.put(`${BASE_URL}/cart/token/${token}/items/${itemId}`, payload);
+        return response.data;
+    },
+
+    /**
+     * Update item quantity for authenticated user
+     * @param {number} itemId - Cart item ID to update
+     * @param {Object} itemData - Update payload { quantity }
+     * @returns {Promise<Object>} - Updated cart item data
+     */
+    async updateItemInCart(itemId, itemData) {
+        const payload = {
+            cart_item_id: itemId,
+            quantity: itemData.quantity
+        };
+        const response = await api.put(`${BASE_URL}/cart/items/${itemId}`, payload);
+        return response.data;
     }
 }

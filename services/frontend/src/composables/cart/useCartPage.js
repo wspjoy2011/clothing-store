@@ -46,7 +46,8 @@ export function useCartPage(options = {}) {
         createRemoveItemHandler,
         reloadCart,
         switchToUserCart,
-        switchToAnonymousCart
+        switchToAnonymousCart,
+        updateItemInCart
     } = useCartActions()
 
     const {
@@ -116,6 +117,7 @@ export function useCartPage(options = {}) {
         initializeCart,
         addItemToCart: (itemData) => addItemToCart(itemData, showNotifications),
         removeItemFromCart: (itemId) => removeItemFromCart(itemId, showNotifications),
+        updateItemInCart: (itemId, itemData) => updateItemInCart(itemId, itemData, showNotifications),
         reloadCart,
         switchToUserCart,
         switchToAnonymousCart,

@@ -188,7 +188,6 @@ export const useCartStore = defineStore('cart', {
             return await cartService.addItemToCartByToken(this.cartToken, itemData)
         },
 
-
         /**
          * Universal method to remove item from cart
          * Automatically chooses between authenticated and anonymous methods
@@ -236,6 +235,61 @@ export const useCartStore = defineStore('cart', {
             }
 
             return await cartService.removeItemFromCartByToken(this.cartToken, itemId)
+        },
+
+        /**
+         * Universal method to update item quantity in cart
+         * Automatically chooses between authenticated and anonymous methods
+         * @param {number} itemId - Cart item ID to update
+         * @param {Object} itemData - Update payload { quantity }
+         * @returns {Promise<Object>} - Updated cart item
+         */
+        async updateItemInCart(itemId, itemData) {
+            this.isLoading = true
+            this.error = null
+
+            try {
+                let result
+
+                if (this.isAuthenticated) {
+                    result = await this.updateItemInUserCart(itemId, itemData)
+                } else {
+                    result = await this.updateItemInAnonymousCart(itemId, itemData)
+                }
+
+                await this.reloadCart()
+
+                return result
+            } catch (error) {
+                this.error = error.message
+                throw error
+            } finally {
+                this.isLoading = false
+            }
+        },
+
+        /**
+         * Update item quantity for authenticated user
+         * @param {number} itemId - Cart item ID to update
+         * @param {Object} itemData - Update payload { quantity }
+         * @returns {Promise<Object>} - Updated cart item
+         */
+        async updateItemInUserCart(itemId, itemData) {
+            return await cartService.updateItemInCart(itemId, itemData)
+        },
+
+        /**
+         * Update item quantity for anonymous user
+         * @param {number} itemId - Cart item ID to update
+         * @param {Object} itemData - Update payload { quantity }
+         * @returns {Promise<Object>} - Updated cart item
+         */
+        async updateItemInAnonymousCart(itemId, itemData) {
+            if (!this.cartToken) {
+                await this.createCartToken()
+            }
+
+            return await cartService.updateItemInCartByToken(this.cartToken, itemId, itemData)
         },
 
         /**

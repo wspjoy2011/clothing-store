@@ -13,7 +13,7 @@
               class="product-image"
               @click="handleViewProduct"
           >
-            <template v-slot:placeholder>
+            <template #placeholder>
               <div class="image-placeholder">
                 <v-icon icon="mdi-image" size="24" color="grey-lighten-2"/>
               </div>
@@ -76,8 +76,9 @@
                   size="x-small"
                   variant="outlined"
                   color="primary"
-                  :disabled="!item.is_available || updating"
+                  :disabled="!item.is_available || updating || (props.maxAvailable !== null && item.quantity >= props.maxAvailable)"
                   @click="handleIncreaseQuantity"
+                  :title="props.maxAvailable !== null && item.quantity >= props.maxAvailable ? 'Maximum available reached' : ''"
               >
                 <v-icon size="12">mdi-plus</v-icon>
               </v-btn>
@@ -120,8 +121,9 @@
               size="small"
               variant="outlined"
               color="primary"
-              :disabled="!item.is_available || updating"
+              :disabled="!item.is_available || updating || (props.maxAvailable !== null && item.quantity >= props.maxAvailable)"
               @click="handleIncreaseQuantity"
+              :title="props.maxAvailable !== null && item.quantity >= props.maxAvailable ? 'Maximum available reached' : ''"
           >
             <v-icon size="14">mdi-plus</v-icon>
           </v-btn>
@@ -179,6 +181,11 @@ const props = defineProps({
   item: {
     type: Object,
     required: true
+  },
+   maxAvailable: {
+    type: Number,
+    required: false,
+    default: null
   }
 })
 

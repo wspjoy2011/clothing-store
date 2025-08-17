@@ -4,8 +4,10 @@
       <!-- Header Section -->
       <div class="cart-header">
         <v-row align="center" class="mb-6">
-          <v-col cols="12" md="8">
-            <h1 class="cart-title">
+          <v-col cols="12" md="4" class="d-none d-md-block"></v-col>
+
+          <v-col cols="12" md="4" class="text-center">
+            <h1 class="cart-title d-inline-flex align-center">
               <v-icon icon="mdi-cart" size="32" class="me-3" color="primary"/>
               Shopping Cart
             </h1>
@@ -13,7 +15,9 @@
               {{ itemsCount }} {{ itemsCount === 1 ? 'item' : 'items' }} in your cart
             </p>
           </v-col>
-          <v-col cols="12" md="4" class="text-md-end">
+
+          <!-- Actions on the right (centered on mobile) -->
+          <v-col cols="12" md="4" class="text-md-end text-center mt-3 mt-md-0">
             <v-btn
                 v-if="hasItems"
                 variant="outlined"
@@ -127,6 +131,7 @@
                   >
                     <cart-item-card
                         :item="item"
+                        :max-available="maxAvailableByItemId.get(item.id) ?? undefined"
                         @update:quantity="handleUpdateQuantity"
                         @remove="handleRemoveItem"
                         @view-product="handleViewProduct"
@@ -256,7 +261,9 @@
 import {useRouter} from 'vue-router'
 import {useCartPage} from '@/composables/cart/useCartPage.js'
 import CartItemCard from '@/components/cart/CartItemCard.vue'
-import {ref} from "vue";
+import {ref, onMounted, watch} from "vue"
+import {useNotifications} from '@/composables/accounts/useNotifications.js'
+import {useCatalogStore} from '@/stores/catalog'
 
 const router = useRouter()
 
@@ -275,6 +282,7 @@ const {
   // Actions
   reloadCart,
   removeItemFromCart,
+  updateItemInCart,
 
   // Error handling
   getCartErrorDetails,
@@ -286,24 +294,86 @@ const {
   hasDiscount
 } = useCartPage()
 
+const {showWarning, showError} = useNotifications()
+const catalogStore = useCatalogStore()
+
 const processingItems = ref(new Set())
+const maxAvailableByItemId = ref(new Map())
+
+const fetchAndSetMaxAvailable = async (cartItem) => {
+  try {
+    const product = await catalogStore.getProductById(cartItem.product_id)
+    const inv = product?.inventory
+    const maxAvailable = typeof inv?.available_quantity === 'number' ? inv.available_quantity : null
+    maxAvailableByItemId.value.set(cartItem.id, maxAvailable)
+  } catch (e) {
+    maxAvailableByItemId.value.set(cartItem.id, null)
+  }
+}
+
+const preloadMaxAvailable = async () => {
+  const items = cart.value?.items || []
+  await Promise.all(items.map(item => fetchAndSetMaxAvailable(item)))
+}
+
+onMounted(() => {
+  preloadMaxAvailable()
+})
+
+watch(
+    () => cart.value?.items?.map(i => i.id),
+    () => {
+      preloadMaxAvailable()
+    }
+)
 
 const handleReloadCart = async () => {
   try {
     await reloadCart()
-  } catch (error) {
-    console.error('Failed to reload cart:', error)
+  } catch (e) {
+    showError('Failed to reload cart')
   }
 }
 
 const handleUpdateQuantity = async (itemId, newQuantity) => {
+  processingItems.value.add(itemId)
   try {
-    processingItems.value.add(itemId)
+    const currentItem = cart.value?.items?.find(i => i.id === itemId)
+    if (!currentItem) {
+      showError('Item not found in cart')
+      return
+    }
 
-    // TODO: Implement update quantity functionality
-    console.log(`Update item ${itemId} to quantity ${newQuantity}`)
-  } catch (error) {
-    console.error('Failed to update quantity:', error)
+    if (currentItem.is_available === false) {
+      showWarning('This item is currently unavailable')
+      return
+    }
+
+    let maxAvailable = maxAvailableByItemId.value.get(itemId)
+    if (maxAvailable == null) {
+      await fetchAndSetMaxAvailable(currentItem)
+      maxAvailable = maxAvailableByItemId.value.get(itemId)
+    }
+
+    const minQty = 1
+    let desiredQty = Number(newQuantity)
+    if (!Number.isFinite(desiredQty)) desiredQty = minQty
+    desiredQty = Math.max(minQty, desiredQty)
+
+    if (typeof maxAvailable === 'number' && desiredQty > maxAvailable) {
+      desiredQty = maxAvailable
+      showWarning(`Only ${maxAvailable} pcs available for this item`)
+    }
+
+    if (desiredQty === currentItem.quantity) {
+      return
+    }
+
+    await updateItemInCart(itemId, {quantity: desiredQty})
+  } catch (e) {
+    showError(e?.message || 'Failed to update item quantity')
+  } finally {
+    processingItems.value.delete(itemId)
   }
 }
 
@@ -311,11 +381,12 @@ const handleRemoveItem = async (itemId) => {
   processingItems.value.add(itemId)
   try {
     await removeItemFromCart(itemId)
-  } catch (error) {
-    console.error('Failed to remove item:', error)
+  } catch (e) {
+    showError(e?.message || 'Failed to remove item from cart')
+  } finally {
+    processingItems.value.delete(itemId)
   }
 }
-
 
 const handleViewProduct = (productSlug) => {
   router.push({
@@ -326,10 +397,8 @@ const handleViewProduct = (productSlug) => {
 
 const handleCheckout = () => {
   // TODO: Navigate to checkout page
-  console.log('Proceed to checkout')
 }
 </script>
-
 
 <style scoped>
 /* Light theme styles */

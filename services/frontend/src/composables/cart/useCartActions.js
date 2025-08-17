@@ -9,38 +9,54 @@ export function useCartActions() {
         try {
             await cartStore.initializeCart();
         } catch (error) {
-            console.error('Failed to initialize cart:', error);
             throw error;
         }
     };
 
-    const baseAddItemToCart = async (itemData, showNotifications = true) => {
+    const baseAddItemToCart = async (itemData, showNotify = true) => {
         try {
             const result = await cartStore.addItemToCart(itemData);
 
-            if (showNotifications) {
-                showSuccess(`Item added to cart successfully!`);
+            if (showNotify) {
+                showSuccess('Item added to cart successfully!');
             }
 
             return result;
         } catch (error) {
-            if (showNotifications) {
+            if (showNotify) {
                 showError(error.message || 'Failed to add item to cart');
             }
             throw error;
         }
     };
 
-    const baseRemoveItemFromCart = async (itemId, showNotifications = true) => {
+    const baseRemoveItemFromCart = async (itemId, showNotify = true) => {
         try {
             await cartStore.removeItemFromCart(itemId);
 
-            if (showNotifications) {
-                showSuccess(`Item removed from cart successfully!`);
+            if (showNotify) {
+                showSuccess('Item removed from cart successfully!');
             }
         } catch (error) {
-            if (showNotifications) {
+            if (showNotify) {
                 showError(error.message || 'Failed to remove item from cart');
+            }
+            throw error;
+        }
+    };
+
+    const baseUpdateItemInCart = async (itemId, itemData, showNotify = true) => {
+        try {
+            const result = await cartStore.updateItemInCart(itemId, itemData);
+
+            if (showNotify) {
+                showSuccess('Item quantity updated');
+            }
+
+            return result;
+        } catch (error) {
+            if (showNotify) {
+                showError(error.message || 'Failed to update item quantity');
             }
             throw error;
         }
@@ -49,14 +65,14 @@ export function useCartActions() {
     const createAddItemHandler = (stateHandlers) => {
         const { isAddingItem, setAddingItem, clearAddItemError, setAddItemError } = stateHandlers;
 
-        return async (itemData, showNotifications = true) => {
+        return async (itemData, showNotify = true) => {
             if (isAddingItem.value) return;
 
             setAddingItem(true);
             clearAddItemError();
 
             try {
-                return await baseAddItemToCart(itemData, showNotifications);
+                return await baseAddItemToCart(itemData, showNotify);
             } catch (error) {
                 setAddItemError(error.message);
                 throw error;
@@ -69,14 +85,14 @@ export function useCartActions() {
     const createRemoveItemHandler = (stateHandlers) => {
         const { isRemovingItem, setRemovingItem, clearRemoveItemError, setRemoveItemError } = stateHandlers;
 
-        return async (itemId, showNotifications = true) => {
+        return async (itemId, showNotify = true) => {
             if (isRemovingItem.value) return;
 
             setRemovingItem(true);
             clearRemoveItemError();
 
             try {
-                return await baseRemoveItemFromCart(itemId, showNotifications);
+                return await baseRemoveItemFromCart(itemId, showNotify);
             } catch (error) {
                 setRemoveItemError(error.message);
                 throw error;
@@ -90,7 +106,6 @@ export function useCartActions() {
         try {
             await cartStore.reloadCart();
         } catch (error) {
-            console.error('Failed to reload cart:', error);
             throw error;
         }
     };
@@ -99,7 +114,6 @@ export function useCartActions() {
         try {
             await cartStore.switchToUserCart();
         } catch (error) {
-            console.error('Failed to switch to user cart:', error);
             throw error;
         }
     };
@@ -108,7 +122,6 @@ export function useCartActions() {
         try {
             await cartStore.switchToAnonymousCart();
         } catch (error) {
-            console.error('Failed to switch to anonymous cart:', error);
             throw error;
         }
     };
@@ -118,9 +131,11 @@ export function useCartActions() {
 
         addItemToCart: baseAddItemToCart,
         removeItemFromCart: baseRemoveItemFromCart,
+        updateItemInCart: baseUpdateItemInCart,
 
         baseAddItemToCart,
         baseRemoveItemFromCart,
+        baseUpdateItemInCart,
 
         createAddItemHandler,
         createRemoveItemHandler,
