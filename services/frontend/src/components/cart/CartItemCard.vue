@@ -3,43 +3,16 @@
     <v-row no-gutters align="center" class="cart-item-content">
       <!-- Product Image -->
       <v-col cols="3" sm="2" md="2">
-        <div class="product-image-container">
-          <v-img
-              :src="item.product_image_url"
-              :alt="item.product_name"
-              height="80"
-              width="80"
-              cover
-              class="product-image"
-              @click="handleViewProduct"
-          >
-            <template #placeholder>
-              <div class="image-placeholder">
-                <v-icon icon="mdi-image" size="24" color="grey-lighten-2"/>
-              </div>
-            </template>
-          </v-img>
-
-          <!-- Availability Badge -->
-          <div v-if="!item.is_available" class="availability-badge">
-            <v-chip
-                color="error"
-                size="x-small"
-                variant="elevated"
-            >
-              Out of Stock
-            </v-chip>
-          </div>
-        </div>
+        <CartItemImage
+            :item="item"
+            @view-product="handleViewProduct"
+        />
       </v-col>
 
       <!-- Product Details -->
       <v-col cols="9" sm="6" md="7" class="product-details">
         <div class="product-info">
-          <h4
-              class="product-name"
-              @click="handleViewProduct"
-          >
+          <h4 class="product-name" @click="handleViewProduct">
             {{ item.product_name }}
           </h4>
 
@@ -56,104 +29,41 @@
           </div>
 
           <!-- Mobile Quantity Controls -->
-          <div class="mobile-controls d-sm-none">
-            <div class="quantity-controls">
-              <v-btn
-                  icon
-                  size="x-small"
-                  variant="outlined"
-                  color="primary"
-                  :disabled="item.quantity <= 1 || updating"
-                  @click="handleDecreaseQuantity"
-              >
-                <v-icon size="12">mdi-minus</v-icon>
-              </v-btn>
-
-              <span class="quantity-display">{{ item.quantity }}</span>
-
-              <v-btn
-                  icon
-                  size="x-small"
-                  variant="outlined"
-                  color="primary"
-                  :disabled="!item.is_available || updating || (props.maxAvailable !== null && item.quantity >= props.maxAvailable)"
-                  @click="handleIncreaseQuantity"
-                  :title="props.maxAvailable !== null && item.quantity >= props.maxAvailable ? 'Maximum available reached' : ''"
-              >
-                <v-icon size="12">mdi-plus</v-icon>
-              </v-btn>
-            </div>
-
-            <div class="item-actions">
-              <v-btn
-                  icon
-                  size="small"
-                  variant="text"
-                  color="error"
-                  @click="handleRemove"
-                  :loading="removing"
-              >
-                <v-icon size="16">mdi-delete</v-icon>
-              </v-btn>
-            </div>
-          </div>
+          <CartItemQuantityMobile
+              class="d-sm-none"
+              :item="item"
+              :updating="updating"
+              :removing="removing"
+              :max-available="maxAvailable"
+              :is-available="!!item.is_available"
+              @increase="handleIncreaseQuantity"
+              @decrease="handleDecreaseQuantity"
+              @remove="handleRemove"
+          />
         </div>
       </v-col>
 
       <!-- Desktop Quantity Controls -->
       <v-col cols="0" sm="2" md="2" class="d-none d-sm-flex quantity-section">
-        <div class="quantity-controls-desktop">
-          <v-btn
-              icon
-              size="small"
-              variant="outlined"
-              color="primary"
-              :disabled="item.quantity <= 1 || updating"
-              @click="handleDecreaseQuantity"
-          >
-            <v-icon size="14">mdi-minus</v-icon>
-          </v-btn>
-
-          <span class="quantity-display-desktop">{{ item.quantity }}</span>
-
-          <v-btn
-              icon
-              size="small"
-              variant="outlined"
-              color="primary"
-              :disabled="!item.is_available || updating || (props.maxAvailable !== null && item.quantity >= props.maxAvailable)"
-              @click="handleIncreaseQuantity"
-              :title="props.maxAvailable !== null && item.quantity >= props.maxAvailable ? 'Maximum available reached' : ''"
-          >
-            <v-icon size="14">mdi-plus</v-icon>
-          </v-btn>
-        </div>
+        <CartItemQuantityDesktop
+            :item="item"
+            :updating="updating"
+            :max-available="maxAvailable"
+            :is-available="!!item.is_available"
+            @increase="handleIncreaseQuantity"
+            @decrease="handleDecreaseQuantity"
+        />
       </v-col>
 
-      <!-- Total Price & Actions -->
+      <!-- Total Price & Actions (Desktop) -->
       <v-col cols="0" sm="2" md="1" class="d-none d-sm-flex total-section">
-        <div class="item-total">
-          <div class="total-price">
-            <div v-if="hasItemDiscount(item)" class="sale-total">
-              ${{ formatItemSaleTotal(item) }}
-            </div>
-            <div v-else class="regular-total">
-              ${{ formatItemTotal(item) }}
-            </div>
-          </div>
-
-          <v-btn
-              icon
-              size="small"
-              variant="text"
-              color="error"
-              @click="handleRemove"
-              :loading="removing"
-              class="remove-btn"
-          >
-            <v-icon size="18">mdi-delete</v-icon>
-          </v-btn>
-        </div>
+        <CartItemTotalActions
+            :has-discount="hasItemDiscount(item)"
+            :sale-total="formatItemSaleTotal(item)"
+            :regular-total="formatItemTotal(item)"
+            :removing="removing"
+            @remove="handleRemove"
+        />
       </v-col>
     </v-row>
 
@@ -169,20 +79,23 @@
         </span>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useCartFormatting } from '@/composables/cart/useCartFormatting.js'
+import {ref, computed} from 'vue'
+import {useCartFormatting} from '@/composables/cart/useCartFormatting.js'
+import CartItemImage from '@/components/cart/cart-item/CartItemImage.vue'
+import CartItemQuantityMobile from '@/components/cart/cart-item/CartItemQuantityMobile.vue'
+import CartItemQuantityDesktop from '@/components/cart/cart-item/CartItemQuantityDesktop.vue'
+import CartItemTotalActions from '@/components/cart/cart-item/CartItemTotalActions.vue'
 
 const props = defineProps({
   item: {
     type: Object,
     required: true
   },
-   maxAvailable: {
+  maxAvailable: {
     type: Number,
     required: false,
     default: null
@@ -210,12 +123,9 @@ const {
 
 const handleIncreaseQuantity = async () => {
   if (updating.value) return
-
   updating.value = true
   try {
-    await emit('update:quantity', props.item.id, props.item.quantity + 1)
-  } catch (error) {
-    console.error('Failed to increase quantity:', error)
+    emit('update:quantity', props.item.id, props.item.quantity + 1)
   } finally {
     updating.value = false
   }
@@ -223,12 +133,9 @@ const handleIncreaseQuantity = async () => {
 
 const handleDecreaseQuantity = async () => {
   if (updating.value || props.item.quantity <= 1) return
-
   updating.value = true
   try {
-    await emit('update:quantity', props.item.id, props.item.quantity - 1)
-  } catch (error) {
-    console.error('Failed to decrease quantity:', error)
+    emit('update:quantity', props.item.id, props.item.quantity - 1)
   } finally {
     updating.value = false
   }
@@ -236,12 +143,9 @@ const handleDecreaseQuantity = async () => {
 
 const handleRemove = async () => {
   if (removing.value) return
-
   removing.value = true
   try {
-    await emit('remove', props.item.id)
-  } catch (error) {
-    console.error('Failed to remove item:', error)
+    emit('remove', props.item.id)
   } finally {
     removing.value = false
   }
@@ -253,7 +157,7 @@ const handleViewProduct = () => {
 </script>
 
 <style scoped>
-/* Light theme styles */
+/* Container styles */
 .cart-item-card {
   position: relative;
   padding: 20px;
@@ -267,37 +171,6 @@ const handleViewProduct = () => {
 
 .cart-item-content {
   align-items: center;
-}
-
-.product-image-container {
-  position: relative;
-  cursor: pointer;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.product-image {
-  border-radius: 8px;
-  transition: transform 0.2s ease;
-}
-
-.product-image:hover {
-  transform: scale(1.05);
-}
-
-.image-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  background-color: #f5f5f5;
-}
-
-.availability-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  z-index: 1;
 }
 
 .product-details {
@@ -325,6 +198,7 @@ const handleViewProduct = () => {
   color: #1976d2;
 }
 
+/* Prices */
 .price-info {
   margin-bottom: 12px;
 }
@@ -363,44 +237,9 @@ const handleViewProduct = () => {
   color: #1976d2;
 }
 
-.mobile-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-}
-
-.quantity-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.quantity-display {
-  min-width: 20px;
-  text-align: center;
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #1a1a1a;
-}
-
+/* Sections alignment */
 .quantity-section {
   justify-content: center;
-}
-
-.quantity-controls-desktop {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.quantity-display-desktop {
-  min-width: 24px;
-  text-align: center;
-  font-weight: 600;
-  font-size: 1rem;
-  color: #1a1a1a;
 }
 
 .total-section {
@@ -408,33 +247,7 @@ const handleViewProduct = () => {
   align-items: center;
 }
 
-.item-total {
-  text-align: center;
-}
-
-.total-price {
-  margin-bottom: 8px;
-}
-
-.sale-total,
-.regular-total {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #1976d2;
-}
-
-.sale-total {
-  color: #d32f2f;
-}
-
-.remove-btn {
-  transition: all 0.2s ease;
-}
-
-.remove-btn:hover {
-  background-color: rgba(244, 67, 54, 0.1);
-}
-
+/* Mobile total */
 .mobile-total {
   margin-top: 12px;
   padding-top: 12px;
@@ -460,20 +273,8 @@ const handleViewProduct = () => {
   color: #1976d2;
 }
 
-/* Dark theme support */
+/* Dark theme support for shared parts */
 :deep(.v-theme--dark) {
-  .cart-item-card {
-    background-color: rgba(255, 255, 255, 0.02);
-  }
-
-  .cart-item-card:hover {
-    background-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .image-placeholder {
-    background-color: rgba(255, 255, 255, 0.05);
-  }
-
   .product-name {
     color: #e8eaed;
   }
@@ -499,22 +300,6 @@ const handleViewProduct = () => {
     color: #90caf9;
   }
 
-  .quantity-display {
-    color: #e8eaed;
-  }
-
-  .quantity-display-desktop {
-    color: #e8eaed;
-  }
-
-  .sale-total {
-    color: #ff6b6b;
-  }
-
-  .regular-total {
-    color: #90caf9;
-  }
-
   .total-price-mobile {
     color: #e8eaed;
   }
@@ -530,17 +315,9 @@ const handleViewProduct = () => {
   .mobile-total {
     border-top: 1px solid rgba(255, 255, 255, 0.12);
   }
-
-  .updating-overlay {
-    background-color: rgba(18, 18, 18, 0.8);
-  }
-
-  .remove-btn:hover {
-    background-color: rgba(244, 67, 54, 0.15);
-  }
 }
 
-/* Responsive adjustments */
+/* Responsive */
 @media (max-width: 600px) {
   .cart-item-card {
     padding: 16px;
