@@ -1,37 +1,37 @@
 <template>
   <div class="action-buttons">
     <v-btn
-        :disabled="!canAddToCart"
-        :color="getActionButtonColor()"
-        size="large"
-        variant="flat"
-        block
-        class="mb-3"
-        prepend-icon="mdi-cart-plus"
-        @click="handleAddToCart"
+      :disabled="!isAvailable || isAddingItem || isRemovingItem"
+      :color="cartButtonColor"
+      size="large"
+      variant="flat"
+      block
+      class="mb-3"
+      :prepend-icon="cartButtonIcon"
+      @click="handleCartAction"
     >
-      {{ getActionButtonText() }}
+      {{ cartButtonText }}
     </v-btn>
 
     <v-btn
-        :disabled="!isAvailable"
-        :color="getActionButtonColor('secondary')"
-        size="large"
-        variant="outlined"
-        block
-        class="mb-3"
-        prepend-icon="mdi-heart-outline"
-        @click="handleAddToWishlist"
+      :disabled="!isAvailable"
+      color="secondary"
+      size="large"
+      variant="outlined"
+      block
+      class="mb-3"
+      prepend-icon="mdi-heart-outline"
+      @click="handleAddToWishlist"
     >
       Add to Wishlist
     </v-btn>
 
     <v-btn
-        color="primary"
-        variant="text"
-        block
-        @click="$emit('go-back')"
-        prepend-icon="mdi-arrow-left"
+      color="primary"
+      variant="text"
+      block
+      @click="$emit('go-back')"
+      prepend-icon="mdi-arrow-left"
     >
       Back to Catalog
     </v-btn>
@@ -39,37 +39,57 @@
 </template>
 
 <script setup>
-import {toRef} from 'vue';
-import {useProductInventory} from '@/composables/product/useProductInventory';
+import { computed, toRef } from 'vue'
+import { useProductInventory } from '@/composables/product/useProductInventory'
+import { useCart } from '@/composables/cart/useCart'
 
 const props = defineProps({
   product: {
     type: Object,
     required: true
   }
-});
+})
+const emit = defineEmits(['go-back', 'add-to-wishlist', 'add-to-cart', 'remove-from-cart'])
 
-const emit = defineEmits(['go-back', 'add-to-cart', 'add-to-wishlist']);
-
-const productRef = toRef(props, 'product');
+const productRef = toRef(props, 'product')
 const {
-  isAvailable,
-  canAddToCart,
-  getActionButtonText,
-  getActionButtonColor
-} = useProductInventory(productRef);
+  isAvailable
+} = useProductInventory(productRef)
 
-const handleAddToCart = () => {
-  if (!canAddToCart.value) return;
-  emit('add-to-cart');
-  // TODO: Implement cart functionality
-};
+const {
+  isAddingItem,
+  isRemovingItem,
+  addItemToCart,
+  removeItemFromCart,
+  isProductInCart,
+  getCartItemInfo
+} = useCart({ showNotifications: true })
+
+const inCart = isProductInCart(props.product.product_id)
+const cartItemInfo = getCartItemInfo(props.product.product_id)
+
+const cartButtonText = computed(() => (inCart.value ? 'Remove from Cart' : 'Add to Cart'))
+const cartButtonColor = computed(() => (inCart.value ? 'error' : 'primary'))
+const cartButtonIcon = computed(() => (inCart.value ? 'mdi-cart-remove' : 'mdi-cart-plus'))
+
+const handleCartAction = async () => {
+  if (!isAvailable.value) return
+
+  if (inCart.value) {
+    const itemId = cartItemInfo.value?.id
+    if (!itemId) return
+    await removeItemFromCart(itemId)
+    emit('remove-from-cart', { productId: props.product.product_id, cartItemId: itemId })
+  } else {
+    await addItemToCart({ product_id: props.product.product_id, quantity: 1 })
+    emit('add-to-cart', { productId: props.product.product_id, quantity: 1 })
+  }
+}
 
 const handleAddToWishlist = () => {
-  if (!isAvailable.value) return;
-  emit('add-to-wishlist');
-  // TODO: Implement wishlist functionality
-};
+  if (!isAvailable.value) return
+  emit('add-to-wishlist', { productId: props.product.product_id })
+}
 </script>
 
 <style scoped>
