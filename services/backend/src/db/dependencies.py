@@ -1,13 +1,10 @@
-from typing import Optional
-
 from fastapi import Depends
 
 from db.connection import get_connection_pool, AsyncConnectionPool
 from db.dao import PostgreSQLDAO
-from db.interfaces import DAOInterface, SQLQueryBuilderInterface
+from db.interfaces import DAOInterface, SQLQueryBuilderInterface, TransactionManagerInterface
 from db.query_builder import SQLQueryBuilder
-
-_dao_instance: Optional[DAOInterface] = None
+from db.transaction import TransactionManager
 
 
 async def get_connection_pool_dependency() -> AsyncConnectionPool:
@@ -24,21 +21,30 @@ async def get_database_dao(
         connection_pool: AsyncConnectionPool = Depends(get_connection_pool_dependency)
 ) -> DAOInterface:
     """
-    Dependency that provides a SINGLE database DAO instance.
-    All repositories will share the same DAO for transaction consistency.
+    Dependency that provides a database DAO.
 
     Args:
         connection_pool: PostgreSQL connection pool
 
     Returns:
-        Shared Data Access Object for database operations
+        Data Access Object for database operations
     """
-    global _dao_instance
+    return PostgreSQLDAO(connection_pool)
 
-    if _dao_instance is None:
-        _dao_instance = PostgreSQLDAO(connection_pool)
 
-    return _dao_instance
+async def get_transaction_manager(
+        connection_pool: AsyncConnectionPool = Depends(get_connection_pool_dependency)
+) -> TransactionManagerInterface:
+    """
+    Dependency that provides a transaction manager.
+
+    Args:
+        connection_pool: PostgreSQL connection pool
+
+    Returns:
+        Transaction manager owning transaction boundaries
+    """
+    return TransactionManager(connection_pool)
 
 
 def get_query_builder(table_name: str) -> SQLQueryBuilderInterface:

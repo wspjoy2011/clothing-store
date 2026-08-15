@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from contextlib import AbstractAsyncContextManager
 from typing import Any, List, Optional, TypeVar, Type, Union, Dict, Self, Tuple
 
 from psycopg import IsolationLevel
@@ -22,6 +23,9 @@ class DAOInterface(ABC):
         """
         Execute a query and optionally fetch results
 
+        Runs inside the caller's active transaction when there is one,
+        otherwise acquires its own connection from the pool.
+
         Args:
             query: SQL query to execute
             params: Query parameters
@@ -35,19 +39,27 @@ class DAOInterface(ABC):
         """
         pass
 
-    @abstractmethod
-    async def begin_transaction(self, isolation_level: Optional[IsolationLevel] = None):
-        """Begin database transaction"""
-        pass
+
+class TransactionManagerInterface(ABC):
+    """Interface for managing database transaction boundaries"""
 
     @abstractmethod
-    async def commit_transaction(self):
-        """Commit database transaction"""
-        pass
+    def atomic(
+            self,
+            isolation_level: Optional[IsolationLevel] = None
+    ) -> AbstractAsyncContextManager[None]:
+        """
+        Run the wrapped block in a single database transaction
 
-    @abstractmethod
-    async def rollback_transaction(self):
-        """Rollback database transaction"""
+        Commits when the block exits normally and rolls back when it raises.
+        Nested calls join the outermost transaction instead of opening a new one.
+
+        Args:
+            isolation_level: Isolation level applied to the outermost transaction
+
+        Returns:
+            Async context manager owning the transaction boundary
+        """
         pass
 
 

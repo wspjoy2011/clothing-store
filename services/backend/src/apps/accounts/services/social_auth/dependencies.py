@@ -24,6 +24,8 @@ from security.dependencies import get_password_manager, get_jwt_manager
 from security.interfaces import PasswordManagerInterface, JWTManagerInterface
 from notifications.dependencies import get_email_sender_dependency
 from notifications.email.interfaces import EmailSenderInterface
+from db.dependencies import get_transaction_manager
+from db.interfaces import TransactionManagerInterface
 
 
 def get_google_social_auth_service(
@@ -33,7 +35,8 @@ def get_google_social_auth_service(
         token_repository: TokenRepositoryInterface = Depends(get_token_repository),
         password_manager: PasswordManagerInterface = Depends(get_password_manager),
         jwt_manager: JWTManagerInterface = Depends(get_jwt_manager),
-        email_sender: EmailSenderInterface = Depends(get_email_sender_dependency)
+        email_sender: EmailSenderInterface = Depends(get_email_sender_dependency),
+        transaction_manager: TransactionManagerInterface = Depends(get_transaction_manager)
 ) -> SocialAuthServiceInterface:
     """
     Get Google social authentication service.
@@ -46,6 +49,7 @@ def get_google_social_auth_service(
         password_manager: Manager for password hashing and verification
         jwt_manager: Manager for JWT token operations
         email_sender: Email sender for notifications
+        transaction_manager: Manager owning transaction boundaries
 
     Returns:
         Google social auth service instance
@@ -60,7 +64,8 @@ def get_google_social_auth_service(
         token_repository=token_repository,
         password_manager=password_manager,
         jwt_manager=jwt_manager,
-        email_sender=email_sender
+        email_sender=email_sender,
+        transaction_manager=transaction_manager
     )
 
 
@@ -71,7 +76,8 @@ def get_facebook_social_auth_service(
         token_repository: TokenRepositoryInterface = Depends(get_token_repository),
         password_manager: PasswordManagerInterface = Depends(get_password_manager),
         jwt_manager: JWTManagerInterface = Depends(get_jwt_manager),
-        email_sender: EmailSenderInterface = Depends(get_email_sender_dependency)
+        email_sender: EmailSenderInterface = Depends(get_email_sender_dependency),
+        transaction_manager: TransactionManagerInterface = Depends(get_transaction_manager)
 ) -> SocialAuthServiceInterface:
     """
     Get Facebook social authentication service.
@@ -84,6 +90,7 @@ def get_facebook_social_auth_service(
         password_manager: Manager for password hashing and verification
         jwt_manager: Manager for JWT token operations
         email_sender: Email sender for notifications
+        transaction_manager: Manager owning transaction boundaries
 
     Returns:
         Facebook social auth service instance
@@ -98,7 +105,8 @@ def get_facebook_social_auth_service(
         token_repository=token_repository,
         password_manager=password_manager,
         jwt_manager=jwt_manager,
-        email_sender=email_sender
+        email_sender=email_sender,
+        transaction_manager=transaction_manager
     )
 
 
@@ -110,7 +118,8 @@ def get_social_auth_service(
         token_repository: TokenRepositoryInterface,
         password_manager: PasswordManagerInterface,
         jwt_manager: JWTManagerInterface,
-        email_sender: EmailSenderInterface
+        email_sender: EmailSenderInterface,
+        transaction_manager: TransactionManagerInterface
 ) -> SocialAuthServiceInterface:
     """
     Get social authentication service by provider name.
@@ -125,6 +134,7 @@ def get_social_auth_service(
         password_manager: Manager for password hashing and verification
         jwt_manager: Manager for JWT token operations
         email_sender: Email sender for notifications
+        transaction_manager: Manager owning transaction boundaries
 
     Returns:
         Social auth service instance
@@ -154,5 +164,6 @@ def get_social_auth_service(
         token_repository=token_repository,
         password_manager=password_manager,
         jwt_manager=jwt_manager,
-        email_sender=email_sender
+        email_sender=email_sender,
+        transaction_manager=transaction_manager
     )

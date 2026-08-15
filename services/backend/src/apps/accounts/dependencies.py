@@ -12,8 +12,8 @@ from apps.accounts.repositories.user_group import UserGroupRepository
 from apps.accounts.repositories.user_profile import UserProfileRepository
 from apps.accounts.repositories.token import TokenRepository
 from apps.accounts.services.account import AccountService
-from db.dependencies import get_database_dao, get_query_builder
-from db.interfaces import DAOInterface, SQLQueryBuilderInterface
+from db.dependencies import get_database_dao, get_query_builder, get_transaction_manager
+from db.interfaces import DAOInterface, SQLQueryBuilderInterface, TransactionManagerInterface
 from notifications.dependencies import get_email_sender_dependency
 from notifications.email.interfaces import EmailSenderInterface
 from security.dependencies import get_password_manager, get_jwt_manager
@@ -94,7 +94,8 @@ async def get_account_service(
         token_repository: TokenRepositoryInterface = Depends(get_token_repository),
         password_manager: PasswordManagerInterface = Depends(get_password_manager),
         jwt_manager: JWTManagerInterface = Depends(get_jwt_manager),
-        email_sender: EmailSenderInterface = Depends(get_email_sender_dependency)
+        email_sender: EmailSenderInterface = Depends(get_email_sender_dependency),
+        transaction_manager: TransactionManagerInterface = Depends(get_transaction_manager)
 ) -> AccountServiceInterface:
     """
     Dependency for getting account service.
@@ -106,6 +107,7 @@ async def get_account_service(
         password_manager: Manager for password hashing and verification
         jwt_manager: Manager for JWT token operations
         email_sender: Email sender for notifications
+        transaction_manager: Manager owning transaction boundaries
 
     Returns:
         Initialized account service
@@ -116,5 +118,6 @@ async def get_account_service(
         token_repository=token_repository,
         password_manager=password_manager,
         jwt_manager=jwt_manager,
-        email_sender=email_sender
+        email_sender=email_sender,
+        transaction_manager=transaction_manager
     )

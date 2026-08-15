@@ -38,7 +38,7 @@ from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInter
 from apps.accounts.repositories.exceptions import (
     UserCreationError as RepoUserCreationError
 )
-from db.transaction_context import atomic
+from db.interfaces import TransactionManagerInterface
 from security.interfaces import PasswordManagerInterface, JWTManagerInterface
 from security.exceptions import TokenCreationError as SecurityTokenCreationError
 from notifications.email.interfaces import EmailSenderInterface
@@ -63,7 +63,8 @@ class SocialAuthService(SocialAuthServiceInterface):
             token_repository: TokenRepositoryInterface,
             password_manager: PasswordManagerInterface,
             jwt_manager: JWTManagerInterface,
-            email_sender: EmailSenderInterface
+            email_sender: EmailSenderInterface,
+            transaction_manager: TransactionManagerInterface
     ):
         """
         Initialize universal social auth service.
@@ -76,6 +77,7 @@ class SocialAuthService(SocialAuthServiceInterface):
             password_manager: Manager for password hashing and verification
             jwt_manager: Manager for JWT token operations
             email_sender: Email sender for notifications
+            transaction_manager: Manager owning transaction boundaries
         """
         self._oauth_provider = oauth_provider
         self._user_repository = user_repository
@@ -84,6 +86,7 @@ class SocialAuthService(SocialAuthServiceInterface):
         self._password_manager = password_manager
         self._jwt_manager = jwt_manager
         self._email_sender = email_sender
+        self._transaction_manager = transaction_manager
         self.provider_name = oauth_provider.provider_name
 
     async def authenticate(self, request: SocialAuthRequest) -> SocialAuthResponse:
@@ -126,7 +129,8 @@ class SocialAuthService(SocialAuthServiceInterface):
         self._validate_profile(user_profile)
 
         try:
-            auth_result = await self._handle_user(user_profile)
+            async with self._transaction_manager.atomic():
+                auth_result = await self._handle_user(user_profile)
             tokens = await self._generate_tokens(auth_result)
         except SocialAuthError:
             raise
@@ -218,7 +222,6 @@ class SocialAuthService(SocialAuthServiceInterface):
                 profile.provider
             )
 
-    @atomic(['_user_repository', '_user_group_repository'])
     async def _handle_user(self, profile: SocialUserProfile) -> SocialAuthResult:
         """
         Handle user lookup/creation.
