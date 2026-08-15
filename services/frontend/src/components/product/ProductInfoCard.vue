@@ -43,7 +43,7 @@
           </v-chip>
         </div>
 
-        <div class="meta-item mt-3">
+        <div v-if="product.year" class="meta-item mt-3">
           <v-icon icon="mdi-calendar" class="mr-2" color="primary"/>
           <span class="meta-label">Year:</span>
           <v-chip

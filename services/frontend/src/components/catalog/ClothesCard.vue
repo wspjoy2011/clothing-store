@@ -70,7 +70,7 @@
     <!-- Subtitle -->
     <v-card-subtitle>
       <span class="font-weight-medium">{{ props.product.gender }}</span>
-      <span class="ms-2 text-medium-emphasis text-caption">{{ props.product.year }}</span>
+      <span v-if="props.product.year" class="ms-2 text-medium-emphasis text-caption">{{ props.product.year }}</span>
     </v-card-subtitle>
 
     <!-- Price section -->
