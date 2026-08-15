@@ -23,7 +23,8 @@ from ledger import Ledger, latest_run_id, new_run_id, run_directory
 PROJECT_MARKER = "docker-compose.yml"
 TEST_EMAIL_PREFIX = "e2e-"
 DEFAULT_API = "http://localhost:8000/api/v1"
-STACK_SERVICES = ("db", "web")
+STACK_SERVICES = ("db", "mailhog", "web")
+REQUEST_TIMEOUT = 120
 
 
 def find_project_root() -> str:
@@ -324,7 +325,7 @@ def request(method: str, url: str, payload: Optional[dict] = None, token: Option
         http_request.add_header("Authorization", f"Bearer {token}")
 
     try:
-        with urllib.request.urlopen(http_request, timeout=30) as response:
+        with urllib.request.urlopen(http_request, timeout=REQUEST_TIMEOUT) as response:
             body = response.read().decode("utf-8")
             return response.status, json.loads(body) if body else {}
     except urllib.error.HTTPError as error:
@@ -353,6 +354,7 @@ def command_up(arguments, ledger: Ledger) -> int:
     ledger.note(f"docker client: {' '.join(docker)}")
 
     env_file = ensure_env_file(project_root, ledger)
+    ensure_mailhog_env(project_root, ledger)
     ensure_override(project_root, ledger)
 
     ledger.record("started", "compose_stack", ",".join(STACK_SERVICES), project_root=project_root)
