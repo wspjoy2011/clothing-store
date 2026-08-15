@@ -45,13 +45,16 @@ Polling on a timer rather than subscribing to events is deliberate: a dropped ev
 
 ## Rules
 
-1. **Always clean up.** Run `cleanup` when the checks finish, including when they fail and including when you are interrupted. Report what was removed.
+1. **Always tear the stand down.** A run ends with `cleanup`, without exception: after success, after failure, and after an interruption. Containers stop, volumes go, generated files are deleted and every row the run wrote is removed. Nothing survives the run except the ledger itself.
+
+   `cleanup` replays the ledger backwards, so anything created outside it — a container started by hand, a throwaway script, a table row written by an ad-hoc query — must be recorded in the ledger at the moment it is created, or it will be left behind. After cleanup, verify: no project containers, no project volumes, no generated files, working tree clean. Report that verification, not just the fact that cleanup ran.
 2. **Test data is marked.** Accounts created by scenarios use the `e2e-` email prefix so cleanup can identify them without touching real rows.
 3. **Report the ledger.** After a run, print what was created and what was removed. The user must be able to see that nothing was left behind.
 4. **Failures are results.** A failing scenario is reported with its status code and response body, not retried until it passes and not silently dropped.
 
 ## Steps
 
+0. Start `monitor` in the background before anything else and leave it running for the whole session. Without it a stack that dies mid-run looks like failing code, and the wrong thing gets debugged.
 1. Run `up` and wait for the API to answer. If it never does, print the last lines of the web service logs and stop — do not run scenarios against a stack that is not ready.
 2. Run `scenarios`.
 3. Read the results. For every failure, look at the container logs before drawing a conclusion; a failure may be a broken environment rather than broken code.
