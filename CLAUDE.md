@@ -21,6 +21,12 @@ Working guidelines for the clothing-store codebase.
 
 Conventional Commits, **one line**, no body: `type(scope): what was done`. Scope is the affected module (`cart`, `catalog`, `checkout`, `auth`, `backend`, `migrations`). Keep the summary short and concrete — `feat(cart): validate stock limit on quantity update`, not `feat(cart): improvements`.
 
+## Tests
+
+Every change ships with tests. A bug fix adds a test that fails without the fix; new logic is covered by tests for its behaviour, not its implementation.
+
+Backend tests live in `services/backend/tests`, mirror the package they cover and run with `pytest`. External boundaries — database, SMTP, HTTP — are replaced by fakes, so no test needs a running Postgres or `.env`. One behaviour per test, named as the statement it proves.
+
 ## Dependencies
 
 Backend dependencies are managed by **uv**: `pyproject.toml` + `uv.lock`, both committed. Add packages with `uv add`, install with `uv sync`.
