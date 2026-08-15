@@ -35,10 +35,18 @@ class FakeProduct:
 class FakeCatalogService:
     """Catalog reporting a configurable amount of available stock"""
 
-    def __init__(self, available_quantity: int = 100, product: Optional[FakeProduct] = None):
+    def __init__(
+            self,
+            available_quantity: int = 100,
+            product: Optional[FakeProduct] = None,
+            sellable: bool = True
+    ):
         self.available_quantity = available_quantity
+        self.sellable = sellable
         self.product = product
         self.availability_checks: List[tuple] = []
+        self.holds: List[tuple] = []
+        self.holds_inside_transaction: List[bool] = []
 
     async def get_product_by_id(self, product_id: int) -> Optional[FakeProduct]:
         """Return the configured product, or a complete one by default"""
@@ -50,6 +58,14 @@ class FakeCatalogService:
         """Record the check and answer from the configured stock"""
         self.availability_checks.append((product_id, quantity))
         return quantity <= self.available_quantity
+
+    async def hold_available_quantity(self, product_id: int) -> Optional[int]:
+        """Record the hold, whether a transaction was open, and report the stock"""
+        from db.transaction import get_current_transaction
+
+        self.holds.append(product_id)
+        self.holds_inside_transaction.append(get_current_transaction() is not None)
+        return self.available_quantity if self.sellable else None
 
 
 @dataclass
@@ -121,14 +137,32 @@ class FakeCartItemRepository:
         """Sum the quantities stored in the cart"""
         return sum(item.quantity for item in await self.get_cart_items_by_cart_id(cart_id))
 
+    async def get_cart_item_by_cart_and_product(self, cart_id: int, product_id: int) -> Optional[CartItemDTO]:
+        """Return the stored item when it matches the cart and product"""
+        if self.item is not None and self.item.cart_id == cart_id and self.item.product_id == product_id:
+            return self.item
+        return None
+
+    async def add_item_to_cart(self, request_data: Any, cart_id: int) -> CartItemDTO:
+        """Store the item, summing the quantity when it is already there"""
+        existing = await self.get_cart_item_by_cart_and_product(cart_id, request_data.product_id)
+        quantity = request_data.quantity + (existing.quantity if existing else 0)
+
+        self.item = CartItemDTO(
+            id=existing.id if existing else 1,
+            cart_id=cart_id,
+            product_id=request_data.product_id,
+            quantity=quantity,
+            added_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            updated_at=datetime(2026, 1, 2, tzinfo=timezone.utc)
+        )
+        return self.item
+
     async def update_cart_item(self, request_data: Any, cart_id: int) -> Optional[CartItemDTO]:
-        """Record the update and return the item, mirroring the stock guard in SQL"""
+        """Record the update and return the item, enforcing ownership only"""
         self.updates.append((request_data.cart_item_id, request_data.quantity, cart_id))
 
         if self.item is None or self.item.cart_id != cart_id:
-            return None
-
-        if request_data.quantity > self.available_quantity:
             return None
 
         self.item = CartItemDTO(

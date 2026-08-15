@@ -22,6 +22,7 @@ from apps.checkout.exceptions import (
     CartNotFoundError, ProductNotFoundError, InsufficientStockError,
 )
 from apps.catalog.interfaces.services import CatalogServiceInterface
+from db.interfaces import TransactionManagerInterface
 from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "checkout")
@@ -35,7 +36,8 @@ class CartService(CartServiceInterface):
             cart_token_repository: CartTokenRepositoryInterface,
             cart_repository: CartRepositoryInterface,
             cart_item_repository: CartItemRepositoryInterface,
-            catalog_service: CatalogServiceInterface
+            catalog_service: CatalogServiceInterface,
+            transaction_manager: TransactionManagerInterface
     ):
         """
         Initialize cart service
@@ -45,11 +47,13 @@ class CartService(CartServiceInterface):
             cart_repository: Repository for cart operations
             cart_item_repository: Repository for cart item operations
             catalog_service: Service for product information
+            transaction_manager: Manager owning transaction boundaries
         """
         self._cart_token_repository = cart_token_repository
         self._cart_repository = cart_repository
         self._cart_item_repository = cart_item_repository
         self._catalog_service = catalog_service
+        self._transaction_manager = transaction_manager
 
     async def create_cart_token(self) -> CartTokenResponseDTO:
         """
@@ -179,21 +183,26 @@ class CartService(CartServiceInterface):
             logger.warning(f"Product not found: {request_data.product_id}")
             raise ProductNotFoundError(f"Product with ID {request_data.product_id} not found")
 
-        is_available = await self._catalog_service.check_product_availability(
-            request_data.product_id,
-            request_data.quantity
-        )
-        if not is_available:
-            logger.warning(f"Insufficient stock for product {request_data.product_id}, requested: {request_data.quantity}")
-            raise InsufficientStockError(f"Insufficient stock for product {request_data.product_id}")
+        async with self._transaction_manager.atomic():
+            available_quantity = await self._catalog_service.hold_available_quantity(request_data.product_id)
+            if available_quantity is None:
+                logger.warning(f"Product {request_data.product_id} cannot be sold")
+                raise InsufficientStockError(f"Insufficient stock for product {request_data.product_id}")
 
-        cart_item = await self._cart_item_repository.add_item_to_cart(request_data, cart_response.id)
-        if not cart_item:
-            logger.warning(
-                f"Item not added to cart {cart_response.id}: adding {request_data.quantity} of product "
-                f"{request_data.product_id} would exceed the available stock"
+            already_in_cart = await self._cart_item_repository.get_cart_item_by_cart_and_product(
+                cart_response.id,
+                request_data.product_id
             )
-            raise InsufficientStockError(f"Insufficient stock for product {request_data.product_id}")
+            resulting_quantity = request_data.quantity + (already_in_cart.quantity if already_in_cart else 0)
+
+            if resulting_quantity > available_quantity:
+                logger.warning(
+                    f"Insufficient stock for product {request_data.product_id}: "
+                    f"cart would hold {resulting_quantity} of {available_quantity} available"
+                )
+                raise InsufficientStockError(f"Insufficient stock for product {request_data.product_id}")
+
+            cart_item = await self._cart_item_repository.add_item_to_cart(request_data, cart_response.id)
 
         logger.info(f"Item added to cart successfully: cart_id={cart_response.id}, item_id={cart_item.id}")
 
@@ -234,35 +243,26 @@ class CartService(CartServiceInterface):
         else:
             cart_response = await self.get_or_create_cart_for_token(token)
 
-        existing_item = await self._cart_item_repository.get_cart_item_by_id(request_data.cart_item_id)
-        if not existing_item or existing_item.cart_id != cart_response.id:
-            logger.warning(
-                f"Cart item {request_data.cart_item_id} not found or does not belong to cart {cart_response.id}"
-            )
-            raise CartNotFoundError("Cart item not found in your cart")
-
-        is_available = await self._catalog_service.check_product_availability(
-            existing_item.product_id,
-            request_data.quantity
-        )
-        if not is_available:
-            logger.warning(
-                f"Insufficient stock for product {existing_item.product_id}, requested: {request_data.quantity}"
-            )
-            raise InsufficientStockError(f"Insufficient stock for product {existing_item.product_id}")
-
-        updated_item = await self._cart_item_repository.update_cart_item(request_data, cart_response.id)
-        if not updated_item:
-            still_present = await self._cart_item_repository.get_cart_item_by_id(request_data.cart_item_id)
-            if still_present is None:
-                logger.warning(f"Cart item {request_data.cart_item_id} disappeared while it was being updated")
+        async with self._transaction_manager.atomic():
+            existing_item = await self._cart_item_repository.get_cart_item_by_id(request_data.cart_item_id)
+            if not existing_item or existing_item.cart_id != cart_response.id:
+                logger.warning(
+                    f"Cart item {request_data.cart_item_id} not found or does not belong to cart {cart_response.id}"
+                )
                 raise CartNotFoundError("Cart item not found in your cart")
 
-            logger.warning(
-                f"Cart item {request_data.cart_item_id} passed the stock check but the update did not apply: "
-                f"product {existing_item.product_id} is no longer covered by its inventory"
-            )
-            raise InsufficientStockError(f"Insufficient stock for product {existing_item.product_id}")
+            available_quantity = await self._catalog_service.hold_available_quantity(existing_item.product_id)
+            if available_quantity is None or request_data.quantity > available_quantity:
+                logger.warning(
+                    f"Insufficient stock for product {existing_item.product_id}: "
+                    f"requested {request_data.quantity} of {available_quantity} available"
+                )
+                raise InsufficientStockError(f"Insufficient stock for product {existing_item.product_id}")
+
+            updated_item = await self._cart_item_repository.update_cart_item(request_data, cart_response.id)
+            if not updated_item:
+                logger.warning(f"Cart item {request_data.cart_item_id} disappeared while it was being updated")
+                raise CartNotFoundError("Cart item not found in your cart")
 
         product = await self._catalog_service.get_product_by_id(updated_item.product_id)
         if not product:

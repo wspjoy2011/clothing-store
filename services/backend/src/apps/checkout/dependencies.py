@@ -14,8 +14,8 @@ from apps.checkout.repositories import (
 from apps.checkout.services import CartService
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.interfaces.services import CatalogServiceInterface
-from db.dependencies import get_database_dao, get_query_builder
-from db.interfaces import DAOInterface, SQLQueryBuilderInterface
+from db.dependencies import get_database_dao, get_query_builder, get_transaction_manager
+from db.interfaces import DAOInterface, SQLQueryBuilderInterface, TransactionManagerInterface
 
 
 async def get_cart_token_repository(
@@ -73,7 +73,8 @@ async def get_cart_service(
         cart_token_repository: CartTokenRepositoryInterface = Depends(get_cart_token_repository),
         cart_repository: CartRepositoryInterface = Depends(get_cart_repository),
         cart_item_repository: CartItemRepositoryInterface = Depends(get_cart_item_repository),
-        catalog_service: CatalogServiceInterface = Depends(get_catalog_service)
+        catalog_service: CatalogServiceInterface = Depends(get_catalog_service),
+        transaction_manager: TransactionManagerInterface = Depends(get_transaction_manager)
 ) -> CartServiceInterface:
     """
     Dependency for getting cart service.
@@ -83,6 +84,7 @@ async def get_cart_service(
         cart_repository: Repository for cart operations
         cart_item_repository: Repository for cart item operations
         catalog_service: Service for product information
+        transaction_manager: Manager owning transaction boundaries
 
     Returns:
         Initialized cart service
@@ -91,5 +93,6 @@ async def get_cart_service(
         cart_token_repository=cart_token_repository,
         cart_repository=cart_repository,
         cart_item_repository=cart_item_repository,
-        catalog_service=catalog_service
+        catalog_service=catalog_service,
+        transaction_manager=transaction_manager
     )
