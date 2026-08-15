@@ -216,7 +216,7 @@ class SocialAuthService(SocialAuthServiceInterface):
             )
 
         try:
-            validation_result = validate_email(profile.email)
+            validation_result = validate_email(profile.email, check_deliverability=False)
             profile.email = validation_result.normalized
         except EmailNotValidError as e:
             raise SocialUserValidationError(

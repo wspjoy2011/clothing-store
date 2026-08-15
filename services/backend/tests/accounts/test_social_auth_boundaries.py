@@ -1,6 +1,3 @@
-import pytest
-
-import apps.accounts.services.social_auth.service as service_module
 from apps.accounts.services.social_auth.dto import SocialAuthRequest
 from apps.accounts.services.social_auth.service import SocialAuthService
 from oauth.dto import OAuthUserInfo
@@ -13,16 +10,6 @@ from tests.accounts.fakes import (
     FakeUserGroupRepository,
     FakeUserRepository,
 )
-
-
-@pytest.fixture(autouse=True)
-def email_validation_without_dns(monkeypatch):
-    """Keep profile validation offline: the real validator resolves MX records"""
-
-    def accept_address(email: str, **options):
-        return type("ValidatedEmail", (), {"normalized": email})()
-
-    monkeypatch.setattr(service_module, "validate_email", accept_address)
 
 
 class FakeOAuthProvider:

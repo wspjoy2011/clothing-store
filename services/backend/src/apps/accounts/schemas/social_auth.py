@@ -81,7 +81,7 @@ class SocialUserProfileSchema(BaseModel):
     def validate_email_field(cls, value: str) -> str:
         """Validate and normalize email address."""
         try:
-            validation_result = validate_email(value)
+            validation_result = validate_email(value, check_deliverability=False)
             return validation_result.email
         except EmailNotValidError as e:
             raise ValueError(f"Invalid email format: {str(e)}")
