@@ -95,7 +95,13 @@ def collect_pull_request(number: str) -> Optional[dict]:
     if metadata.returncode != 0 or diff.returncode != 0:
         return None
 
-    return {"metadata": metadata.stdout, "diff": diff.stdout}
+    head_ref = number
+    try:
+        head_ref = json.loads(metadata.stdout).get("headRefName") or number
+    except json.JSONDecodeError:
+        pass
+
+    return {"metadata": metadata.stdout, "diff": diff.stdout, "head_ref": head_ref}
 
 
 def render_pull_request_metadata(raw: str) -> str:
@@ -159,6 +165,26 @@ def truncate(text: str, limit: int) -> str:
     return f"{kept}\n\n[diff truncated, {dropped} bytes omitted — review the listed files directly]"
 
 
+def build_reading_instructions(review_ref: str) -> str:
+    """
+    Build the note telling reviewers how to read files safely
+
+    Args:
+        review_ref: Ref holding the reviewed code
+
+    Returns:
+        Markdown note for the snapshot header
+    """
+    checked_out = run_git(["branch", "--show-current"]) or "detached HEAD"
+    return (
+        "## How to read files\n\n"
+        f"The reviewed code lives in `{review_ref}`. The working tree is currently on `{checked_out}`.\n\n"
+        f"Read files with `git show {review_ref}:<path>` rather than opening them from disk. "
+        "The working tree may sit on another branch, or be switched while the review runs, "
+        "and files read from it would then belong to different code than the diff below.\n"
+    )
+
+
 def build_report(target: str, base: str, pull_request: Optional[str], max_diff_bytes: int) -> str:
     """
     Build the review snapshot
@@ -181,6 +207,7 @@ def build_report(target: str, base: str, pull_request: Optional[str], max_diff_b
 
         sections.append("# Review target: pull request\n")
         sections.append(render_pull_request_metadata(collected["metadata"]))
+        sections.append(build_reading_instructions(collected["head_ref"]))
         sections.append(f"## Diff\n\n```diff\n{truncate(collected['diff'], max_diff_bytes)}\n```\n")
         return "\n".join(sections)
 
@@ -193,6 +220,7 @@ def build_report(target: str, base: str, pull_request: Optional[str], max_diff_b
             sections.append(f"## Untracked files\n\n```\n{untracked}\n```\n")
     else:
         sections.append(f"# Review target: branch against {base}\n")
+        sections.append(build_reading_instructions("HEAD"))
         commits = run_git(["log", "--oneline", f"{base}..HEAD"])
         sections.append(f"## Commits\n\n```\n{commits or 'no commits ahead of base'}\n```\n")
         stat = run_git(["diff", f"{base}...HEAD", "--stat"])

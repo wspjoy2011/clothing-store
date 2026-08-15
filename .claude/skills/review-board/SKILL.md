@@ -38,7 +38,7 @@ Send all three in a single message so they run concurrently. Give each one:
 - the path to the snapshot,
 - the path to its role file under `.claude/skills/review-board/roles/`,
 - the instruction to read `CLAUDE.md` before judging,
-- permission to open any file in the repository for context — the diff alone rarely tells the whole story.
+- the ref holding the reviewed code, and the instruction to read files with `git show <ref>:<path>` rather than from the working tree — the diff alone rarely tells the whole story, but the working tree may sit on a different branch or be switched mid-review, and files read from it would then belong to different code than the diff.
 
 Roles: `architect.md`, `tech-lead.md`, `senior-developer.md`.
 
