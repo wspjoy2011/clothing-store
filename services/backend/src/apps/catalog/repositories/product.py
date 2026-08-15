@@ -866,7 +866,7 @@ class ProductRepository(ProductRepositoryInterface):
         """
         product_id = int(row[0])
         gender = row[1]
-        year = int(row[2])
+        year = int(row[2]) if row[2] is not None else None
         product_display_name = row[3]
         image_url = row[4]
         slug = row[5]

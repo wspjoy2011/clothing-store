@@ -24,8 +24,8 @@ class InventoryDTO:
 class ProductDTO:
     product_id: int
     gender: str
-    year: int
-    product_display_name: str
-    image_url: str
+    year: Optional[int]
+    product_display_name: Optional[str]
+    image_url: Optional[str]
     slug: str
     inventory: Optional[InventoryDTO] = None

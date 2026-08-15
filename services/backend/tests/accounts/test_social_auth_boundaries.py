@@ -1,6 +1,3 @@
-import pytest
-
-import apps.accounts.services.social_auth.service as service_module
 from apps.accounts.services.social_auth.dto import SocialAuthRequest
 from apps.accounts.services.social_auth.service import SocialAuthService
 from oauth.dto import OAuthUserInfo
@@ -13,16 +10,6 @@ from tests.accounts.fakes import (
     FakeUserGroupRepository,
     FakeUserRepository,
 )
-
-
-@pytest.fixture(autouse=True)
-def email_validation_without_dns(monkeypatch):
-    """Keep profile validation offline: the real validator resolves MX records"""
-
-    def accept_address(email: str, **options):
-        return type("ValidatedEmail", (), {"normalized": email})()
-
-    monkeypatch.setattr(service_module, "validate_email", accept_address)
 
 
 class FakeOAuthProvider:
@@ -97,6 +84,24 @@ async def test_welcome_email_is_sent_outside_the_transaction():
     assert [email.kind for email in email_sender.sent] == ["activation_complete"]
     assert email_sender.sent[0].inside_transaction is False
     assert transaction_manager.committed == 1
+
+
+async def test_login_does_not_resolve_mx_records(monkeypatch):
+    """Profile validation checks the address format without querying DNS"""
+    import apps.accounts.services.social_auth.service as service_module
+
+    captured = {}
+
+    def spy(email: str, **options):
+        captured.update(options)
+        return type("ValidatedEmail", (), {"normalized": email, "email": email})()
+
+    monkeypatch.setattr(service_module, "validate_email", spy)
+    service = build_service(FakeEmailSender(), FakeTransactionManager())
+
+    await service.authenticate(SocialAuthRequest(provider="google", access_token="token"))
+
+    assert captured.get("check_deliverability") is False
 
 
 async def test_welcome_email_failure_does_not_fail_authentication():

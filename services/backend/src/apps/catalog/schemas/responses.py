@@ -22,12 +22,16 @@ class InventorySchema(BaseModel):
 
 
 class ProductSchema(BaseModel):
-    """Schema for product information in API responses"""
+    """Schema for product information in API responses
+
+    Year, display name and image are nullable in the catalogue table, so a
+    product missing any of them is served as it is rather than failing the page.
+    """
     product_id: int
     gender: str
-    year: int
-    product_display_name: str
-    image_url: str
+    year: Optional[int] = None
+    product_display_name: Optional[str] = None
+    image_url: Optional[str] = None
     slug: str
     inventory: Optional[InventorySchema] = None
 

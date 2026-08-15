@@ -26,24 +26,36 @@ class CartItemRepository(CartItemRepositoryInterface):
         self._dao = dao
         self._query_builder = query_builder
 
-    async def add_item_to_cart(self, request_data: AddToCartRequestDTO, cart_id: int) -> CartItemDTO:
+    async def add_item_to_cart(self, request_data: AddToCartRequestDTO, cart_id: int) -> Optional[CartItemDTO]:
         """
         Add item to cart or update quantity if item already exists
+
+        The resulting quantity is re-checked against stock inside the statement,
+        the same way update_cart_item does: on conflict the quantities are summed,
+        and a separate check could not see that sum.
 
         Args:
             request_data: Data for adding item to cart
             cart_id: ID of the cart
 
         Returns:
-            Created or updated CartItemDTO
+            Created or updated CartItemDTO, or None when stock no longer covers
+            the resulting quantity
         """
         query = f"""
             INSERT INTO {self.APP_NAME}_cart_items (cart_id, product_id, quantity)
             VALUES (%s, %s, %s)
             ON CONFLICT (cart_id, product_id)
-            DO UPDATE SET 
+            DO UPDATE SET
                 quantity = {self.APP_NAME}_cart_items.quantity + EXCLUDED.quantity,
                 updated_at = CURRENT_TIMESTAMP
+            WHERE EXISTS (
+                SELECT 1 FROM catalog_product_inventory AS inventory
+                WHERE inventory.product_id = {self.APP_NAME}_cart_items.product_id
+                  AND inventory.is_active
+                  AND inventory.is_in_stock
+                  AND inventory.available_quantity >= {self.APP_NAME}_cart_items.quantity + EXCLUDED.quantity
+            )
             RETURNING id, cart_id, product_id, quantity, added_at, updated_at
         """
 
@@ -141,25 +153,36 @@ class CartItemRepository(CartItemRepositoryInterface):
 
     async def update_cart_item(self, request_data: UpdateCartItemRequestDTO, cart_id: int) -> Optional[CartItemDTO]:
         """
-        Update cart item quantity with cart ownership validation
+        Update cart item quantity with cart ownership and stock validation
+
+        Stock is re-checked inside the statement itself: a separate check would
+        leave a window in which a concurrent request could take the last units
+        between the check and the update.
 
         Args:
             request_data: Data for updating cart item
             cart_id: ID of the cart to which the item must belong
 
         Returns:
-            Updated CartItemDTO if successful, None otherwise
+            Updated CartItemDTO, or None when the item is absent, owned by another
+            cart, or no longer covered by the available stock
         """
         query = f"""
-            UPDATE {self.APP_NAME}_cart_items
+            UPDATE {self.APP_NAME}_cart_items AS item
             SET quantity = %s, updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s AND cart_id = %s
-            RETURNING id, cart_id, product_id, quantity, added_at, updated_at
+            FROM catalog_product_inventory AS inventory
+            WHERE item.id = %s
+              AND item.cart_id = %s
+              AND inventory.product_id = item.product_id
+              AND inventory.is_active
+              AND inventory.is_in_stock
+              AND inventory.available_quantity >= %s
+            RETURNING item.id, item.cart_id, item.product_id, item.quantity, item.added_at, item.updated_at
         """
 
         result = await self._dao.execute(
             query=query,
-            params=[request_data.quantity, request_data.cart_item_id, cart_id],
+            params=[request_data.quantity, request_data.cart_item_id, cart_id, request_data.quantity],
             fetch=True,
             fetch_one=True,
             model_class=CartItemDTO
@@ -171,7 +194,8 @@ class CartItemRepository(CartItemRepositoryInterface):
             )
         else:
             logger.warning(
-                f"Cart item {request_data.cart_item_id} not found in cart {cart_id} or ownership mismatch"
+                f"Cart item {request_data.cart_item_id} not updated in cart {cart_id}: "
+                f"missing, owned by another cart, or stock no longer covers {request_data.quantity}"
             )
 
         return result

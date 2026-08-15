@@ -398,6 +398,12 @@ async def update_cart_item_by_token_controller(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
+    except InsufficientStockError as e:
+        logger.warning(f"Insufficient stock: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient stock: {e.message}"
+        )
     except Exception as e:
         logger.error(f"Unexpected error updating cart item {item_id} by token {token[:10]}...: {e}")
         raise HTTPException(
@@ -433,6 +439,12 @@ async def update_cart_item_for_user_controller(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
+        )
+    except InsufficientStockError as e:
+        logger.warning(f"Insufficient stock: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Insufficient stock: {e.message}"
         )
     except Exception as e:
         logger.error(f"Unexpected error updating cart item {item_id} for user {jwt_payload.user_id}: {e}")

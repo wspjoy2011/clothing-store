@@ -9,9 +9,12 @@ class PasswordManagerInterface(ABC):
     """Interface for password management operations"""
 
     @abstractmethod
-    def hash_password(self, password: str) -> str:
+    async def hash_password(self, password: str) -> str:
         """
         Hash a plain text password
+
+        Hashing is deliberately expensive, so it runs in a worker thread and
+        leaves the event loop free to serve other requests.
 
         Args:
             password: Plain text password to hash
@@ -27,9 +30,12 @@ class PasswordManagerInterface(ABC):
         pass
 
     @abstractmethod
-    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
+    async def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """
         Verify a plain text password against a hashed password
+
+        Verification costs as much as hashing, so it runs in a worker thread and
+        leaves the event loop free to serve other requests.
 
         Args:
             plain_password: Plain text password to verify
