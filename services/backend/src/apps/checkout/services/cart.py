@@ -188,6 +188,12 @@ class CartService(CartServiceInterface):
             raise InsufficientStockError(f"Insufficient stock for product {request_data.product_id}")
 
         cart_item = await self._cart_item_repository.add_item_to_cart(request_data, cart_response.id)
+        if not cart_item:
+            logger.warning(
+                f"Item not added to cart {cart_response.id}: adding {request_data.quantity} of product "
+                f"{request_data.product_id} would exceed the available stock"
+            )
+            raise InsufficientStockError(f"Insufficient stock for product {request_data.product_id}")
 
         logger.info(f"Item added to cart successfully: cart_id={cart_response.id}, item_id={cart_item.id}")
 
@@ -247,9 +253,14 @@ class CartService(CartServiceInterface):
 
         updated_item = await self._cart_item_repository.update_cart_item(request_data, cart_response.id)
         if not updated_item:
+            still_present = await self._cart_item_repository.get_cart_item_by_id(request_data.cart_item_id)
+            if still_present is None:
+                logger.warning(f"Cart item {request_data.cart_item_id} disappeared while it was being updated")
+                raise CartNotFoundError("Cart item not found in your cart")
+
             logger.warning(
                 f"Cart item {request_data.cart_item_id} passed the stock check but the update did not apply: "
-                f"the remaining units for product {existing_item.product_id} were taken concurrently"
+                f"product {existing_item.product_id} is no longer covered by its inventory"
             )
             raise InsufficientStockError(f"Insufficient stock for product {existing_item.product_id}")
 
@@ -380,9 +391,9 @@ class CartService(CartServiceInterface):
         return CartItemResponseDTO(
             id=cart_item.id,
             product_id=cart_item.product_id,
-            product_name=product.product_display_name if product else "Unknown Product",
-            product_slug=product.slug if product else "unknown",
-            product_image_url=product.image_url if product else "",
+            product_name=(product.product_display_name if product else None) or "Unknown Product",
+            product_slug=(product.slug if product else None) or "unknown",
+            product_image_url=(product.image_url if product else None) or "",
             quantity=cart_item.quantity,
             unit_price=unit_price,
             sale_price=sale_price,

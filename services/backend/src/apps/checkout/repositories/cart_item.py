@@ -26,24 +26,36 @@ class CartItemRepository(CartItemRepositoryInterface):
         self._dao = dao
         self._query_builder = query_builder
 
-    async def add_item_to_cart(self, request_data: AddToCartRequestDTO, cart_id: int) -> CartItemDTO:
+    async def add_item_to_cart(self, request_data: AddToCartRequestDTO, cart_id: int) -> Optional[CartItemDTO]:
         """
         Add item to cart or update quantity if item already exists
+
+        The resulting quantity is re-checked against stock inside the statement,
+        the same way update_cart_item does: on conflict the quantities are summed,
+        and a separate check could not see that sum.
 
         Args:
             request_data: Data for adding item to cart
             cart_id: ID of the cart
 
         Returns:
-            Created or updated CartItemDTO
+            Created or updated CartItemDTO, or None when stock no longer covers
+            the resulting quantity
         """
         query = f"""
             INSERT INTO {self.APP_NAME}_cart_items (cart_id, product_id, quantity)
             VALUES (%s, %s, %s)
             ON CONFLICT (cart_id, product_id)
-            DO UPDATE SET 
+            DO UPDATE SET
                 quantity = {self.APP_NAME}_cart_items.quantity + EXCLUDED.quantity,
                 updated_at = CURRENT_TIMESTAMP
+            WHERE EXISTS (
+                SELECT 1 FROM catalog_product_inventory AS inventory
+                WHERE inventory.product_id = {self.APP_NAME}_cart_items.product_id
+                  AND inventory.is_active
+                  AND inventory.is_in_stock
+                  AND inventory.available_quantity >= {self.APP_NAME}_cart_items.quantity + EXCLUDED.quantity
+            )
             RETURNING id, cart_id, product_id, quantity, added_at, updated_at
         """
 

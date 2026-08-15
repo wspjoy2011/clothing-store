@@ -22,9 +22,9 @@ class FakeProduct:
     """Product returned by the catalog"""
 
     product_id: int
-    product_display_name: str = "Test Product"
-    slug: str = "test-product"
-    image_url: str = "http://example.com/image.jpg"
+    product_display_name: Optional[str] = "Test Product"
+    slug: Optional[str] = "test-product"
+    image_url: Optional[str] = "http://example.com/image.jpg"
     inventory: FakeInventory = None
 
     def __post_init__(self):
@@ -35,12 +35,15 @@ class FakeProduct:
 class FakeCatalogService:
     """Catalog reporting a configurable amount of available stock"""
 
-    def __init__(self, available_quantity: int = 100):
+    def __init__(self, available_quantity: int = 100, product: Optional[FakeProduct] = None):
         self.available_quantity = available_quantity
+        self.product = product
         self.availability_checks: List[tuple] = []
 
     async def get_product_by_id(self, product_id: int) -> Optional[FakeProduct]:
-        """Return a product for any identifier"""
+        """Return the configured product, or a complete one by default"""
+        if self.product is not None:
+            return self.product
         return FakeProduct(product_id=product_id)
 
     async def check_product_availability(self, product_id: int, quantity: int) -> bool:
@@ -82,13 +85,24 @@ class FakeCartItemRepository:
     UPDATE, so a test can reproduce stock being taken between check and write.
     """
 
-    def __init__(self, item: Optional[CartItemDTO] = None, available_quantity: int = 10 ** 6):
+    def __init__(
+            self,
+            item: Optional[CartItemDTO] = None,
+            available_quantity: int = 10 ** 6,
+            vanish_after_read: bool = False
+    ):
         self.item = item
         self.available_quantity = available_quantity
+        self.vanish_after_read = vanish_after_read
+        self.reads = 0
         self.updates: List[Any] = []
 
     async def get_cart_item_by_id(self, item_id: int) -> Optional[CartItemDTO]:
         """Return the stored item when the identifier matches"""
+        if self.vanish_after_read and self.reads:
+            return None
+
+        self.reads += 1
         if self.item is not None and self.item.id == item_id:
             return self.item
         return None

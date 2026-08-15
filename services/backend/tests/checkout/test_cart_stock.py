@@ -4,6 +4,7 @@ from apps.checkout.dto.requests import UpdateCartItemRequestDTO
 from apps.checkout.exceptions.services import CartNotFoundError, InsufficientStockError
 from apps.checkout.services.cart import CartService
 from tests.checkout.fakes import (
+    FakeProduct,
     FakeCartItemRepository,
     FakeCartRepository,
     FakeCartTokenRepository,
@@ -106,6 +107,38 @@ async def test_stock_taken_between_check_and_write_is_refused():
         )
 
     assert items.updates == [(1, 3, 1)]
+
+
+async def test_product_without_a_name_or_image_still_serves_the_cart():
+    """A catalogue product missing optional fields does not break the cart response"""
+    catalog = FakeCatalogService(
+        available_quantity=5,
+        product=FakeProduct(product_id=10, product_display_name=None, image_url=None, slug=None)
+    )
+    items = FakeCartItemRepository(build_cart_item(quantity=1))
+    service = build_service(catalog, items)
+
+    response = await service.update_cart_item(
+        UpdateCartItemRequestDTO(cart_item_id=1, quantity=2),
+        user_id=USER_ID
+    )
+
+    assert response.product_name == "Unknown Product"
+    assert response.product_image_url == ""
+    assert response.product_slug == "unknown"
+
+
+async def test_item_removed_during_the_update_is_reported_as_missing():
+    """Losing the item itself is reported as missing, not as missing stock"""
+    catalog = FakeCatalogService(available_quantity=5)
+    items = FakeCartItemRepository(build_cart_item(quantity=1), available_quantity=0, vanish_after_read=True)
+    service = build_service(catalog, items)
+
+    with pytest.raises(CartNotFoundError):
+        await service.update_cart_item(
+            UpdateCartItemRequestDTO(cart_item_id=1, quantity=2),
+            user_id=USER_ID
+        )
 
 
 async def test_missing_item_is_rejected():
