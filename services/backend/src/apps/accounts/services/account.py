@@ -41,6 +41,7 @@ from apps.accounts.services.exceptions import (
     ExpiredPasswordResetTokenError,
     PasswordResetTokenNotFoundError,
     PasswordResetEmailError,
+    PasswordResetRollbackError,
     IncorrectCurrentPasswordError,
     SamePasswordError,
     PasswordChangeError
@@ -115,7 +116,8 @@ class AccountService(AccountServiceInterface):
 
         Raises:
             EmailAlreadyExistsError: If email already exists
-            UserCreationError: If user creation fails at service level or default group not found
+            UserCreationError: If user creation fails, the default group is missing,
+                or the activation token could not be created
             UserPasswordError: Password processing errors
         """
         async with self._transaction_manager.atomic():
@@ -159,14 +161,16 @@ class AccountService(AccountServiceInterface):
                 activation_token = await self._create_activation_token(created_user.id)
                 logger.info(f"Activation token created for user: {user_data.email}, user_id: {created_user.id}")
             except TokenCreationError as e:
-                logger.error(f"Failed to create activation token for user {created_user.id}: {e}")
-                activation_token = None
+                logger.error(
+                    f"Registration rolled back for {user_data.email}: "
+                    f"activation token could not be created for user {created_user.id}: {e}"
+                )
+                raise UserCreationError("Registration could not be completed. Please try again.", e)
 
-        if activation_token is not None:
-            try:
-                await self._send_activation_email(user_data.email, activation_token)
-            except BaseEmailError as e:
-                logger.error(f"Failed to send activation email to {user_data.email}: {e}")
+        try:
+            await self._send_activation_email(user_data.email, activation_token)
+        except BaseEmailError as e:
+            logger.error(f"Failed to send activation email to {user_data.email}: {e}")
 
         return created_user
 
@@ -496,6 +500,8 @@ class AccountService(AccountServiceInterface):
             ExpiredPasswordResetTokenError: If token has expired
             PasswordResetTokenNotFoundError: If token not found
             UserPasswordError: If password processing fails
+            PasswordResetError: If the new password could not be stored, or the used
+                token could not be invalidated and the change was rolled back
         """
         logger.info(f"Starting password reset confirmation for token: {confirm_data.token[:10]}...")
 
@@ -538,8 +544,15 @@ class AccountService(AccountServiceInterface):
                 logger.error(f"Failed to update password for user {user.id}: {e}")
                 raise PasswordResetError(f"Failed to update password: {e}", e)
 
-            await self._token_repository.delete_password_reset_token(confirm_data.token)
-            logger.info(f"Password reset token deleted for user {user.id}")
+            try:
+                await self._token_repository.delete_password_reset_token(confirm_data.token)
+                logger.info(f"Password reset token deleted for user {user.id}")
+            except TokenRepositoryError as e:
+                logger.error(f"Failed to invalidate password reset token for user {user.id}: {e}")
+                raise PasswordResetRollbackError(
+                    "Password reset was rolled back: the used token could not be invalidated",
+                    e
+                )
 
         try:
             await self._send_password_reset_complete_email(user.email)
