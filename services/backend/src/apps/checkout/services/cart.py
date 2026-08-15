@@ -248,9 +248,10 @@ class CartService(CartServiceInterface):
         updated_item = await self._cart_item_repository.update_cart_item(request_data, cart_response.id)
         if not updated_item:
             logger.warning(
-                f"Cart item {request_data.cart_item_id} not found or does not belong to cart {cart_response.id}"
+                f"Cart item {request_data.cart_item_id} passed the stock check but the update did not apply: "
+                f"the remaining units for product {existing_item.product_id} were taken concurrently"
             )
-            raise CartNotFoundError("Cart item not found in your cart")
+            raise InsufficientStockError(f"Insufficient stock for product {existing_item.product_id}")
 
         product = await self._catalog_service.get_product_by_id(updated_item.product_id)
         if not product:

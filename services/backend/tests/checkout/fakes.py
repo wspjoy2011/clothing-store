@@ -76,10 +76,15 @@ class FakeCartRepository:
 
 
 class FakeCartItemRepository:
-    """Cart item repository backed by one stored item"""
+    """Cart item repository backed by one stored item
 
-    def __init__(self, item: Optional[CartItemDTO] = None):
+    The update mirrors the real statement, which re-checks stock inside the
+    UPDATE, so a test can reproduce stock being taken between check and write.
+    """
+
+    def __init__(self, item: Optional[CartItemDTO] = None, available_quantity: int = 10 ** 6):
         self.item = item
+        self.available_quantity = available_quantity
         self.updates: List[Any] = []
 
     async def get_cart_item_by_id(self, item_id: int) -> Optional[CartItemDTO]:
@@ -103,10 +108,13 @@ class FakeCartItemRepository:
         return sum(item.quantity for item in await self.get_cart_items_by_cart_id(cart_id))
 
     async def update_cart_item(self, request_data: Any, cart_id: int) -> Optional[CartItemDTO]:
-        """Record the update and return the item with the new quantity"""
+        """Record the update and return the item, mirroring the stock guard in SQL"""
         self.updates.append((request_data.cart_item_id, request_data.quantity, cart_id))
 
         if self.item is None or self.item.cart_id != cart_id:
+            return None
+
+        if request_data.quantity > self.available_quantity:
             return None
 
         self.item = CartItemDTO(

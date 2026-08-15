@@ -141,25 +141,36 @@ class CartItemRepository(CartItemRepositoryInterface):
 
     async def update_cart_item(self, request_data: UpdateCartItemRequestDTO, cart_id: int) -> Optional[CartItemDTO]:
         """
-        Update cart item quantity with cart ownership validation
+        Update cart item quantity with cart ownership and stock validation
+
+        Stock is re-checked inside the statement itself: a separate check would
+        leave a window in which a concurrent request could take the last units
+        between the check and the update.
 
         Args:
             request_data: Data for updating cart item
             cart_id: ID of the cart to which the item must belong
 
         Returns:
-            Updated CartItemDTO if successful, None otherwise
+            Updated CartItemDTO, or None when the item is absent, owned by another
+            cart, or no longer covered by the available stock
         """
         query = f"""
-            UPDATE {self.APP_NAME}_cart_items
+            UPDATE {self.APP_NAME}_cart_items AS item
             SET quantity = %s, updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s AND cart_id = %s
-            RETURNING id, cart_id, product_id, quantity, added_at, updated_at
+            FROM catalog_product_inventory AS inventory
+            WHERE item.id = %s
+              AND item.cart_id = %s
+              AND inventory.product_id = item.product_id
+              AND inventory.is_active
+              AND inventory.is_in_stock
+              AND inventory.available_quantity >= %s
+            RETURNING item.id, item.cart_id, item.product_id, item.quantity, item.added_at, item.updated_at
         """
 
         result = await self._dao.execute(
             query=query,
-            params=[request_data.quantity, request_data.cart_item_id, cart_id],
+            params=[request_data.quantity, request_data.cart_item_id, cart_id, request_data.quantity],
             fetch=True,
             fetch_one=True,
             model_class=CartItemDTO
@@ -171,7 +182,8 @@ class CartItemRepository(CartItemRepositoryInterface):
             )
         else:
             logger.warning(
-                f"Cart item {request_data.cart_item_id} not found in cart {cart_id} or ownership mismatch"
+                f"Cart item {request_data.cart_item_id} not updated in cart {cart_id}: "
+                f"missing, owned by another cart, or stock no longer covers {request_data.quantity}"
             )
 
         return result

@@ -93,6 +93,21 @@ async def test_item_of_another_cart_is_not_updated():
     assert items.updates == []
 
 
+async def test_stock_taken_between_check_and_write_is_refused():
+    """Losing the race against another request is reported as missing stock, not as success"""
+    catalog = FakeCatalogService(available_quantity=5)
+    items = FakeCartItemRepository(build_cart_item(quantity=1), available_quantity=0)
+    service = build_service(catalog, items)
+
+    with pytest.raises(InsufficientStockError):
+        await service.update_cart_item(
+            UpdateCartItemRequestDTO(cart_item_id=1, quantity=3),
+            user_id=USER_ID
+        )
+
+    assert items.updates == [(1, 3, 1)]
+
+
 async def test_missing_item_is_rejected():
     """An unknown item is rejected before any stock check"""
     catalog = FakeCatalogService(available_quantity=100)
