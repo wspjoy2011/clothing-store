@@ -23,8 +23,11 @@ from ledger import Ledger, latest_run_id, new_run_id, run_directory
 PROJECT_MARKER = "docker-compose.yml"
 TEST_EMAIL_PREFIX = "e2e-"
 DEFAULT_API = "http://localhost:8000/api/v1"
+ANCHOR_PROCESS = "wsl.exe"
 STACK_SERVICES = ("db", "mailhog", "web")
 REQUEST_TIMEOUT = 120
+STOCK_PROBE_PRODUCT_ID = 999_000_001
+STOCK_PROBE_UNITS = 3
 
 
 def find_project_root() -> str:
@@ -100,21 +103,40 @@ def open_wsl_anchor(docker: List[str], ledger: Ledger) -> None:
         stderr=subprocess.DEVNULL,
         creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     )
-    ledger.record("started", "wsl_anchor", str(process.pid), distribution=docker[2])
+    ledger.record("started", "wsl_anchor", str(process.pid), distribution=docker[2], image=ANCHOR_PROCESS)
     print(f"holding a WSL session open (pid {process.pid}) so the containers survive")
 
 
-def close_wsl_anchor(pid: str) -> None:
+def close_wsl_anchor(pid: str) -> str:
     """
     Release the WSL session held for the stack
 
+    The identity of the process is confirmed before killing it: a recorded pid
+    may already be gone and reassigned by the operating system, and killing it
+    blindly would take down an unrelated process tree.
+
     Args:
         pid: Process identifier recorded when the session was opened
+
+    Returns:
+        What happened, for the caller to report
     """
-    if os.name == "nt":
-        subprocess.run(["taskkill", "/PID", pid, "/F", "/T"], capture_output=True)
-    else:
-        subprocess.run(["kill", pid], capture_output=True)
+    if os.name != "nt":
+        result = subprocess.run(["kill", pid], capture_output=True, text=True)
+        return "released" if result.returncode == 0 else f"not released ({result.stderr.strip() or 'no such process'})"
+
+    listing = subprocess.run(
+        ["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
+        capture_output=True, text=True
+    )
+    if ANCHOR_PROCESS.lower() not in listing.stdout.lower():
+        return f"already gone (pid {pid} is not {ANCHOR_PROCESS})"
+
+    killed = subprocess.run(["taskkill", "/PID", pid, "/F", "/T"], capture_output=True, text=True)
+    if killed.returncode != 0:
+        return f"not released ({killed.stdout.strip() or killed.stderr.strip()})"
+
+    return "released"
 
 
 def to_docker_path(docker: List[str], path: str) -> str:
@@ -472,9 +494,100 @@ def command_scenarios(arguments, ledger: Ledger) -> int:
         status, body = request("POST", f"{base}/checkout/cart/token/get", {"token": cart_token})
         results.append(("cart readable by token", status == 200, f"status {status}"))
 
+        if seed_test_product(arguments, ledger, STOCK_PROBE_PRODUCT_ID, STOCK_PROBE_UNITS):
+            results.extend(check_stock_limit(base, cart_token, STOCK_PROBE_PRODUCT_ID))
+
     print_results(results)
     write_report(ledger, results)
     return 0 if all(passed for _, passed, _ in results) else 1
+
+
+def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) -> bool:
+    """
+    Insert one product with a known stock level
+
+    Scenarios must not depend on the dataset being loaded, and must not reuse a
+    real product whose stock they would then disturb.
+
+    Args:
+        arguments: Parsed command line arguments
+        ledger: Journal recording the rows
+        product_id: Identifier to insert
+        stock: Units to make available
+
+    Returns:
+        True when the product is in place
+    """
+    project_root = find_project_root()
+    docker = detect_docker(arguments.distro)
+    env_file = os.path.join(project_root, "services", "backend", ".env")
+
+    ledger.record("created", "db_row", str(product_id), table="catalog_products", note="stock scenario")
+    ledger.record("created", "db_row", str(product_id), table="catalog_product_inventory", note="stock scenario")
+
+    statement = (
+        f"INSERT INTO catalog_products "
+        f"(product_id, gender, year, product_display_name, image_url, slug) "
+        f"VALUES ({product_id}, 'Unisex', 2026, 'E2E Stock Probe', "
+        f"'http://example.com/e2e.jpg', 'e2e-stock-probe-{product_id}') "
+        f"ON CONFLICT (product_id) DO NOTHING; "
+        f"INSERT INTO catalog_product_inventory (product_id, base_price, stock_quantity, is_active) "
+        f"VALUES ({product_id}, 10.00, {stock}, TRUE) "
+        f"ON CONFLICT (product_id) DO UPDATE SET stock_quantity = {stock};"
+    )
+
+    user = read_env_value(env_file, "POSTGRES_USER") or "admin"
+    database = read_env_value(env_file, "POSTGRES_DB") or "clothing_store"
+    code, output = compose(
+        docker, project_root, env_file,
+        ["exec", "-T", "db", "psql", "-U", user, "-d", database, "-c", statement],
+        timeout=120
+    )
+
+    if code != 0:
+        print(f"could not seed the stock probe product: {output.strip()[:200]}")
+
+    return code == 0
+
+
+def check_stock_limit(base: str, cart_token: str, product_id: int) -> List[Tuple[str, bool, str]]:
+    """
+    Check that the database refuses a cart quantity beyond the available stock
+
+    The guard lives in the UPDATE statement itself, so only a real database can
+    prove it: unit tests run against a repository double and would pass either way.
+
+    Args:
+        base: API base URL
+        cart_token: Token of an existing anonymous cart
+
+    Returns:
+        Scenario results
+    """
+    results: List[Tuple[str, bool, str]] = []
+
+    status, added = request(
+        "POST",
+        f"{base}/checkout/cart/token/{cart_token}/items",
+        {"product_id": product_id, "quantity": 1}
+    )
+    if status != 201:
+        results.append(("stock limit enforced by the database", False, f"could not add item, status {status}"))
+        return results
+
+    item_id = added.get("id")
+    status, body = request(
+        "PUT",
+        f"{base}/checkout/cart/token/{cart_token}/items/{item_id}",
+        {"cart_item_id": item_id, "quantity": STOCK_PROBE_UNITS + 5}
+    )
+    results.append((
+        "stock limit enforced by the database",
+        status == 400,
+        f"status {status} {str(body)[:80]}"
+    ))
+
+    return results
 
 
 def run_parallel_registrations(base: str, emails: List[str]) -> List[int]:
@@ -546,6 +659,11 @@ def command_cleanup(arguments, ledger: Ledger) -> int:
     docker = detect_docker(arguments.distro)
     env_file = os.path.join(project_root, "services", "backend", ".env")
 
+    marker = os.path.join(ledger.directory, "cleaned")
+    if os.path.isfile(marker):
+        print(f"{ledger.run_id} was already cleaned up; nothing to undo twice")
+        return 0
+
     entries = ledger.cleanup_entries()
     if not entries:
         print(f"nothing recorded for {ledger.run_id}")
@@ -561,15 +679,14 @@ def command_cleanup(arguments, ledger: Ledger) -> int:
 
     for entry in entries:
         if entry["resource"] == "wsl_anchor":
-            close_wsl_anchor(entry["identifier"])
-            print(f"released the WSL session (pid {entry['identifier']})")
+            outcome = close_wsl_anchor(entry["identifier"])
+            print(f"WSL session pid {entry['identifier']}: {outcome}")
 
         if entry["resource"] == "file" and entry["action"] == "created":
             if os.path.isfile(entry["identifier"]):
                 os.remove(entry["identifier"])
                 print(f"removed generated file {entry['identifier']}")
 
-    marker = os.path.join(ledger.directory, "cleaned")
     with open(marker, "w", encoding="utf-8") as handle:
         handle.write("cleanup completed\n")
 
@@ -592,7 +709,7 @@ def delete_test_rows(docker: List[str], project_root: str, env_file: str, entrie
 
     statements = []
     if emails:
-        statements.append(f"DELETE FROM accounts_users WHERE email LIKE '{TEST_EMAIL_PREFIX}%';")
+        statements.append(f"DELETE FROM accounts_users WHERE email IN ({format_in_list(emails)});")
     if tokens:
         statements.append(f"DELETE FROM checkout_cart_tokens WHERE token IN ({format_in_list(tokens)});")
 
