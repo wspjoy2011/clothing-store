@@ -522,6 +522,9 @@ def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) ->
     docker = detect_docker(arguments.distro)
     env_file = os.path.join(project_root, "services", "backend", ".env")
 
+    if not isinstance(product_id, int) or not isinstance(stock, int):
+        raise TypeError("product_id and stock must be integers: they are interpolated into SQL")
+
     ledger.record("created", "db_row", str(product_id), table="catalog_products", note="stock scenario")
     ledger.record("created", "db_row", str(product_id), table="catalog_product_inventory", note="stock scenario")
 
