@@ -19,7 +19,11 @@ Working guidelines for the clothing-store codebase.
 
 ## Commits
 
-Conventional Commits, **one line**, no body: `type(scope): what was done`. Scope is the affected module (`cart`, `catalog`, `checkout`, `auth`, `backend`, `migrations`). Keep the summary short and concrete — `feat(cart): validate stock limit on quantity update`, not `feat(cart): improvements`.
+Conventional Commits, **one line**, no body: `type(scope): what was done`.
+
+The scope is mandatory — never commit a bare `docs:`, `fix:` or `chore:`. It names the affected module: `cart`, `catalog`, `checkout`, `auth`, `db`, `accounts`, `backend`, `frontend`, `migrations`, `tests`.
+
+Keep the summary short and concrete: `feat(cart): validate stock limit on quantity update`, not `feat(cart): improvements`.
 
 ## Tests
 
