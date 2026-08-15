@@ -29,6 +29,8 @@ Keep the summary short and concrete: `feat(cart): validate stock limit on quanti
 
 Every change ships with tests. A bug fix adds a test that fails without the fix; new logic is covered by tests for its behaviour, not its implementation.
 
+Prove every new test by mutation before considering it done: break the code it covers, watch it go red for the right reason, restore the code, watch it go green. A test that stays green against broken code certifies nothing.
+
 Backend tests live in `services/backend/tests`, mirror the package they cover and run with `pytest`. External boundaries — database, SMTP, HTTP — are replaced by fakes, so no test needs a running Postgres or `.env`. One behaviour per test, named as the statement it proves.
 
 ## Dependencies
