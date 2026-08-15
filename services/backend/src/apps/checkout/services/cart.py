@@ -200,7 +200,10 @@ class CartService(CartServiceInterface):
             token: Optional[str] = None
     ) -> CartItemResponseDTO:
         """
-        Update cart item quantity with cart ownership validation
+        Update cart item quantity with cart ownership and stock validation
+
+        Business logic: Resolve the owner's cart, confirm the item belongs to it,
+        check the requested quantity against available stock, then apply the update
 
         Args:
             request_data: cart_item_id and new quantity
@@ -211,6 +214,7 @@ class CartService(CartServiceInterface):
             Updated cart item response with product details
 
         Raises:
+            InsufficientStockError: If the requested quantity exceeds available stock
             CartNotFoundError: if cart not found or item not in user's/token's cart
             ProductNotFoundError: if related product not found (should not happen for existing items)
         """
@@ -223,6 +227,23 @@ class CartService(CartServiceInterface):
             cart_response = await self.get_or_create_cart_for_user(user_id)
         else:
             cart_response = await self.get_or_create_cart_for_token(token)
+
+        existing_item = await self._cart_item_repository.get_cart_item_by_id(request_data.cart_item_id)
+        if not existing_item or existing_item.cart_id != cart_response.id:
+            logger.warning(
+                f"Cart item {request_data.cart_item_id} not found or does not belong to cart {cart_response.id}"
+            )
+            raise CartNotFoundError("Cart item not found in your cart")
+
+        is_available = await self._catalog_service.check_product_availability(
+            existing_item.product_id,
+            request_data.quantity
+        )
+        if not is_available:
+            logger.warning(
+                f"Insufficient stock for product {existing_item.product_id}, requested: {request_data.quantity}"
+            )
+            raise InsufficientStockError(f"Insufficient stock for product {existing_item.product_id}")
 
         updated_item = await self._cart_item_repository.update_cart_item(request_data, cart_response.id)
         if not updated_item:
