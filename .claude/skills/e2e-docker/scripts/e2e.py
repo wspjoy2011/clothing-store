@@ -496,6 +496,7 @@ def command_scenarios(arguments, ledger: Ledger) -> int:
 
         if seed_test_product(arguments, ledger, STOCK_PROBE_PRODUCT_ID, STOCK_PROBE_UNITS):
             results.extend(check_stock_limit(base, cart_token, STOCK_PROBE_PRODUCT_ID))
+            results.extend(check_concurrent_stock_limit(base, STOCK_PROBE_PRODUCT_ID, STOCK_PROBE_UNITS))
 
     print_results(results)
     write_report(ledger, results)
@@ -591,6 +592,51 @@ def check_stock_limit(base: str, cart_token: str, product_id: int) -> List[Tuple
     ))
 
     return results
+
+
+def check_concurrent_stock_limit(base: str, product_id: int, stock: int) -> List[Tuple[str, bool, str]]:
+    """
+    Check that concurrent additions to one cart cannot exceed the stock
+
+    Only a real database proves this: the guard is a row lock held for the length of
+    a transaction, and a repository double cannot reproduce it.
+
+    Args:
+        base: API base URL
+        product_id: Product to compete for
+        stock: Units the warehouse holds
+
+    Returns:
+        Scenario results
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    status, body = request("POST", f"{base}/checkout/cart/token")
+    token = body.get("token")
+    if status != 201 or not token:
+        return [("concurrent additions respect the stock", False, f"no cart token, status {status}")]
+
+    def add_one(_: int) -> int:
+        code, _body = request(
+            "POST",
+            f"{base}/checkout/cart/token/{token}/items",
+            {"product_id": product_id, "quantity": 1}
+        )
+        return code
+
+    attempts = stock + 2
+    with ThreadPoolExecutor(max_workers=attempts) as pool:
+        codes = list(pool.map(add_one, range(attempts)))
+
+    status, cart = request("POST", f"{base}/checkout/cart/token/get", {"token": token})
+    stored = sum(item.get("quantity", 0) for item in cart.get("items", []))
+
+    return [(
+        "concurrent additions respect the stock",
+        stored <= stock and codes.count(500) == 0,
+        f"{attempts} at once -> {codes.count(201)} accepted, {codes.count(400)} refused, "
+        f"{codes.count(500)} failed, cart holds {stored} of {stock}"
+    )]
 
 
 def run_parallel_registrations(base: str, emails: List[str]) -> List[int]:
