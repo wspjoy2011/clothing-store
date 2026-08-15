@@ -21,19 +21,21 @@ RUN apt update && apt install -y \
     dos2unix \
     && apt clean
 
-# Install Poetry globally
+# Install uv globally
 RUN python -m pip install --upgrade pip && \
-    pip install poetry
+    pip install uv
+
+# Install dependencies into the system interpreter instead of a virtualenv
+ENV UV_PROJECT_ENVIRONMENT=/usr/local
 
 # Copy dependency descriptors
-COPY poetry.lock pyproject.toml /usr/src/poetry/
+COPY uv.lock pyproject.toml /usr/src/uv/
 
 # Set working directory for dependency install
-WORKDIR /usr/src/poetry
+WORKDIR /usr/src/uv
 
 # Install only main dependencies (no dev) and skip installing project as a package
-RUN poetry config virtualenvs.create false && \
-    poetry install --no-root --only main
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Set working directory for the app itself
 WORKDIR ${APP_ROOT}/backend

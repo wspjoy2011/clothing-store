@@ -119,6 +119,11 @@ class PasswordResetEmailError(PasswordResetError):
     pass
 
 
+class PasswordResetRollbackError(PasswordResetError):
+    """Raised when a password reset was rolled back and can be retried"""
+    pass
+
+
 class PasswordChangeError(AccountServiceError):
     """Base exception for password change operations"""
     pass

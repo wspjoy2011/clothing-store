@@ -56,6 +56,7 @@ from apps.accounts.services.exceptions import (
     ExpiredPasswordResetTokenError,
     PasswordResetTokenNotFoundError,
     PasswordResetError,
+    PasswordResetRollbackError,
     IncorrectCurrentPasswordError,
     SamePasswordError,
     PasswordChangeError
@@ -422,6 +423,12 @@ async def confirm_password_reset_controller(
         raise HTTPException(
             status_code=404,
             detail=str(e)
+        )
+    except PasswordResetRollbackError as e:
+        logger.error(f"Password reset rolled back for token {confirm_data.token}: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Password reset could not be completed. Please request it again."
         )
     except PasswordResetError as e:
         raise HTTPException(
