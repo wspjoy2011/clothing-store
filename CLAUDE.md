@@ -33,6 +33,8 @@ Prove every new test by mutation before considering it done: break the code it c
 
 Backend tests live in `services/backend/tests`, mirror the package they cover and run with `pytest`. External boundaries — database, SMTP, HTTP — are replaced by fakes, so no test needs a running Postgres or `.env`. One behaviour per test, named as the statement it proves.
 
+Coverage is measured with `pytest --cov`. The target is **90%**, and no change may lower the current figure — code that ships without tests takes the number down and is rejected on that ground alone. Chase uncovered branches, not uncovered lines: a file at 100% whose error paths were never executed is not covered.
+
 ## Dependencies
 
 Backend dependencies are managed by **uv**: `pyproject.toml` + `uv.lock`, both committed. Add packages with `uv add`, install with `uv sync`.
