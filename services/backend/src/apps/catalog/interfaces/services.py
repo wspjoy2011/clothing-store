@@ -181,3 +181,28 @@ class CatalogServiceInterface(ABC):
             True if product is available and has sufficient stock, False otherwise
         """
         pass
+
+    @abstractmethod
+    async def hold_available_quantity(self, product_id: int) -> Optional[int]:
+        """
+        Report sellable stock while holding the inventory row against concurrent changes
+
+        Business logic: Lock the inventory row for the rest of the caller's transaction
+        and return how many units may be sold, so the caller can read its own state and
+        decide, knowing nobody else can change the stock meanwhile
+
+        Take the hold before reading anything the decision depends on: a read made
+        earlier is already stale by the time the lock is granted. Callers must run
+        inside a transaction, otherwise the lock is released immediately.
+
+        The row is only locked, never modified: stock is reserved when an order is
+        placed, not while goods sit in a cart.
+
+        Args:
+            product_id: ID of the product to hold
+
+        Returns:
+            Units available for sale, or None when the product is inactive, out of
+            stock, or has no inventory at all
+        """
+        pass

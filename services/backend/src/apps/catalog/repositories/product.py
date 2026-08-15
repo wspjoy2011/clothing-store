@@ -40,6 +40,36 @@ class ProductRepository(ProductRepositoryInterface):
         self._dao = dao
         self._query_builder = query_builder
 
+    async def lock_inventory(self, product_id: int) -> Optional[tuple]:
+        """
+        Read the inventory row of a product and hold it for the current transaction
+
+        Only the single row is locked, found through the unique index on product_id,
+        so concurrent work on other products is unaffected. Outside a transaction the
+        lock is released as soon as the statement returns.
+
+        Args:
+            product_id: The ID of the product whose inventory is needed
+
+        Returns:
+            Tuple of is_active, is_in_stock and available_quantity, or None when the
+            product has no inventory row
+        """
+        query = f"""
+            SELECT is_active, is_in_stock, available_quantity
+            FROM {self.APP_NAME}_product_inventory
+            WHERE product_id = %s
+            FOR UPDATE
+        """
+
+        result = await self._dao.execute(query, [product_id], fetch_one=True)
+
+        if not result:
+            logger.info(f"No inventory row to lock for product {product_id}")
+            return None
+
+        return tuple(result)
+
     async def get_product_by_id(self, product_id: int) -> Optional[ProductDTO]:
         """
         Get a single product by its ID
