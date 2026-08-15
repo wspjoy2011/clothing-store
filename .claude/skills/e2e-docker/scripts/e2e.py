@@ -631,11 +631,22 @@ def check_concurrent_stock_limit(base: str, product_id: int, stock: int) -> List
     status, cart = request("POST", f"{base}/checkout/cart/token/get", {"token": token})
     stored = sum(item.get("quantity", 0) for item in cart.get("items", []))
 
+    accepted = codes.count(201)
+    refused = codes.count(400)
+    broken = [code for code in codes if code not in (201, 400)]
+
+    passed = (
+        stored == stock
+        and accepted == stock
+        and refused == attempts - stock
+        and not broken
+    )
+
     return [(
         "concurrent additions respect the stock",
-        stored <= stock and codes.count(500) == 0,
-        f"{attempts} at once -> {codes.count(201)} accepted, {codes.count(400)} refused, "
-        f"{codes.count(500)} failed, cart holds {stored} of {stock}"
+        passed,
+        f"{attempts} at once -> {accepted} accepted, {refused} refused, "
+        f"{len(broken)} neither ({sorted(set(broken))}), cart holds {stored} of {stock}"
     )]
 
 
