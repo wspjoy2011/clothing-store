@@ -25,7 +25,7 @@ from security.exceptions import (
 
 
 class PasswordManager(PasswordManagerInterface):
-    """Password manager using bcrypt for hashing and verification"""
+    """Password manager using argon2 for hashing and verification"""
 
     def __init__(self):
         """Initialize password manager with argon2 context"""

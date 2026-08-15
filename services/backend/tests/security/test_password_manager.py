@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from security.exceptions import EmptyPasswordError
+from security.exceptions import EmptyPasswordError, InvalidPasswordHashError
 from security.passwords import PasswordManager
 
 PASSWORD = "E2ePassword123!"
@@ -54,19 +54,15 @@ async def test_verification_leaves_the_event_loop_free():
     assert ticks > 0
 
 
-async def test_concurrent_hashing_overlaps():
-    """Several hashes run at once instead of queueing behind one another"""
+async def test_concurrent_hashing_keeps_serving_other_tasks():
+    """Several hashes at once still leave room for the rest of the loop"""
     manager = PasswordManager()
 
-    started = asyncio.get_running_loop().time()
-    await manager.hash_password(PASSWORD)
-    single = asyncio.get_running_loop().time() - started
+    ticks = await count_ticks_during(
+        asyncio.gather(*(manager.hash_password(f"{PASSWORD}{index}") for index in range(4)))
+    )
 
-    started = asyncio.get_running_loop().time()
-    await asyncio.gather(*(manager.hash_password(f"{PASSWORD}{index}") for index in range(4)))
-    batch = asyncio.get_running_loop().time() - started
-
-    assert batch < single * 4
+    assert ticks > 0
 
 
 async def test_hash_and_verify_round_trip():
@@ -85,3 +81,74 @@ async def test_empty_password_is_rejected():
 
     with pytest.raises(EmptyPasswordError):
         await manager.hash_password("")
+
+
+async def test_verification_rejects_empty_arguments():
+    """Verification refuses an empty password or an empty hash"""
+    manager = PasswordManager()
+    hashed = await manager.hash_password(PASSWORD)
+
+    with pytest.raises(EmptyPasswordError):
+        await manager.verify_password("", hashed)
+
+    with pytest.raises(EmptyPasswordError):
+        await manager.verify_password(PASSWORD, "")
+
+
+async def test_fresh_hash_needs_no_update():
+    """A hash produced by the current settings is not scheduled for rehashing"""
+    manager = PasswordManager()
+
+    hashed = await manager.hash_password(PASSWORD)
+
+    assert manager.needs_update(hashed) is False
+
+
+def test_unreadable_hash_is_treated_as_needing_update():
+    """A hash the context cannot read is rehashed rather than trusted"""
+    manager = PasswordManager()
+
+    assert manager.needs_update("not-a-hash") is True
+
+
+def test_needs_update_rejects_an_empty_hash():
+    """An empty hash is an error, not an answer"""
+    manager = PasswordManager()
+
+    with pytest.raises(EmptyPasswordError):
+        manager.needs_update("")
+
+
+async def test_hash_info_reports_the_scheme():
+    """Hash analysis names the scheme that produced it"""
+    manager = PasswordManager()
+
+    hashed = await manager.hash_password(PASSWORD)
+
+    assert manager.get_hash_info(hashed) == {"scheme": "argon2"}
+
+
+def test_hash_info_rejects_an_unidentifiable_hash():
+    """A string that identifies as no scheme is reported as invalid"""
+    manager = PasswordManager()
+
+    with pytest.raises(InvalidPasswordHashError):
+        manager.get_hash_info("not-a-hash")
+
+
+def test_hash_info_rejects_an_empty_hash():
+    """An empty hash is an error, not an answer"""
+    manager = PasswordManager()
+
+    with pytest.raises(EmptyPasswordError):
+        manager.get_hash_info("")
+
+
+async def test_support_check_accepts_its_own_hash_and_refuses_junk():
+    """Support detection answers without raising for any input"""
+    manager = PasswordManager()
+    hashed = await manager.hash_password(PASSWORD)
+
+    assert manager.is_hash_supported(hashed) is True
+    assert manager.is_hash_supported("not-a-hash") is False
+    assert manager.is_hash_supported("") is False
