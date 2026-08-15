@@ -77,6 +77,46 @@ def detect_docker(distro: Optional[str]) -> List[str]:
     raise RuntimeError("No docker client available on PATH or inside WSL")
 
 
+def open_wsl_anchor(docker: List[str], ledger: Ledger) -> None:
+    """
+    Hold a WSL session open for as long as the stack runs
+
+    WSL stops the containers of a distribution once its last session closes, so a
+    stack started by one short command dies seconds later, with the containers
+    reporting exit code 255 and nothing in their logs. Keeping one idle session
+    alive prevents that (microsoft/WSL issue 9667).
+
+    Args:
+        docker: Docker command prefix
+        ledger: Journal recording the session
+    """
+    if docker[0] != "wsl":
+        return
+
+    process = subprocess.Popen(
+        ["wsl", "-d", docker[2], "-u", "root", "-e", "sleep", "infinity"],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    )
+    ledger.record("started", "wsl_anchor", str(process.pid), distribution=docker[2])
+    print(f"holding a WSL session open (pid {process.pid}) so the containers survive")
+
+
+def close_wsl_anchor(pid: str) -> None:
+    """
+    Release the WSL session held for the stack
+
+    Args:
+        pid: Process identifier recorded when the session was opened
+    """
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/PID", pid, "/F", "/T"], capture_output=True)
+    else:
+        subprocess.run(["kill", pid], capture_output=True)
+
+
 def to_docker_path(docker: List[str], path: str) -> str:
     """
     Translate a host path into the path the docker client expects
@@ -352,6 +392,7 @@ def command_up(arguments, ledger: Ledger) -> int:
     project_root = find_project_root()
     docker = detect_docker(arguments.distro)
     ledger.note(f"docker client: {' '.join(docker)}")
+    open_wsl_anchor(docker, ledger)
 
     env_file = ensure_env_file(project_root, ledger)
     ensure_mailhog_env(project_root, ledger)
@@ -519,6 +560,10 @@ def command_cleanup(arguments, ledger: Ledger) -> int:
         compose(docker, project_root, env_file, ["down", "-v", "--remove-orphans"])
 
     for entry in entries:
+        if entry["resource"] == "wsl_anchor":
+            close_wsl_anchor(entry["identifier"])
+            print(f"released the WSL session (pid {entry['identifier']})")
+
         if entry["resource"] == "file" and entry["action"] == "created":
             if os.path.isfile(entry["identifier"]):
                 os.remove(entry["identifier"])
