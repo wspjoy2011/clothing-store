@@ -70,10 +70,24 @@ class FakeConnection:
         self.rows = rows if rows is not None else []
         self.description = [("column",)] if description is UNSET else description
         self.fail_on_commit = fail_on_commit
-        self.isolation_level = None
+        self._isolation_level = None
         self.events: List[str] = []
         self.executed: List[Tuple[str, Optional[List[Any]]]] = []
         self.returned_to_pool = False
+
+    @property
+    def isolation_level(self) -> Optional[Any]:
+        """Report the isolation level, read-only as on a real async connection"""
+        return self._isolation_level
+
+    async def set_isolation_level(self, value: Optional[Any]) -> None:
+        """
+        Change the isolation level the way an async connection requires
+
+        Args:
+            value: Level to apply, or None to restore the server default
+        """
+        self._isolation_level = value
 
     def transaction(self) -> FakeTransaction:
         """Start a fake transaction bound to this connection"""

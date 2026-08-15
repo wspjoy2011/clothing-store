@@ -65,7 +65,7 @@ class TransactionManager(TransactionManagerInterface):
 
             try:
                 if isolation_level is not None:
-                    connection.isolation_level = isolation_level
+                    await connection.set_isolation_level(isolation_level)
 
                 async with connection.transaction():
                     token = _current_transaction.set(TransactionState(connection=connection))
@@ -77,4 +77,4 @@ class TransactionManager(TransactionManagerInterface):
                         logger.debug("Transaction finished")
             finally:
                 if isolation_level is not None:
-                    connection.isolation_level = previous_isolation_level
+                    await connection.set_isolation_level(previous_isolation_level)
