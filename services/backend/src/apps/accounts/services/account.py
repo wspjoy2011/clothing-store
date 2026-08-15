@@ -135,7 +135,7 @@ class AccountService(AccountServiceInterface):
             logger.debug(f"Default group found: ID={default_group.id}, name='{default_group.name}'")
 
             try:
-                hashed_password = self._password_manager.hash_password(user_data.password)
+                hashed_password = await self._password_manager.hash_password(user_data.password)
                 logger.debug(f"Password hashed successfully for user: {user_data.email}")
             except (EmptyPasswordError, PasswordTooLongError, HashingError) as e:
                 logger.error(f"Password hashing failed for user {user_data.email}: {e}")
@@ -329,7 +329,7 @@ class AccountService(AccountServiceInterface):
             raise InvalidCredentialsError("Invalid email or password")
 
         try:
-            password_valid = self._password_manager.verify_password(login_data.password, hashed_password)
+            password_valid = await self._password_manager.verify_password(login_data.password, hashed_password)
             if not password_valid:
                 logger.warning(f"Login failed: Invalid password for email {login_data.email}")
                 raise InvalidCredentialsError("Invalid email or password")
@@ -526,7 +526,7 @@ class AccountService(AccountServiceInterface):
             raise InvalidPasswordResetTokenError("Invalid password reset token")
 
         try:
-            hashed_password = self._password_manager.hash_password(confirm_data.new_password)
+            hashed_password = await self._password_manager.hash_password(confirm_data.new_password)
             logger.debug(f"New password hashed successfully for user: {user.email}")
         except (EmptyPasswordError, PasswordTooLongError, HashingError) as e:
             logger.error(f"Password hashing failed for user {user.email}: {e}")
@@ -594,7 +594,7 @@ class AccountService(AccountServiceInterface):
             raise PasswordChangeError("Failed to retrieve current password")
 
         try:
-            password_valid = self._password_manager.verify_password(change_data.old_password, current_password_hash)
+            password_valid = await self._password_manager.verify_password(change_data.old_password, current_password_hash)
             if not password_valid:
                 logger.warning(f"Password change failed: Incorrect current password for user {email}")
                 raise IncorrectCurrentPasswordError("Current password is incorrect")
@@ -603,7 +603,7 @@ class AccountService(AccountServiceInterface):
             raise IncorrectCurrentPasswordError("Current password is incorrect")
 
         try:
-            same_password = self._password_manager.verify_password(change_data.new_password, current_password_hash)
+            same_password = await self._password_manager.verify_password(change_data.new_password, current_password_hash)
             if same_password:
                 logger.warning(f"Password change failed: New password is the same as current for user {email}")
                 raise SamePasswordError("New password must be different from current password")
@@ -611,7 +611,7 @@ class AccountService(AccountServiceInterface):
             pass
 
         try:
-            new_password_hash = self._password_manager.hash_password(change_data.new_password)
+            new_password_hash = await self._password_manager.hash_password(change_data.new_password)
             logger.debug(f"New password hashed successfully for user: {email}")
         except (EmptyPasswordError, PasswordTooLongError, HashingError) as e:
             logger.error(f"Password hashing failed for user {email}: {e}")

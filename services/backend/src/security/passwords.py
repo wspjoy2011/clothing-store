@@ -1,4 +1,6 @@
-"""Password management implementation using passlib and bcrypt"""
+"""Password management implementation using passlib and argon2"""
+
+import asyncio
 
 from passlib.context import CryptContext
 from passlib.exc import (
@@ -38,9 +40,12 @@ class PasswordManager(PasswordManagerInterface):
         except (MissingBackendError, InternalBackendError, PasslibSecurityError) as e:
             raise HashContextError("Failed to initialize password context", e)
 
-    def hash_password(self, password: str) -> str:
+    async def hash_password(self, password: str) -> str:
         """
-        Hash a plain text password using bcrypt
+        Hash a plain text password using argon2
+
+        The work runs in a worker thread: argon2 is deliberately slow and would
+        otherwise stall every other request sharing the event loop.
 
         Args:
             password: Plain text password to hash
@@ -57,7 +62,7 @@ class PasswordManager(PasswordManagerInterface):
             raise EmptyPasswordError("Password cannot be empty or None")
 
         try:
-            return self._pwd_context.hash(password)
+            return await asyncio.to_thread(self._pwd_context.hash, password)
         except (PasswordSizeError, PasswordTruncateError) as e:
             raise PasswordTooLongError(f"Password exceeds maximum allowed length: {e}", e)
         except PasswordValueError as e:
@@ -67,9 +72,12 @@ class PasswordManager(PasswordManagerInterface):
         except Exception as e:
             raise HashingError(f"Unexpected error during password hashing: {e}", e)
 
-    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
+    async def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """
         Verify a plain text password against a hashed password
+
+        The work runs in a worker thread: verification costs as much as hashing
+        and would otherwise stall every other request sharing the event loop.
 
         Args:
             plain_password: Plain text password to verify
@@ -90,7 +98,7 @@ class PasswordManager(PasswordManagerInterface):
             raise EmptyPasswordError("Hashed password cannot be empty or None")
 
         try:
-            return self._pwd_context.verify(plain_password, hashed_password)
+            return await asyncio.to_thread(self._pwd_context.verify, plain_password, hashed_password)
         except ValueError as e:
             if "not a valid" in str(e) or "malformed" in str(e):
                 raise InvalidPasswordHashError(f"Invalid password hash format: {e}", e)

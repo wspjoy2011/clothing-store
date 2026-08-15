@@ -283,7 +283,7 @@ class SocialAuthService(SocialAuthServiceInterface):
             )
 
         random_password = secrets.token_urlsafe(32)
-        hashed_password = self._password_manager.hash_password(random_password)
+        hashed_password = await self._password_manager.hash_password(random_password)
 
         user_data = CreateUserDTO(
             email=profile.email,

@@ -166,12 +166,12 @@ class FakePasswordManager:
     """Password manager performing a reversible transformation"""
 
     @staticmethod
-    def hash_password(password: str) -> str:
+    async def hash_password(password: str) -> str:
         """Return a recognisable stand-in for a hash"""
         return f"hashed:{password}"
 
     @staticmethod
-    def verify_password(plain: str, hashed: str) -> bool:
+    async def verify_password(plain: str, hashed: str) -> bool:
         """Compare against the stand-in hash"""
         return hashed == f"hashed:{plain}"
 
