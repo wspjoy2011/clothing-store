@@ -61,14 +61,20 @@ class TransactionManager(TransactionManagerInterface):
             return
 
         async with self._connection_pool.connection() as connection:
-            if isolation_level is not None:
-                connection.isolation_level = isolation_level
+            previous_isolation_level = connection.isolation_level
 
-            async with connection.transaction():
-                token = _current_transaction.set(TransactionState(connection=connection))
-                logger.debug("Transaction started")
-                try:
-                    yield
-                finally:
-                    _current_transaction.reset(token)
-                    logger.debug("Transaction finished")
+            try:
+                if isolation_level is not None:
+                    connection.isolation_level = isolation_level
+
+                async with connection.transaction():
+                    token = _current_transaction.set(TransactionState(connection=connection))
+                    logger.debug("Transaction started")
+                    try:
+                        yield
+                    finally:
+                        _current_transaction.reset(token)
+                        logger.debug("Transaction finished")
+            finally:
+                if isolation_level is not None:
+                    connection.isolation_level = previous_isolation_level

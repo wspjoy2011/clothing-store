@@ -92,16 +92,22 @@ class _ConnectionContext:
         self._connection: Optional[FakeConnection] = None
 
     async def __aenter__(self) -> FakeConnection:
-        self._connection = self._pool.create_connection()
+        self._connection = self._pool.acquire()
         return self._connection
 
     async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        self._connection.returned_to_pool = True
+        self._pool.release(self._connection)
         return False
 
 
 class FakeConnectionPool:
-    """Connection pool creating a new fake connection on every acquisition"""
+    """Connection pool reusing idle connections the way a real pool does
+
+    A new connection is created only while every existing one is checked out.
+    Reusing the same object matters: state left on a connection by one caller
+    stays visible to the next one, which is exactly how state leaks between
+    requests in production.
+    """
 
     def __init__(
             self,
@@ -113,9 +119,20 @@ class FakeConnectionPool:
         self.description = description
         self.fail_on_commit = fail_on_commit
         self.created: List[FakeConnection] = []
+        self.idle: List[FakeConnection] = []
 
-    def create_connection(self) -> FakeConnection:
-        """Create and register a new fake connection"""
+    def acquire(self) -> FakeConnection:
+        """
+        Check out an idle connection, creating one only when none is free
+
+        Returns:
+            Connection handed to the caller
+        """
+        if self.idle:
+            connection = self.idle.pop()
+            connection.returned_to_pool = False
+            return connection
+
         connection = FakeConnection(
             name=f"conn#{len(self.created) + 1}",
             rows=self.rows,
@@ -124,6 +141,16 @@ class FakeConnectionPool:
         )
         self.created.append(connection)
         return connection
+
+    def release(self, connection: FakeConnection) -> None:
+        """
+        Return a connection to the pool without resetting its state
+
+        Args:
+            connection: Connection being handed back
+        """
+        connection.returned_to_pool = True
+        self.idle.append(connection)
 
     def connection(self) -> _ConnectionContext:
         """Acquire a connection as an async context manager"""

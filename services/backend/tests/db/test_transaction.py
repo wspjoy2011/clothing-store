@@ -120,8 +120,33 @@ async def test_transaction_state_is_cleared_after_a_failure(connection_pool: Fak
 async def test_isolation_level_is_applied_to_the_connection(connection_pool: FakeConnectionPool):
     """The requested isolation level is set on the transaction connection"""
     manager = TransactionManager(connection_pool)
+    observed = []
+
+    async with manager.atomic(isolation_level=IsolationLevel.SERIALIZABLE):
+        observed.append(get_current_transaction().connection.isolation_level)
+
+    assert observed == [IsolationLevel.SERIALIZABLE]
+
+
+async def test_isolation_level_does_not_leak_to_the_next_transaction(connection_pool: FakeConnectionPool):
+    """A connection carrying a raised isolation level is restored before it is reused"""
+    manager = TransactionManager(connection_pool)
 
     async with manager.atomic(isolation_level=IsolationLevel.SERIALIZABLE):
         pass
 
-    assert connection_pool.created[0].isolation_level == IsolationLevel.SERIALIZABLE
+    async with manager.atomic():
+        reused = get_current_transaction().connection
+        assert reused.isolation_level is None
+
+    assert len(connection_pool.created) == 1
+
+
+async def test_reused_connection_keeps_the_default_isolation_level(connection_pool: FakeConnectionPool):
+    """Back in the pool, the connection carries no isolation level of its own"""
+    manager = TransactionManager(connection_pool)
+
+    async with manager.atomic(isolation_level=IsolationLevel.SERIALIZABLE):
+        pass
+
+    assert connection_pool.created[0].isolation_level is None
