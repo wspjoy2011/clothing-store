@@ -212,3 +212,70 @@ async def test_adding_within_the_total_is_stored():
 
     assert response.quantity == 3
     assert catalog.holds == [10]
+
+
+async def test_adding_holds_stock_inside_the_transaction_that_writes():
+    """The hold taken while adding lives in the transaction that stores the item"""
+    catalog = FakeCatalogService(available_quantity=5)
+    items = FakeCartItemRepository(item=None)
+    transactions = FakeTransactionManager()
+    service = build_service(catalog, items, transactions)
+
+    await service.add_item_to_cart(
+        AddToCartRequestDTO(product_id=10, quantity=2),
+        user_id=USER_ID
+    )
+
+    assert catalog.holds_inside_transaction == [True]
+    assert transactions.committed == 1
+
+
+async def test_the_hold_precedes_the_read_it_protects():
+    """The inventory row is held before the cart is read, so the read cannot go stale"""
+    journal: list = []
+    catalog = FakeCatalogService(available_quantity=5, journal=journal)
+    items = FakeCartItemRepository(item=None, journal=journal)
+    service = build_service(catalog, items)
+
+    await service.add_item_to_cart(
+        AddToCartRequestDTO(product_id=10, quantity=2),
+        user_id=USER_ID
+    )
+
+    assert journal.index("hold") < journal.index("read")
+
+
+async def test_a_refused_add_rolls_the_transaction_back():
+    """A total beyond the stock aborts the transaction instead of storing the item"""
+    catalog = FakeCatalogService(available_quantity=3)
+    items = FakeCartItemRepository(build_cart_item(product_id=10, quantity=2))
+    transactions = FakeTransactionManager()
+    service = build_service(catalog, items, transactions)
+
+    with pytest.raises(InsufficientStockError):
+        await service.add_item_to_cart(
+            AddToCartRequestDTO(product_id=10, quantity=2),
+            user_id=USER_ID
+        )
+
+    assert items.additions == []
+    assert transactions.rolled_back == 1
+    assert transactions.committed == 0
+
+
+async def test_adding_an_unsellable_product_rolls_the_transaction_back():
+    """A product the catalogue refuses to sell aborts the transaction"""
+    catalog = FakeCatalogService(sellable=False)
+    items = FakeCartItemRepository(item=None)
+    transactions = FakeTransactionManager()
+    service = build_service(catalog, items, transactions)
+
+    with pytest.raises(InsufficientStockError):
+        await service.add_item_to_cart(
+            AddToCartRequestDTO(product_id=10, quantity=1),
+            user_id=USER_ID
+        )
+
+    assert items.additions == []
+    assert transactions.rolled_back == 1
+    assert transactions.committed == 0

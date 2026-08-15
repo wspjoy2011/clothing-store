@@ -58,7 +58,7 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 46
+fail_under = 47
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",

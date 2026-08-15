@@ -39,13 +39,14 @@ class FakeCatalogService:
             self,
             available_quantity: int = 100,
             product: Optional[FakeProduct] = None,
-            sellable: bool = True
+            sellable: bool = True,
+            journal: Optional[List[str]] = None
     ):
         self.available_quantity = available_quantity
         self.sellable = sellable
         self.product = product
-        self.availability_checks: List[tuple] = []
-        self.holds: List[tuple] = []
+        self.journal = journal if journal is not None else []
+        self.holds: List[int] = []
         self.holds_inside_transaction: List[bool] = []
 
     async def get_product_by_id(self, product_id: int) -> Optional[FakeProduct]:
@@ -54,15 +55,11 @@ class FakeCatalogService:
             return self.product
         return FakeProduct(product_id=product_id)
 
-    async def check_product_availability(self, product_id: int, quantity: int) -> bool:
-        """Record the check and answer from the configured stock"""
-        self.availability_checks.append((product_id, quantity))
-        return quantity <= self.available_quantity
-
     async def hold_available_quantity(self, product_id: int) -> Optional[int]:
         """Record the hold, whether a transaction was open, and report the stock"""
         from db.transaction import get_current_transaction
 
+        self.journal.append("hold")
         self.holds.append(product_id)
         self.holds_inside_transaction.append(get_current_transaction() is not None)
         return self.available_quantity if self.sellable else None
@@ -97,28 +94,18 @@ class FakeCartRepository:
 class FakeCartItemRepository:
     """Cart item repository backed by one stored item
 
-    The update mirrors the real statement, which re-checks stock inside the
-    UPDATE, so a test can reproduce stock being taken between check and write.
+    Like the real statement, the update enforces ownership only: stock is decided
+    by the caller while it holds the inventory row.
     """
 
-    def __init__(
-            self,
-            item: Optional[CartItemDTO] = None,
-            available_quantity: int = 10 ** 6,
-            vanish_after_read: bool = False
-    ):
+    def __init__(self, item: Optional[CartItemDTO] = None, journal: Optional[List[str]] = None):
         self.item = item
-        self.available_quantity = available_quantity
-        self.vanish_after_read = vanish_after_read
-        self.reads = 0
+        self.journal = journal if journal is not None else []
+        self.additions: List[Any] = []
         self.updates: List[Any] = []
 
     async def get_cart_item_by_id(self, item_id: int) -> Optional[CartItemDTO]:
         """Return the stored item when the identifier matches"""
-        if self.vanish_after_read and self.reads:
-            return None
-
-        self.reads += 1
         if self.item is not None and self.item.id == item_id:
             return self.item
         return None
@@ -139,12 +126,14 @@ class FakeCartItemRepository:
 
     async def get_cart_item_by_cart_and_product(self, cart_id: int, product_id: int) -> Optional[CartItemDTO]:
         """Return the stored item when it matches the cart and product"""
+        self.journal.append("read")
         if self.item is not None and self.item.cart_id == cart_id and self.item.product_id == product_id:
             return self.item
         return None
 
     async def add_item_to_cart(self, request_data: Any, cart_id: int) -> CartItemDTO:
         """Store the item, summing the quantity when it is already there"""
+        self.additions.append((request_data.product_id, request_data.quantity, cart_id))
         existing = await self.get_cart_item_by_cart_and_product(cart_id, request_data.product_id)
         quantity = request_data.quantity + (existing.quantity if existing else 0)
 
