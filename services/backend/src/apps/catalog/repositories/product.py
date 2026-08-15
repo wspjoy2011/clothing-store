@@ -19,6 +19,7 @@ from apps.catalog.interfaces.specifications import (
     CategorySpecificationInterface
 )
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
+from db.transaction import get_current_transaction, NoActiveTransactionError
 from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "app")
@@ -55,6 +56,13 @@ class ProductRepository(ProductRepositoryInterface):
             Tuple of is_active, is_in_stock and available_quantity, or None when the
             product has no inventory row
         """
+        if get_current_transaction() is None:
+            raise NoActiveTransactionError(
+                "lock_inventory must run inside a transaction: outside one the lock is "
+                "released as soon as the statement returns, and the answer goes stale "
+                "before the caller can act on it"
+            )
+
         query = f"""
             SELECT is_active, is_in_stock, available_quantity
             FROM {self.APP_NAME}_product_inventory

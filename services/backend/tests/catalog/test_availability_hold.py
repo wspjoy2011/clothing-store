@@ -40,13 +40,6 @@ def build_service(inventory: Optional[tuple]) -> CatalogService:
     )
 
 
-async def test_available_stock_is_held():
-    """Enough stock on an active product is confirmed"""
-    service = build_service((True, True, 5))
-
-    assert await service.hold_available_quantity(PRODUCT_ID) == 5
-
-
 async def test_the_reported_quantity_is_the_sellable_one():
     """The hold reports what may be sold, leaving the decision to the caller"""
     service = build_service((True, True, 5))

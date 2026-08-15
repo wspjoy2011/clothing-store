@@ -179,7 +179,7 @@ class CartItemRepository(CartItemRepositoryInterface):
         else:
             logger.warning(
                 f"Cart item {request_data.cart_item_id} not updated in cart {cart_id}: "
-                f"missing, owned by another cart, or stock no longer covers {request_data.quantity}"
+                f"it is missing or belongs to another cart"
             )
 
         return result

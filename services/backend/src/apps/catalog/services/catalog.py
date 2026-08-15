@@ -299,30 +299,6 @@ class CatalogService(CatalogServiceInterface):
         """
         return await self._autocomplete_client.get_suggestions(query, limit)
 
-    async def check_product_availability(self, product_id: int, quantity: int) -> bool:
-        """
-        Check if product is available and has sufficient stock for requested quantity
-
-        Args:
-            product_id: ID of the product to check
-            quantity: Requested quantity
-
-        Returns:
-            True if product is available and has sufficient stock, False otherwise
-        """
-        product = await self._product_repository.get_product_by_id(product_id)
-
-        if not product:
-            return False
-
-        if not product.inventory:
-            return False
-
-        if not product.inventory.is_active or not product.inventory.is_in_stock:
-            return False
-
-        return product.inventory.available_quantity >= quantity
-
     async def hold_available_quantity(self, product_id: int) -> Optional[int]:
         """
         Report sellable stock while holding the inventory row against concurrent changes

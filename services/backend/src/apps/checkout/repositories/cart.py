@@ -39,7 +39,7 @@ class CartRepository(CartRepositoryInterface):
         query = f"""
             INSERT INTO {self.APP_NAME}_cart (user_id)
             VALUES (%s)
-            ON CONFLICT (user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+            ON CONFLICT (user_id) DO UPDATE SET updated_at = checkout_cart.updated_at
             RETURNING id, user_id, cart_token_id, created_at, updated_at
         """
 
@@ -67,7 +67,7 @@ class CartRepository(CartRepositoryInterface):
         query = f"""
             INSERT INTO {self.APP_NAME}_cart (cart_token_id)
             VALUES (%s)
-            ON CONFLICT (cart_token_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+            ON CONFLICT (cart_token_id) DO UPDATE SET updated_at = checkout_cart.updated_at
             RETURNING id, user_id, cart_token_id, created_at, updated_at
         """
 
