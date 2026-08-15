@@ -131,6 +131,14 @@ class SocialAuthService(SocialAuthServiceInterface):
         try:
             async with self._transaction_manager.atomic():
                 auth_result = await self._handle_user(user_profile)
+
+            if not auth_result.user_exists:
+                try:
+                    await self._send_social_registration_email(user_profile.email, user_profile.provider)
+                    logger.info(f"Welcome email sent to new {user_profile.provider} user: {user_profile.email}")
+                except BaseEmailError as e:
+                    logger.warning(f"Failed to send welcome email to {user_profile.email}: {e}")
+
             tokens = await self._generate_tokens(auth_result)
         except SocialAuthError:
             raise
@@ -302,12 +310,6 @@ class SocialAuthService(SocialAuthServiceInterface):
             )
 
         logger.info(f"New user created and activated: {profile.email}, user_id: {created_user.id}")
-
-        try:
-            await self._send_social_registration_email(profile.email, profile.provider)
-            logger.info(f"Welcome email sent to new {profile.provider} user: {profile.email}")
-        except BaseEmailError as e:
-            logger.warning(f"Failed to send welcome email to {profile.email}: {e}")
 
         return SocialAuthResult(
             success=True,
