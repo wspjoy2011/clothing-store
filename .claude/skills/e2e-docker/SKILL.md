@@ -29,7 +29,9 @@ The script finds a docker client itself: the `docker` binary when it is on PATH,
 
 If the backend has no `.env`, the script generates a disposable one from `.env.sample`, records it in the ledger and deletes it during cleanup. An existing `.env` is used as is and never modified.
 
-`up` also writes a compose override that runs the API without the reloading development server. The reloader watches a bind mount, sees phantom changes and restarts every couple of minutes, which drops in-flight requests and makes every scenario fail at random. The override is recorded in the ledger and removed during cleanup.
+`up` rebuilds the image before starting, so a dependency added since the last run is present instead of crashing the API on import.
+
+`up` also writes a compose override that runs the API without the reloading development server. The reloader watches a bind mount, sees phantom changes and restarts every couple of minutes, which drops in-flight requests and makes every scenario fail at random. The override also raises the rate limits the scenarios spend themselves — left at production values, a suite that registers a dozen accounts exhausts its own quota and the next run fails on 429 rather than on code — and shortens the email dispatch window to one second, so the scenario that proves the limiter still refuses a burst leaves no spent quota behind. The override is recorded in the ledger and removed during cleanup.
 
 ## Monitoring
 
@@ -54,7 +56,7 @@ Polling on a timer rather than subscribing to events is deliberate: a dropped ev
 
 ## Steps
 
-0. Start `monitor` in the background before anything else and leave it running for the whole session. Without it a stack that dies mid-run looks like failing code, and the wrong thing gets debugged.
+0. Start `monitor` in the background before anything else and leave it running for the whole session. Without it a stack that dies mid-run looks like failing code, and the wrong thing gets debugged. It follows whichever run is current, so starting it first is safe.
 1. Run `up` and wait for the API to answer. If it never does, print the last lines of the web service logs and stop — do not run scenarios against a stack that is not ready.
 2. Run `scenarios`.
 3. Read the results. For every failure, look at the container logs before drawing a conclusion; a failure may be a broken environment rather than broken code.
@@ -68,6 +70,8 @@ The skill and its scripts hold **permanent rules** — the setup every run needs
 **Permanent** — add it to `command_scenarios` in `scripts/e2e.py`. A scenario sends real HTTP requests and returns a name, a boolean and a detail string. Anything it writes to the database is recorded in the ledger in the same step, before the request that creates it.
 
 Prefer scenarios that unit tests cannot express: concurrent requests competing for the same resource, behaviour that depends on real transaction boundaries, constraints enforced by the database itself.
+
+A scenario must survive being run twice in a row. Anything that consumes a shared allowance — a rate limit, a unique address, a stock level — either restores it or is written so that the second run starts from a clean window.
 
 **One-off** — write the throwaway script, record it in the ledger as a created file, run it, then delete it during cleanup. It never gets committed.
 

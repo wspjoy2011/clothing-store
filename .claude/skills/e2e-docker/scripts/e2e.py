@@ -22,6 +22,10 @@ from ledger import Ledger, latest_run_id, new_run_id, run_directory
 
 PROJECT_MARKER = "docker-compose.yml"
 TEST_EMAIL_PREFIX = "e2e-"
+PARALLEL_REGISTRATION_BUDGET_SECONDS = 5.0
+SCENARIO_RATE_LIMIT = "200/minute"
+EMAIL_DISPATCH_RATE_LIMIT = "3/second"
+EMAIL_DISPATCH_BURST = 8
 DEFAULT_API = "http://localhost:8000/api/v1"
 ANCHOR_PROCESS = "wsl.exe"
 STACK_SERVICES = ("db", "mailhog", "web")
@@ -293,6 +297,12 @@ def ensure_override(project_root: str, ledger: Ledger) -> str:
     restarts the server every couple of minutes, which drops in-flight requests
     and makes every scenario flaky. End-to-end runs use a plain server instead.
 
+    The override also raises the limits the scenarios spend themselves. Left at
+    production values, a suite that registers a dozen accounts exhausts its own
+    quota and a rerun inside the same minute fails on 429 rather than on code.
+    The email dispatch limit stays low on purpose: one scenario proves the
+    limiter still refuses a burst.
+
     Args:
         project_root: Repository root
         ledger: Journal recording the change
@@ -305,6 +315,10 @@ def ensure_override(project_root: str, ledger: Ledger) -> str:
         "services:\n"
         "  web:\n"
         "    command: [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n"
+        "    environment:\n"
+        f"      RATE_LIMIT_REGISTRATION: {SCENARIO_RATE_LIMIT}\n"
+        f"      RATE_LIMIT_CREDENTIAL_GUESS: {SCENARIO_RATE_LIMIT}\n"
+        f"      RATE_LIMIT_EMAIL_DISPATCH: {EMAIL_DISPATCH_RATE_LIMIT}\n"
     )
 
     with open(override_path, "w", encoding="utf-8") as handle:
@@ -421,7 +435,7 @@ def command_up(arguments, ledger: Ledger) -> int:
     ensure_override(project_root, ledger)
 
     ledger.record("started", "compose_stack", ",".join(STACK_SERVICES), project_root=project_root)
-    code, output = compose(docker, project_root, env_file, ["up", "-d", *STACK_SERVICES])
+    code, output = compose(docker, project_root, env_file, ["up", "-d", "--build", *STACK_SERVICES])
     if code != 0:
         print(output[-3000:])
         return code
@@ -476,12 +490,24 @@ def command_scenarios(arguments, ledger: Ledger) -> int:
     for address in concurrent_emails:
         ledger.record("created", "db_row", address, table="accounts_users", note="concurrency scenario")
 
+    started = time.time()
     codes = run_parallel_registrations(base, concurrent_emails)
-    all_created = all(code == 201 for code in codes)
+    elapsed = time.time() - started
+
+    accepted = sum(1 for code in codes if code == 201)
+    throttled = sum(1 for code in codes if code == 429)
+    unexpected = sorted({code for code in codes if code not in (201, 429)})
+    within_budget = elapsed < PARALLEL_REGISTRATION_BUDGET_SECONDS
+
     results.append((
-        f"{arguments.parallel} parallel registrations all succeed",
-        all_created,
-        f"status codes {sorted(set(codes))}"
+        f"{arguments.parallel} parallel registrations are served or throttled, never broken",
+        accepted + throttled == len(codes) and not unexpected and accepted > 0,
+        f"{accepted} created, {throttled} throttled, unexpected {unexpected}"
+    ))
+    results.append((
+        "hashing does not block the event loop",
+        within_budget,
+        f"{len(codes)} concurrent registrations answered in {elapsed:.2f}s"
     ))
 
     status, body = request("POST", f"{base}/checkout/cart/token")
@@ -497,6 +523,8 @@ def command_scenarios(arguments, ledger: Ledger) -> int:
         if seed_test_product(arguments, ledger, STOCK_PROBE_PRODUCT_ID, STOCK_PROBE_UNITS):
             results.extend(check_stock_limit(base, cart_token, STOCK_PROBE_PRODUCT_ID))
             results.extend(check_concurrent_stock_limit(base, STOCK_PROBE_PRODUCT_ID, STOCK_PROBE_UNITS))
+
+    results.extend(check_rate_limit(base))
 
     print_results(results)
     write_report(ledger, results)
@@ -647,6 +675,43 @@ def check_concurrent_stock_limit(base: str, product_id: int, stock: int) -> List
         passed,
         f"{attempts} at once -> {accepted} accepted, {refused} refused, "
         f"{len(broken)} neither ({sorted(set(broken))}), cart holds {stored} of {stock}"
+    )]
+
+
+def check_rate_limit(base: str) -> List[Tuple[str, bool, str]]:
+    """
+    Prove the limiter still refuses a burst on the real stack
+
+    Password reset is used because no other scenario spends its quota, and an
+    address nobody registered writes no row and sends no mail: the limiter counts
+    the request either way.
+
+    The stand configures a per-second window, so the burst proves the mechanism
+    without leaving a spent quota behind: a rerun a second later starts clean.
+    The assertion is therefore that a burst is partly served and partly refused,
+    which fails both when the limiter is absent and when it refuses everything.
+
+    Args:
+        base: API base URL
+
+    Returns:
+        One scenario result
+    """
+    unknown_address = f"{TEST_EMAIL_PREFIX}{uuid.uuid4().hex[:12]}@example.com"
+
+    codes = []
+    for _ in range(EMAIL_DISPATCH_BURST):
+        status, _ = request("POST", f"{base}/accounts/password-reset/request", {"email": unknown_address})
+        codes.append(status)
+
+    served = sum(1 for code in codes if code == 200)
+    refused = sum(1 for code in codes if code == 429)
+
+    return [(
+        "a burst beyond the limit is partly refused",
+        served > 0 and refused > 0 and served + refused == len(codes),
+        f"{EMAIL_DISPATCH_BURST} in a row -> {served} served, {refused} refused, "
+        f"other {sorted({code for code in codes if code not in (200, 429)})}"
     )]
 
 
@@ -872,6 +937,11 @@ def command_monitor(arguments, ledger: Ledger) -> int:
     Polling is used rather than event subscription: a dropped event is silent,
     while a missed poll is corrected by the next one.
 
+    The destination of the log is resolved at every sample unless a run was named
+    explicitly. A monitor started before the stack, as the skill asks, would
+    otherwise keep writing into the previous run's directory for its whole life,
+    and the run it was meant to document would end up with an empty log.
+
     Args:
         arguments: Parsed command line arguments
         ledger: Journal of the run
@@ -880,6 +950,7 @@ def command_monitor(arguments, ledger: Ledger) -> int:
         Process exit code, non-zero when a failure was observed
     """
     docker = detect_docker(arguments.distro)
+    pinned_run = bool(getattr(arguments, "run_id", None))
     log_path = os.path.join(ledger.directory, "monitor.log")
     deadline = time.time() + arguments.duration if arguments.duration else None
 
@@ -889,6 +960,9 @@ def command_monitor(arguments, ledger: Ledger) -> int:
     print(f"monitoring every {arguments.interval}s, log: {log_path}")
 
     while deadline is None or time.time() < deadline:
+        if not pinned_run:
+            log_path = os.path.join(run_directory(latest_run_id()), "monitor.log")
+
         sample = probe_stack(docker, arguments.api)
         stamp = time.strftime("%H:%M:%S")
 
