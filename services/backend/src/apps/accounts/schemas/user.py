@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator, EmailStr
+from pydantic import BaseModel, Field, field_validator, EmailStr
 
 from apps.accounts.validators.password import (
     validate_password_strength,
@@ -54,7 +54,7 @@ class CreateUserResponseSchema(BaseModel):
 class UserLoginSchema(BaseModel):
     """Schema for user login request"""
     email: EmailStr
-    password: str
+    password: str = Field(..., max_length=128)
 
     @field_validator("email")
     @classmethod

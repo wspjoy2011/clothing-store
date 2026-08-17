@@ -1,6 +1,6 @@
 """Routes for accounts module"""
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from apps.accounts.controllers.accounts import (
     create_user_controller,
@@ -15,6 +15,7 @@ from apps.accounts.controllers.accounts import (
 )
 from apps.accounts.dependencies import get_account_service
 from apps.accounts.interfaces.services import AccountServiceInterface
+from security.rate_limit import limiter, CREDENTIAL_GUESS_LIMIT, EMAIL_DISPATCH_LIMIT, REGISTRATION_LIMIT
 from apps.accounts.schemas.examples.errors import (
     EMAIL_ALREADY_EXISTS_ERROR,
     USER_CREATION_ERROR,
@@ -226,7 +227,9 @@ router = APIRouter(
         }
     }
 )
+@limiter.limit(REGISTRATION_LIMIT)
 async def register_user_route(
+        request: Request,
         user_data: CreateUserSchema,
         account_service: AccountServiceInterface = Depends(get_account_service)
 ) -> CreateUserResponseSchema:
@@ -363,7 +366,9 @@ async def register_user_route(
         }
     }
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def activate_account_route(
+        request: Request,
         activation_data: ActivateAccountSchema,
         account_service: AccountServiceInterface = Depends(get_account_service)
 ) -> ActivateAccountResponseSchema:
@@ -483,7 +488,9 @@ async def activate_account_route(
         }
     }
 )
+@limiter.limit(EMAIL_DISPATCH_LIMIT)
 async def resend_activation_route(
+        request: Request,
         resend_data: ResendActivationSchema,
         account_service: AccountServiceInterface = Depends(get_account_service)
 ) -> ResendActivationResponseSchema:
@@ -632,7 +639,9 @@ async def resend_activation_route(
         }
     }
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def login_user_route(
+        request: Request,
         login_data: UserLoginSchema,
         account_service: AccountServiceInterface = Depends(get_account_service)
 ) -> LoginResponseSchema:
@@ -907,7 +916,9 @@ async def get_user_by_refresh_token_route(
         }
     }
 )
+@limiter.limit(EMAIL_DISPATCH_LIMIT)
 async def request_password_reset_route(
+        request: Request,
         request_data: PasswordResetRequestSchema,
         account_service: AccountServiceInterface = Depends(get_account_service)
 ) -> PasswordResetRequestResponseSchema:
@@ -1044,7 +1055,9 @@ async def request_password_reset_route(
         }
     }
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def confirm_password_reset_route(
+        request: Request,
         confirm_data: PasswordResetConfirmSchema,
         account_service: AccountServiceInterface = Depends(get_account_service)
 ) -> PasswordResetConfirmResponseSchema:
@@ -1270,7 +1283,9 @@ async def change_password_route(
     },
     tags=["Authentication"]
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def refresh_access_token_route(
+        request: Request,
         token_data: RefreshTokenRequest,
         account_service: AccountServiceInterface = Depends(get_account_service)
 ) -> RefreshTokenResponse:

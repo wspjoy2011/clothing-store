@@ -26,6 +26,7 @@ dependencies = [
     "python-jose[cryptography]>=3.5.0,<4.0.0",
     "authlib>=1.6.0,<2.0.0",
     "httpx>=0.28.1,<0.29.0",
+    "slowapi>=0.1.10",
 ]
 
 [dependency-groups]
@@ -58,7 +59,7 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 47
+fail_under = 50
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",
