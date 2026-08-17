@@ -14,7 +14,7 @@ class SocialAuthRequestSchema(BaseModel):
     """
     provider: str = Field(
         ...,
-        description="OAuth provider name (google, facebook, etc.)",
+        description="OAuth provider name (google or facebook)",
         min_length=1,
         max_length=50
     )
@@ -34,7 +34,7 @@ class SocialAuthRequestSchema(BaseModel):
 
         provider = value.strip().lower()
 
-        supported_providers = ["google", "facebook", "github", "discord"]
+        supported_providers = ["google", "facebook"]
 
         if provider not in supported_providers:
             raise ValueError(
