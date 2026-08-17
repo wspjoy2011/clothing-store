@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
-from typing import Any, List, Optional, TypeVar, Type, Union, Dict, Self, Tuple
+from typing import Any, Dict, List, Optional, Self, Tuple, Type, TypeVar, Union
 
 from psycopg import IsolationLevel
 

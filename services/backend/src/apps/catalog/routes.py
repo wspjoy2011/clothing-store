@@ -1,35 +1,31 @@
 from typing import Optional
 
-from fastapi import APIRouter, Query, Depends, Path
+from fastapi import APIRouter, Depends, Path, Query
 
 from apps.catalog.controllers import (
-    get_product_list_controller,
-    get_filters_controller,
     get_category_menu_controller,
-    get_products_by_category_controller,
     get_filters_by_categories_controller,
-    get_product_suggestions_controller,
+    get_filters_controller,
     get_product_by_id_controller,
-    get_product_by_slug_controller
+    get_product_by_slug_controller,
+    get_product_list_controller,
+    get_product_suggestions_controller,
+    get_products_by_category_controller,
 )
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.schemas.examples.filters import FILTERS_FULL_EXAMPLE
 from apps.catalog.schemas.examples.responses import (
-    STANDARD_RESPONSE_VALUE,
-    YEAR_FILTERED_VALUE,
-    GENDER_FILTERED_VALUE,
-    YEAR_DESCENDING_VALUE,
-    COMBINED_FILTERS_VALUE,
     CATEGORY_MENU_EXAMPLE,
-    PRODUCT_EXAMPLE1
+    COMBINED_FILTERS_VALUE,
+    GENDER_FILTERED_VALUE,
+    PRODUCT_EXAMPLE1,
+    STANDARD_RESPONSE_VALUE,
+    YEAR_DESCENDING_VALUE,
+    YEAR_FILTERED_VALUE,
 )
 from apps.catalog.schemas.filters import FiltersResponseSchema
-from apps.catalog.schemas.responses import (
-    ProductListResponseSchema,
-    CategoryMenuResponseSchema,
-    ProductSchema
-)
+from apps.catalog.schemas.responses import CategoryMenuResponseSchema, ProductListResponseSchema, ProductSchema
 
 API_PATHS: dict[str, str] = {
     # Products

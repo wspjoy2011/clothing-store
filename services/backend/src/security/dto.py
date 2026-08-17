@@ -1,8 +1,8 @@
 """Data transfer objects for security operations"""
 
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 
 @dataclass

@@ -1,27 +1,28 @@
 import secrets
 from datetime import datetime, timezone
-from typing import Optional
 from decimal import Decimal
+from typing import Optional
 
+from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.checkout.dto import (
-    CartTokenResponseDTO,
-    CartResponseDTO,
-    CartItemResponseDTO,
-    CartSummaryDTO,
     AddToCartRequestDTO,
+    CartItemResponseDTO,
+    CartResponseDTO,
+    CartTokenResponseDTO,
     UpdateCartItemRequestDTO,
 )
-from apps.checkout.interfaces.repositories import (
-    CartTokenRepositoryInterface,
-    CartRepositoryInterface,
-    CartItemRepositoryInterface
+from apps.checkout.exceptions import (
+    CartNotFoundError,
+    CartTokenCreationError,
+    InsufficientStockError,
+    ProductNotFoundError,
 )
 from apps.checkout.interfaces import CartServiceInterface
-from apps.checkout.exceptions import (
-    CartTokenCreationError,
-    CartNotFoundError, ProductNotFoundError, InsufficientStockError,
+from apps.checkout.interfaces.repositories import (
+    CartItemRepositoryInterface,
+    CartRepositoryInterface,
+    CartTokenRepositoryInterface,
 )
-from apps.catalog.interfaces.services import CatalogServiceInterface
 from db.interfaces import TransactionManagerInterface
 from settings.logging_config import get_logger
 
@@ -270,7 +271,8 @@ class CartService(CartServiceInterface):
             raise ProductNotFoundError(f"Product with ID {updated_item.product_id} not found")
 
         logger.info(
-            f"Cart item {updated_item.id} updated successfully in cart {cart_response.id} to quantity {updated_item.quantity}"
+            f"Cart item {updated_item.id} updated successfully in cart {cart_response.id} "
+            f"to quantity {updated_item.quantity}"
         )
 
         return self._build_cart_item_response(updated_item, product)
@@ -316,25 +318,8 @@ class CartService(CartServiceInterface):
 
         return success
 
-    async def clear_cart(
-            self,
-            user_id: Optional[int] = None,
-            token: Optional[str] = None
-    ) -> bool:
-        """Not implemented yet"""
-        raise NotImplementedError("clear_cart method is not implemented yet")
 
-    async def get_cart_summary(
-            self,
-            user_id: Optional[int] = None,
-            token: Optional[str] = None
-    ) -> Optional[CartSummaryDTO]:
-        """Not implemented yet"""
-        raise NotImplementedError("get_cart_summary method is not implemented yet")
 
-    async def merge_anonymous_cart(self, user_id: int, token: str) -> CartResponseDTO:
-        """Not implemented yet"""
-        raise NotImplementedError("merge_anonymous_cart method is not implemented yet")
 
     async def validate_cart_items_availability(
             self,

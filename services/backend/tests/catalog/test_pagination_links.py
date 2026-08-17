@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from urllib.parse import urlparse
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.dto.catalog import CatalogDTO, PaginationDTO
@@ -114,3 +114,14 @@ def test_following_the_next_page_link_answers(client):
 def test_the_category_listing_links_point_at_a_served_path():
     """Category pagination links are built from a path the application serves"""
     assert any(path.startswith(CATALOG_CATEGORIES_PATH) for path in mounted_paths())
+
+
+def test_the_public_product_response_hides_warehouse_counts(client):
+    """Stock and reservation figures are ours, not the anonymous caller's"""
+    body = client.get(f"{CATALOG_PRODUCTS_PATH}?page=1&per_page=1").json()
+
+    inventory = body["products"][0]["inventory"]
+
+    assert "stock_quantity" not in inventory
+    assert "reserved_quantity" not in inventory
+    assert inventory["available_quantity"] == 5

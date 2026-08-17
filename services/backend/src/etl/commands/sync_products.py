@@ -9,10 +9,10 @@ from elasticsearch import AsyncElasticsearch
 from psycopg_pool import AsyncConnectionPool
 
 from db.connection import get_connection_pool
+from etl.sync.exceptions import SyncException
 from etl.sync.extractors import PostgreSQLProductExtractor
 from etl.sync.loaders import ElasticsearchProductLoader
 from etl.sync.migrator import ProductDataMigrator
-from etl.sync.exceptions import SyncException
 from settings.config import config
 from settings.logging_config import get_logger
 
@@ -102,7 +102,7 @@ async def _run_sync(batch_size: int, force: bool, dry_run: bool) -> None:
                 raise SyncException("Elasticsearch is not healthy")
             click.echo("Elasticsearch is healthy")
 
-            click.echo(f"\nStarting migration...")
+            click.echo("\nStarting migration...")
             await migrator.migrate_products(batch_size)
 
             click.echo("Product synchronization completed successfully!")

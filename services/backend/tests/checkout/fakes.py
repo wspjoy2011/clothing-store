@@ -6,6 +6,12 @@ from decimal import Decimal
 from typing import Any, List, Optional
 
 from apps.checkout.dto.cart import CartItemDTO
+from apps.checkout.dto.tokens import CartTokenDTO
+from apps.checkout.interfaces.repositories import (
+    CartItemRepositoryInterface,
+    CartRepositoryInterface,
+    CartTokenRepositoryInterface,
+)
 
 
 @dataclass
@@ -76,8 +82,13 @@ class FakeCart:
     updated_at: datetime = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
-class FakeCartRepository:
-    """Cart repository returning one cart"""
+class FakeCartRepository(CartRepositoryInterface):
+    """Cart repository returning one cart
+
+    Implementing the interface is the point: a method added to the contract has to
+    be answered here too, instead of leaving every test passing against a double
+    that silently lacks it.
+    """
 
     def __init__(self, cart: Optional[FakeCart] = None):
         self.cart = cart if cart is not None else FakeCart()
@@ -86,12 +97,20 @@ class FakeCartRepository:
         """Return the single cart"""
         return self.cart
 
+    async def get_cart_by_token_id(self, cart_token_id: int) -> FakeCart:
+        """Return the single cart"""
+        return self.cart
+
     async def create_cart_for_user(self, user_id: int) -> FakeCart:
         """Return the single cart"""
         return self.cart
 
+    async def create_cart_for_token(self, cart_token_id: int) -> FakeCart:
+        """Return the single cart"""
+        return self.cart
 
-class FakeCartItemRepository:
+
+class FakeCartItemRepository(CartItemRepositoryInterface):
     """Cart item repository backed by one stored item
 
     Like the real statement, the update enforces ownership only: stock is decided
@@ -103,6 +122,7 @@ class FakeCartItemRepository:
         self.journal = journal if journal is not None else []
         self.additions: List[Any] = []
         self.updates: List[Any] = []
+        self.removals: List[Any] = []
 
     async def get_cart_item_by_id(self, item_id: int) -> Optional[CartItemDTO]:
         """Return the stored item when the identifier matches"""
@@ -147,6 +167,16 @@ class FakeCartItemRepository:
         )
         return self.item
 
+    async def remove_cart_item(self, item_id: int, cart_id: int) -> bool:
+        """Forget the stored item when it belongs to that cart"""
+        self.removals.append((item_id, cart_id))
+
+        if self.item is None or self.item.id != item_id or self.item.cart_id != cart_id:
+            return False
+
+        self.item = None
+        return True
+
     async def update_cart_item(self, request_data: Any, cart_id: int) -> Optional[CartItemDTO]:
         """Record the update and return the item, enforcing ownership only"""
         self.updates.append((request_data.cart_item_id, request_data.quantity, cart_id))
@@ -165,11 +195,29 @@ class FakeCartItemRepository:
         return self.item
 
 
-class FakeCartTokenRepository:
-    """Cart token repository that is never reached in these tests"""
+class FakeCartTokenRepository(CartTokenRepositoryInterface):
+    """Cart token repository holding at most one issued token"""
 
-    async def get_cart_token_by_token(self, token: str) -> None:
-        """Report the token as unknown"""
+    def __init__(self, token: Optional[CartTokenDTO] = None):
+        self.token = token
+        self.created: List[str] = []
+
+    async def create_cart_token(self, token: str) -> CartTokenDTO:
+        """Store the issued token"""
+        self.created.append(token)
+        self.token = CartTokenDTO(
+            id=1,
+            token=token,
+            expires_at=datetime(2027, 1, 1, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            updated_at=datetime(2026, 1, 1, tzinfo=timezone.utc)
+        )
+        return self.token
+
+    async def get_cart_token_by_token(self, token: str) -> Optional[CartTokenDTO]:
+        """Return the stored token when it matches"""
+        if self.token is not None and self.token.token == token:
+            return self.token
         return None
 
 

@@ -1,29 +1,13 @@
-from typing import Optional, Callable
+from typing import Optional
 
 from apps.catalog.dto.catalog import CatalogDTO, PaginationDTO
 from apps.catalog.dto.category import CategoryMenuDTO
 from apps.catalog.dto.filters import FiltersDTO
 from apps.catalog.dto.products import ProductDTO
-from apps.catalog.interfaces.repositories import (
-    ProductRepositoryInterface,
-    CategoryRepositoryInterface
-)
+from apps.catalog.interfaces.factories import SpecificationFactoryInterface
+from apps.catalog.interfaces.repositories import CategoryRepositoryInterface, ProductRepositoryInterface
 from apps.catalog.interfaces.services import CatalogServiceInterface
-from apps.catalog.interfaces.specifications import (
-    PaginationSpecificationInterface,
-    OrderingSpecificationInterface,
-    FilterSpecificationInterface,
-    SearchSpecificationInterface,
-    CategorySpecificationInterface
-)
 from search.interfaces import AutocompleteClientInterface
-
-PaginationSpecificationFactory = Callable[[int, int], PaginationSpecificationInterface]
-OrderingSpecificationFactory = Callable[[Optional[str]], OrderingSpecificationInterface]
-FilterSpecificationFactory = Callable[
-    [Optional[int], Optional[int], Optional[float], Optional[float], Optional[str], Optional[bool]], FilterSpecificationInterface]
-SearchSpecificationFactory = Callable[[Optional[str]], SearchSpecificationInterface]
-CategorySpecificationFactory = Callable[[int, Optional[int], Optional[int]], CategorySpecificationInterface]
 
 
 class CatalogService(CatalogServiceInterface):
@@ -33,11 +17,7 @@ class CatalogService(CatalogServiceInterface):
             self,
             product_repository: ProductRepositoryInterface,
             category_repository: CategoryRepositoryInterface,
-            pagination_specification_factory: PaginationSpecificationFactory,
-            ordering_specification_factory: OrderingSpecificationFactory,
-            filter_specification_factory: FilterSpecificationFactory,
-            search_specification_factory: SearchSpecificationFactory,
-            category_specification_factory: CategorySpecificationFactory,
+            specifications: SpecificationFactoryInterface,
             autocomplete_client: AutocompleteClientInterface
     ):
         """
@@ -46,20 +26,12 @@ class CatalogService(CatalogServiceInterface):
         Args:
             product_repository: Repository for product data access
             category_repository: Repository for category data access
-            pagination_specification_factory: Factory for creating pagination specifications
-            ordering_specification_factory: Factory for creating ordering specifications
-            filter_specification_factory: Factory for creating filter specifications
-            search_specification_factory: Factory for creating search specifications
-            category_specification_factory: Factory for creating category specifications
+            specifications: Factory building the specifications of a query
             autocomplete_client: Client for autocomplete operations
         """
         self._product_repository = product_repository
         self._category_repository = category_repository
-        self._pagination_specification_factory = pagination_specification_factory
-        self._ordering_specification_factory = ordering_specification_factory
-        self._filter_specification_factory = filter_specification_factory
-        self._search_specification_factory = search_specification_factory
-        self._category_specification_factory = category_specification_factory
+        self._specifications = specifications
         self._autocomplete_client = autocomplete_client
 
     async def get_products(
@@ -93,21 +65,21 @@ class CatalogService(CatalogServiceInterface):
         Returns:
             CatalogDTO with products and pagination info
         """
-        pagination_spec = self._pagination_specification_factory(page, per_page)
+        pagination_spec = self._specifications.pagination(page, per_page)
 
-        ordering_spec = self._ordering_specification_factory(ordering)
+        ordering_spec = self._specifications.ordering(ordering)
 
         filter_spec = None
         if (min_year is not None or max_year is not None or
             min_price is not None or max_price is not None or
             gender or is_available is not None):
-            filter_spec = self._filter_specification_factory(
+            filter_spec = self._specifications.filters(
                 min_year, max_year, min_price, max_price, gender, is_available
             )
 
         search_spec = None
         if q:
-            search_spec = self._search_specification_factory(q)
+            search_spec = self._specifications.search(q)
 
         products = await self._product_repository.get_products_with_specifications(
             pagination_spec,
@@ -167,25 +139,25 @@ class CatalogService(CatalogServiceInterface):
         Returns:
             CatalogDTO with products and pagination info
         """
-        category_spec = self._category_specification_factory(
+        category_spec = self._specifications.category(
             master_category_id, sub_category_id, article_type_id
         )
 
-        pagination_spec = self._pagination_specification_factory(page, per_page)
+        pagination_spec = self._specifications.pagination(page, per_page)
 
-        ordering_spec = self._ordering_specification_factory(ordering)
+        ordering_spec = self._specifications.ordering(ordering)
 
         filter_spec = None
         if (min_year is not None or max_year is not None or
             min_price is not None or max_price is not None or
             gender or is_available is not None):
-            filter_spec = self._filter_specification_factory(
+            filter_spec = self._specifications.filters(
                 min_year, max_year, min_price, max_price, gender, is_available
             )
 
         search_spec = None
         if q:
-            search_spec = self._search_specification_factory(q)
+            search_spec = self._specifications.search(q)
 
         products = await self._product_repository.get_products_with_specifications_by_categories(
             category_spec,
@@ -249,7 +221,7 @@ class CatalogService(CatalogServiceInterface):
         """
         search_spec = None
         if q:
-            search_spec = self._search_specification_factory(q)
+            search_spec = self._specifications.search(q)
 
         return await self._product_repository.get_available_filters(search_spec)
 
@@ -270,7 +242,7 @@ class CatalogService(CatalogServiceInterface):
         Returns:
             FiltersDTO object containing all available filters for the specified categories or None if no products found
         """
-        category_spec = self._category_specification_factory(
+        category_spec = self._specifications.category(
             master_category_id, sub_category_id, article_type_id
         )
 
@@ -318,9 +290,7 @@ class CatalogService(CatalogServiceInterface):
         if not inventory:
             return None
 
-        is_active, is_in_stock, available_quantity = inventory
-
-        if not is_active or not is_in_stock:
+        if not inventory.is_active or not inventory.is_in_stock:
             return None
 
-        return available_quantity
+        return inventory.available_quantity

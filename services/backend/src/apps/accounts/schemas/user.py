@@ -1,11 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from apps.accounts.validators.password import (
-    validate_password_strength,
-    validate_password_format
-)
+from apps.accounts.validators.password import validate_password_format, validate_password_strength
 
 
 class CreateUserSchema(BaseModel):

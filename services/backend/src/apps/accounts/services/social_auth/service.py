@@ -4,45 +4,42 @@ Universal social authentication service.
 
 import secrets
 
-from email_validator import validate_email, EmailNotValidError
+from email_validator import EmailNotValidError, validate_email
 
-from oauth.interfaces import OAuthProviderInterface
-from oauth.dto import OAuthUserInfo
-from oauth.exceptions import OAuthError, TokenVerificationError, UserInfoError
-
-from apps.accounts.dto.users import CreateUserDTO
 from apps.accounts.dto.tokens import CreateTokenDTO
+from apps.accounts.dto.users import CreateUserDTO
 from apps.accounts.enums.user_groups import UserGroupEnum
 from apps.accounts.interfaces.repositories import (
-    UserRepositoryInterface,
+    TokenRepositoryInterface,
     UserGroupRepositoryInterface,
-    TokenRepositoryInterface
+    UserRepositoryInterface,
 )
+from apps.accounts.repositories.exceptions import UserCreationError as RepoUserCreationError
 from apps.accounts.services.social_auth.dto import (
     SocialAuthRequest,
-    SocialUserProfile,
+    SocialAuthResponse,
     SocialAuthResult,
     SocialAuthTokens,
-    SocialAuthResponse
+    SocialUserProfile,
 )
 from apps.accounts.services.social_auth.exceptions import (
     SocialAuthError,
     SocialProviderError,
     SocialTokenError,
+    SocialTokenGenerationError,
     SocialUserInfoError,
-    SocialUserValidationError,
     SocialUserLookupError,
-    SocialTokenGenerationError
+    SocialUserValidationError,
 )
 from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
-from apps.accounts.repositories.exceptions import (
-    UserCreationError as RepoUserCreationError
-)
 from db.interfaces import TransactionManagerInterface
-from security.interfaces import PasswordManagerInterface, JWTManagerInterface
-from security.exceptions import TokenCreationError as SecurityTokenCreationError
 from notifications.email.interfaces import EmailSenderInterface
 from notifications.exceptions.email import BaseEmailError
+from oauth.dto import OAuthUserInfo
+from oauth.exceptions import OAuthError, TokenVerificationError, UserInfoError
+from oauth.interfaces import OAuthProviderInterface
+from security.exceptions import TokenCreationError as SecurityTokenCreationError
+from security.interfaces import JWTManagerInterface, PasswordManagerInterface
 from settings.config import config
 from settings.logging_config import get_logger
 
@@ -379,7 +376,7 @@ class SocialAuthService(SocialAuthServiceInterface):
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            expires_in=3600
+            expires_in=config.access_token_lifetime_seconds
         )
 
     async def _store_refresh_token(self, user_id: int, refresh_token: str) -> None:

@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -25,7 +25,7 @@ class FakeSocialAuthService:
             success=True,
             message="Authenticated",
             provider=self.provider,
-            tokens=SocialAuthTokens(access_token="access-token", refresh_token="refresh-token"),
+            tokens=SocialAuthTokens(access_token="access-token", refresh_token="refresh-token", expires_in=1800),
             user_profile=None,
             is_new_user=False
         )

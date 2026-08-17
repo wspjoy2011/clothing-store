@@ -2,10 +2,7 @@
 
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
-from apps.accounts.validators.password import (
-    validate_password_strength,
-    validate_password_format
-)
+from apps.accounts.validators.password import validate_password_format, validate_password_strength
 
 
 class PasswordResetRequestSchema(BaseModel):

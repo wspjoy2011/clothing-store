@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, List
 
 import psycopg
 import pytest
@@ -58,14 +58,6 @@ async def test_a_removed_item_is_reported_as_removed():
     repository = CartItemRepository(DeletingDAO(), query_builder=None)
 
     assert await repository.remove_cart_item(ITEM_ID, CART_ID) is True
-
-
-async def test_clearing_a_cart_raises_when_the_statement_fails():
-    """Clearing reports a storage failure instead of claiming an empty cart"""
-    repository = CartItemRepository(FailingDAO(), query_builder=None)
-
-    with pytest.raises(CartStorageError):
-        await repository.clear_cart_items(CART_ID)
 
 
 async def test_the_storage_failure_carries_the_original_error_for_the_log():

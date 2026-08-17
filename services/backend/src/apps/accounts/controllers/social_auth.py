@@ -4,7 +4,7 @@ Controllers for social authentication module.
 
 import logging
 from dataclasses import asdict
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Callable
 
 from fastapi import HTTPException
@@ -12,20 +12,20 @@ from fastapi import HTTPException
 from apps.accounts.schemas.social_auth import (
     SocialAuthRequestSchema,
     SocialAuthResponseSchema,
-    SupportedProvidersSchema
+    SupportedProvidersSchema,
 )
-from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
 from apps.accounts.services.social_auth.dto import SocialAuthRequest
 from apps.accounts.services.social_auth.exceptions import (
     SocialAuthError,
+    SocialConfigurationError,
     SocialProviderError,
     SocialTokenError,
+    SocialTokenGenerationError,
     SocialUserInfoError,
-    SocialUserValidationError,
-    SocialConfigurationError,
     SocialUserLookupError,
-    SocialTokenGenerationError
+    SocialUserValidationError,
 )
+from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
 from oauth.exceptions import ConfigurationError, ProviderNotSupportedError
 from oauth.factories import OAuthProviderRegistry
 

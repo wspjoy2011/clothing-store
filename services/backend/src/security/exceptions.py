@@ -79,6 +79,3 @@ class EmptyTokenError(TokenError):
     pass
 
 
-class TokenSignatureError(TokenError):
-    """Exception raised when token signature is invalid"""
-    pass

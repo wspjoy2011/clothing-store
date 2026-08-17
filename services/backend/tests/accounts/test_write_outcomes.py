@@ -5,16 +5,14 @@ import pytest
 from apps.accounts.dto.password_reset import PasswordChangeDTO
 from apps.accounts.repositories.token import TokenRepository
 from apps.accounts.repositories.user import UserRepository
-from apps.accounts.services.account import AccountService
 from apps.accounts.services.exceptions import PasswordChangeError
+from apps.accounts.services.password import PasswordService
 from db.query_builder import SQLQueryBuilder
 from tests.accounts.fakes import (
     FakeEmailSender,
-    FakeJWTManager,
     FakePasswordManager,
     FakeTokenRepository,
     FakeTransactionManager,
-    FakeUserGroupRepository,
     FakeUserRepository,
 )
 
@@ -116,12 +114,10 @@ async def test_a_password_change_that_wrote_nothing_is_not_reported_as_done():
     email_sender = FakeEmailSender()
     transactions = FakeTransactionManager()
 
-    service = AccountService(
+    service = PasswordService(
         user_repository=repository,
-        user_group_repository=FakeUserGroupRepository(),
         token_repository=FakeTokenRepository(),
         password_manager=FakePasswordManager(),
-        jwt_manager=FakeJWTManager(),
         email_sender=email_sender,
         transaction_manager=transactions
     )

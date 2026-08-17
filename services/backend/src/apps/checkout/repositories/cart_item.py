@@ -1,8 +1,8 @@
-from typing import Optional, List
+from typing import List, Optional
 
 import psycopg
 
-from apps.checkout.dto import CartItemDTO, AddToCartRequestDTO, UpdateCartItemRequestDTO
+from apps.checkout.dto import AddToCartRequestDTO, CartItemDTO, UpdateCartItemRequestDTO
 from apps.checkout.exceptions.repositories import CartStorageError
 from apps.checkout.interfaces.repositories import CartItemRepositoryInterface
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
@@ -60,7 +60,9 @@ class CartItemRepository(CartItemRepositoryInterface):
         )
 
         logger.info(
-            f"Added/updated item in cart {cart_id}: product {request_data.product_id}, quantity {request_data.quantity}")
+            f"Added/updated item in cart {cart_id}: product {request_data.product_id}, "
+            f"quantity {request_data.quantity}"
+        )
         return result
 
     async def get_cart_item_by_id(self, item_id: int) -> Optional[CartItemDTO]:
@@ -201,7 +203,7 @@ class CartItemRepository(CartItemRepositoryInterface):
                 not the same answer as "no such item"
         """
         query = f"""
-            DELETE FROM {self.APP_NAME}_cart_items 
+            DELETE FROM {self.APP_NAME}_cart_items
             WHERE id = %s AND cart_id = %s
             RETURNING id
         """
@@ -228,85 +230,5 @@ class CartItemRepository(CartItemRepositoryInterface):
                 logger.warning(f"Cart item {item_id} not found in cart {cart_id} or doesn't belong to this cart")
                 return False
 
-    async def clear_cart_items(self, cart_id: int) -> bool:
-        """
-        Remove all items from cart
 
-        Args:
-            cart_id: ID of the cart to clear
 
-        Returns:
-            True once the cart holds no items
-
-        Raises:
-            CartStorageError: If the statement could not be carried out
-        """
-        query = f"DELETE FROM {self.APP_NAME}_cart_items WHERE cart_id = %s"
-
-        try:
-            await self._dao.execute(
-                query=query,
-                params=[cart_id],
-                fetch=False
-            )
-        except psycopg.Error as e:
-            logger.error(f"Database error clearing cart {cart_id}: {e}")
-            raise CartStorageError(f"Cart {cart_id} could not be cleared", e)
-        except Exception as e:
-            logger.error(f"Failed to clear cart {cart_id}: {e}")
-            raise CartStorageError(f"Cart {cart_id} could not be cleared", e)
-
-        logger.info(f"Cleared all items from cart {cart_id}")
-        return True
-
-    async def get_cart_items_count(self, cart_id: int) -> int:
-        """
-        Get total count of items in cart
-
-        Args:
-            cart_id: ID of the cart
-
-        Returns:
-            Number of items in the cart
-        """
-        query = f"""
-            SELECT COUNT(*) as count
-            FROM {self.APP_NAME}_cart_items
-            WHERE cart_id = %s
-        """
-
-        result = await self._dao.execute(
-            query=query,
-            params=[cart_id],
-            fetch=True,
-            fetch_one=True,
-            as_dict=True
-        )
-
-        return result['count'] if result else 0
-
-    async def get_cart_total_quantity(self, cart_id: int) -> int:
-        """
-        Get total quantity of all items in cart
-
-        Args:
-            cart_id: ID of the cart
-
-        Returns:
-            Total quantity of all items
-        """
-        query = f"""
-            SELECT COALESCE(SUM(quantity), 0) as total_quantity
-            FROM {self.APP_NAME}_cart_items
-            WHERE cart_id = %s
-        """
-
-        result = await self._dao.execute(
-            query=query,
-            params=[cart_id],
-            fetch=True,
-            fetch_one=True,
-            as_dict=True
-        )
-
-        return result['total_quantity'] if result else 0

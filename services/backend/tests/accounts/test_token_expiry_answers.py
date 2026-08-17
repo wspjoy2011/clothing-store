@@ -7,15 +7,15 @@ from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.dto.password_reset import PasswordResetConfirmDTO
 from apps.accounts.dto.tokens import ActivationTokenDTO, PasswordResetTokenDTO
 from apps.accounts.dto.users import UserDTO
-from apps.accounts.services.account import AccountService
 from apps.accounts.services.exceptions import (
     ExpiredActivationTokenError,
     ExpiredPasswordResetTokenError,
     PasswordResetTokenNotFoundError,
 )
+from apps.accounts.services.password import PasswordService
+from apps.accounts.services.registration import RegistrationService
 from tests.accounts.fakes import (
     FakeEmailSender,
-    FakeJWTManager,
     FakePasswordManager,
     FakeTransactionManager,
     FakeUserGroupRepository,
@@ -88,9 +88,9 @@ class RepositoryWithUser(FakeUserRepository):
         return next((user for user in self.users if user.id == user_id), None)
 
 
-def build_service(tokens: ExpiringTokenRepository) -> AccountService:
+def build_registration_service(tokens: ExpiringTokenRepository) -> RegistrationService:
     """
-    Assemble an account service around one stored token
+    Assemble a registration service around one stored token
 
     Args:
         tokens: Repository serving the token under test
@@ -98,12 +98,30 @@ def build_service(tokens: ExpiringTokenRepository) -> AccountService:
     Returns:
         Service wired for the test
     """
-    return AccountService(
+    return RegistrationService(
         user_repository=RepositoryWithUser(),
         user_group_repository=FakeUserGroupRepository(),
         token_repository=tokens,
         password_manager=FakePasswordManager(),
-        jwt_manager=FakeJWTManager(),
+        email_sender=FakeEmailSender(),
+        transaction_manager=FakeTransactionManager()
+    )
+
+
+def build_password_service(tokens: ExpiringTokenRepository) -> PasswordService:
+    """
+    Assemble the password service around one stored token
+
+    Args:
+        tokens: Repository serving the token under test
+
+    Returns:
+        Service wired for the test
+    """
+    return PasswordService(
+        user_repository=RepositoryWithUser(),
+        token_repository=tokens,
+        password_manager=FakePasswordManager(),
         email_sender=FakeEmailSender(),
         transaction_manager=FakeTransactionManager()
     )
@@ -112,7 +130,7 @@ def build_service(tokens: ExpiringTokenRepository) -> AccountService:
 async def test_an_expired_reset_token_is_reported_as_expired():
     """An expired link is answered as expired, not as an unknown token"""
     tokens = ExpiringTokenRepository(expires_at=NOW - timedelta(hours=1))
-    service = build_service(tokens)
+    service = build_password_service(tokens)
 
     with pytest.raises(ExpiredPasswordResetTokenError):
         await service.confirm_password_reset(
@@ -123,7 +141,7 @@ async def test_an_expired_reset_token_is_reported_as_expired():
 async def test_an_unknown_reset_token_is_reported_as_not_found():
     """A token nobody issued is still answered as not found"""
     tokens = ExpiringTokenRepository(expires_at=None, exists=False)
-    service = build_service(tokens)
+    service = build_password_service(tokens)
 
     with pytest.raises(PasswordResetTokenNotFoundError):
         await service.confirm_password_reset(
@@ -134,7 +152,7 @@ async def test_an_unknown_reset_token_is_reported_as_not_found():
 async def test_an_expired_reset_token_is_removed_when_it_is_refused():
     """The dead token is cleaned up rather than left to be tried again"""
     tokens = ExpiringTokenRepository(expires_at=NOW - timedelta(hours=1))
-    service = build_service(tokens)
+    service = build_password_service(tokens)
 
     with pytest.raises(ExpiredPasswordResetTokenError):
         await service.confirm_password_reset(
@@ -147,7 +165,7 @@ async def test_an_expired_reset_token_is_removed_when_it_is_refused():
 async def test_an_expired_activation_token_is_reported_as_expired():
     """Activation answers the same way: expired is not the same as unknown"""
     tokens = ExpiringTokenRepository(expires_at=NOW - timedelta(days=2))
-    service = build_service(tokens)
+    service = build_registration_service(tokens)
 
     with pytest.raises(ExpiredActivationTokenError):
         await service.activate_account(ActivateAccountDTO(email=ADDRESS, token=TOKEN))

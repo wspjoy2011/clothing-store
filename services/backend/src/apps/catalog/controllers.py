@@ -3,20 +3,65 @@ from urllib.parse import urlencode
 
 from fastapi import HTTPException
 
-from apps.catalog.dto.products import ProductDTO, InventoryDTO
+from apps.catalog.dto.category import ArticleTypeInfoDTO, CategoryMenuDTO, MasterCategoryInfoDTO, SubCategoryInfoDTO
+from apps.catalog.dto.products import InventoryDTO, ProductDTO
 from apps.catalog.interfaces.services import CatalogServiceInterface
-from apps.catalog.schemas.filters import FiltersResponseSchema, CheckboxFilterSchema, RangeFilterSchema, \
-    AvailabilityFilterSchema, PriceRangeFilterSchema
+from apps.catalog.schemas.filters import (
+    AvailabilityFilterSchema,
+    CheckboxFilterSchema,
+    FiltersResponseSchema,
+    PriceRangeFilterSchema,
+    RangeFilterSchema,
+)
 from apps.catalog.schemas.responses import (
+    ArticleTypeSchema,
+    CategoryMenuResponseSchema,
+    InventorySchema,
+    MasterCategorySchema,
     ProductListResponseSchema,
     ProductSchema,
-    InventorySchema,
-    CategoryMenuResponseSchema,
-    MasterCategorySchema,
     SubCategorySchema,
-    ArticleTypeSchema
 )
 from settings.api import CATALOG_CATEGORIES_PATH, CATALOG_PRODUCTS_PATH
+
+
+def _convert_article_type_dto_to_schema(article_type: ArticleTypeInfoDTO) -> ArticleTypeSchema:
+    """Convert ArticleTypeInfoDTO to ArticleTypeSchema"""
+    return ArticleTypeSchema(id=article_type.id, name=article_type.name)
+
+
+def _convert_sub_category_dto_to_schema(sub_category: SubCategoryInfoDTO) -> SubCategorySchema:
+    """Convert SubCategoryInfoDTO to SubCategorySchema"""
+    return SubCategorySchema(
+        id=sub_category.id,
+        name=sub_category.name,
+        article_types=[
+            _convert_article_type_dto_to_schema(article_type)
+            for article_type in sub_category.article_types
+        ]
+    )
+
+
+def _convert_master_category_dto_to_schema(master_category: MasterCategoryInfoDTO) -> MasterCategorySchema:
+    """Convert MasterCategoryInfoDTO to MasterCategorySchema"""
+    return MasterCategorySchema(
+        id=master_category.id,
+        name=master_category.name,
+        sub_categories=[
+            _convert_sub_category_dto_to_schema(sub_category)
+            for sub_category in master_category.sub_categories
+        ]
+    )
+
+
+def _convert_category_menu_dto_to_schema(category_menu: CategoryMenuDTO) -> CategoryMenuResponseSchema:
+    """Convert CategoryMenuDTO to CategoryMenuResponseSchema"""
+    return CategoryMenuResponseSchema(
+        categories=[
+            _convert_master_category_dto_to_schema(master_category)
+            for master_category in category_menu.categories
+        ]
+    )
 
 
 def _build_url_with_filters(
@@ -81,8 +126,6 @@ def _convert_inventory_dto_to_schema(inventory_dto: InventoryDTO) -> InventorySc
         base_price=inventory_dto.base_price,
         sale_price=inventory_dto.sale_price,
         currency=inventory_dto.currency,
-        stock_quantity=inventory_dto.stock_quantity,
-        reserved_quantity=inventory_dto.reserved_quantity,
         available_quantity=inventory_dto.available_quantity,
         is_active=inventory_dto.is_active,
         is_in_stock=inventory_dto.is_in_stock,
@@ -282,30 +325,7 @@ async def get_category_menu_controller(
             detail="No categories available in the catalog."
         )
 
-    response_categories = []
-
-    for master_category in category_menu.categories:
-        response_sub_categories = []
-
-        for sub_category in master_category.sub_categories:
-            response_article_types = [
-                ArticleTypeSchema(id=art_type.id, name=art_type.name)
-                for art_type in sub_category.article_types
-            ]
-
-            response_sub_categories.append(SubCategorySchema(
-                id=sub_category.id,
-                name=sub_category.name,
-                article_types=response_article_types
-            ))
-
-        response_categories.append(MasterCategorySchema(
-            id=master_category.id,
-            name=master_category.name,
-            sub_categories=response_sub_categories
-        ))
-
-    return CategoryMenuResponseSchema(categories=response_categories)
+    return _convert_category_menu_dto_to_schema(category_menu)
 
 
 async def get_products_by_category_controller(

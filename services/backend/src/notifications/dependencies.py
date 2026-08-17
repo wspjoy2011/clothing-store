@@ -1,7 +1,7 @@
 """Dependencies for notifications module"""
 
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 from notifications.email.accounts import EmailSender
 from notifications.email.interfaces import EmailSenderInterface

@@ -1,13 +1,11 @@
 """Interfaces module for checkout application"""
 
 from apps.checkout.interfaces.repositories import (
-    CartTokenRepositoryInterface,
+    CartItemRepositoryInterface,
     CartRepositoryInterface,
-    CartItemRepositoryInterface
+    CartTokenRepositoryInterface,
 )
-from apps.checkout.interfaces.services import (
-    CartServiceInterface
-)
+from apps.checkout.interfaces.services import CartServiceInterface
 
 __all__ = [
     'CartTokenRepositoryInterface',

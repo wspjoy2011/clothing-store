@@ -1,16 +1,17 @@
-from typing import Any, Optional
+from typing import Optional
 
 from apps.catalog.interfaces.specifications import OrderingSpecificationInterface
+from apps.catalog.specifications.clauses import EFFECTIVE_PRICE, PRODUCT_ALIAS
 
 
 class OrderingSpecification(OrderingSpecificationInterface):
     """Specification for ordering results"""
 
     FIELD_EXPRESSIONS = {
-        "id": "id",
-        "year": "year",
-        "product_id": "product_id",
-        "price": "COALESCE(i.sale_price, i.base_price)"
+        "id": f"{PRODUCT_ALIAS}.product_id",
+        "year": f"{PRODUCT_ALIAS}.year",
+        "product_id": f"{PRODUCT_ALIAS}.product_id",
+        "price": EFFECTIVE_PRICE
     }
 
     DEFAULT_ORDERING = "-id"
@@ -65,22 +66,27 @@ class OrderingSpecification(OrderingSpecificationInterface):
         """
         return field[1:] if field.startswith('-') else field
 
-    def to_sql(self) -> tuple[str, list[Any]]:
+    def to_order_by(self) -> list[str]:
         """
-        Build the ORDER BY clause from allowlisted expressions only
+        Build the ordering expressions from allowlisted columns only
 
         Returns:
-            The clause and an empty parameter list
+            Expressions in the order they apply
         """
-        sql_parts = []
+        return [
+            f"{self.FIELD_EXPRESSIONS[self._field_name_of(field)]} "
+            f"{'DESC' if field.startswith('-') else 'ASC'}"
+            for field in self._ordering_fields
+        ]
 
-        for field in self._ordering_fields:
-            expression = self.FIELD_EXPRESSIONS[self._field_name_of(field)]
-            direction = "DESC" if field.startswith('-') else "ASC"
-            sql_parts.append(f"{expression} {direction}")
+    @property
+    def is_default(self) -> bool:
+        """Report whether the client asked for no particular order"""
+        return self._ordering_fields == [self.DEFAULT_ORDERING]
 
-        sql = f"ORDER BY {', '.join(sql_parts)}"
-        return sql, []
+    def is_empty(self) -> bool:
+        """Ordering always contributes an order, if only the default one"""
+        return False
 
     def get_ordering_fields(self) -> list[str]:
         """Get the list of ordering fields"""

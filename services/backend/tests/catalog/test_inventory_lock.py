@@ -33,7 +33,7 @@ def build_repository(row: Optional[List[Any]] = None) -> tuple:
         Repository and the DAO backing it
     """
     dao = RecordingDAO(row)
-    return ProductRepository(dao=dao, query_builder=None), dao
+    return ProductRepository(dao=dao), dao
 
 
 async def test_locking_outside_a_transaction_is_refused():
@@ -54,7 +54,7 @@ async def test_locking_inside_a_transaction_reads_the_row_for_update():
     async with manager.atomic():
         inventory = await repository.lock_inventory(PRODUCT_ID)
 
-    assert inventory == (True, True, 5)
+    assert (inventory.is_active, inventory.is_in_stock, inventory.available_quantity) == (True, True, 5)
     assert "FOR UPDATE" in dao.executed[0]
 
 

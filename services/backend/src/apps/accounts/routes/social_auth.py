@@ -4,38 +4,35 @@ Routes for social authentication API.
 
 from typing import Callable
 
-from fastapi import APIRouter, Depends, Request, status, HTTPException
+from fastapi import APIRouter, Depends, Request, status
 
-from apps.accounts.controllers.social_auth import (
-    social_auth_controller,
-    get_supported_providers_controller
-)
-from apps.accounts.services.social_auth.dependencies import get_social_auth_service_resolver
-from oauth.dependencies import get_oauth_registry
-from apps.accounts.schemas.social_auth import (
-    SocialAuthRequestSchema,
-    SocialAuthResponseSchema,
-    SupportedProvidersSchema
-)
+from apps.accounts.controllers.social_auth import get_supported_providers_controller, social_auth_controller
 from apps.accounts.schemas.examples.social_auth import (
-    SOCIAL_AUTH_REQUEST_GOOGLE,
-    SOCIAL_AUTH_REQUEST_FACEBOOK,
-    SOCIAL_AUTH_SUCCESS_EXISTING_USER,
-    SOCIAL_AUTH_SUCCESS_NEW_USER,
-    SUPPORTED_PROVIDERS_RESPONSE,
-    SOCIAL_TOKEN_ERROR,
-    SOCIAL_PROVIDER_ERROR,
-    SOCIAL_USER_INFO_ERROR,
-    SOCIAL_USER_VALIDATION_ERROR,
+    ACCESS_TOKEN_EMPTY_ERROR,
+    EMAIL_INVALID_FORMAT_ERROR,
     GOOGLE_EMAIL_NOT_VERIFIED_ERROR,
     PROVIDER_EMPTY_ERROR,
     PROVIDER_UNSUPPORTED_ERROR,
-    ACCESS_TOKEN_EMPTY_ERROR,
-    EMAIL_INVALID_FORMAT_ERROR
+    SOCIAL_AUTH_REQUEST_FACEBOOK,
+    SOCIAL_AUTH_REQUEST_GOOGLE,
+    SOCIAL_AUTH_SUCCESS_EXISTING_USER,
+    SOCIAL_AUTH_SUCCESS_NEW_USER,
+    SOCIAL_PROVIDER_ERROR,
+    SOCIAL_TOKEN_ERROR,
+    SOCIAL_USER_INFO_ERROR,
+    SOCIAL_USER_VALIDATION_ERROR,
+    SUPPORTED_PROVIDERS_RESPONSE,
 )
+from apps.accounts.schemas.social_auth import (
+    SocialAuthRequestSchema,
+    SocialAuthResponseSchema,
+    SupportedProvidersSchema,
+)
+from apps.accounts.services.social_auth.dependencies import get_social_auth_service_resolver
 from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
-from security.rate_limit import limiter, CREDENTIAL_GUESS_LIMIT
+from oauth.dependencies import get_oauth_registry
 from oauth.factories import OAuthProviderRegistry
+from security.rate_limit import CREDENTIAL_GUESS_LIMIT, limiter
 
 API_PATHS = {
     "social_auth": "/social-auth",

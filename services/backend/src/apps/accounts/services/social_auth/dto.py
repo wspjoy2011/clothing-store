@@ -51,8 +51,8 @@ class SocialAuthTokens:
     """
     access_token: str
     refresh_token: str
+    expires_in: int
     token_type: str = "bearer"
-    expires_in: int = 3600
 
 
 @dataclass

@@ -3,15 +3,15 @@ import pytest
 from apps.checkout.dto.requests import AddToCartRequestDTO, UpdateCartItemRequestDTO
 from apps.checkout.exceptions.services import CartNotFoundError, InsufficientStockError
 from apps.checkout.services.cart import CartService
-from tests.fakes import FakeTransactionManager
 from tests.checkout.fakes import (
-    FakeProduct,
     FakeCartItemRepository,
     FakeCartRepository,
     FakeCartTokenRepository,
     FakeCatalogService,
+    FakeProduct,
     build_cart_item,
 )
+from tests.fakes import FakeTransactionManager
 
 USER_ID = 1
 

@@ -4,8 +4,8 @@ Pydantic schemas for social authentication API.
 
 from typing import Optional
 
+from email_validator import EmailNotValidError, validate_email
 from pydantic import BaseModel, Field, field_validator
-from email_validator import validate_email, EmailNotValidError
 
 
 class SocialAuthRequestSchema(BaseModel):

@@ -1,17 +1,8 @@
+from datetime import date, datetime
 from typing import Optional, Union
-from datetime import datetime, date
 
-from apps.accounts.dto.tokens import (
-    ActivationTokenDTO,
-    PasswordResetTokenDTO,
-    RefreshTokenDTO
-)
-from apps.accounts.dto.users import (
-    UserDTO,
-    UserWithProfileDTO,
-    UserProfileDTO,
-    UserGroupDTO
-)
+from apps.accounts.dto.tokens import ActivationTokenDTO, PasswordResetTokenDTO, RefreshTokenDTO
+from apps.accounts.dto.users import UserDTO, UserGroupDTO, UserProfileDTO, UserWithProfileDTO
 
 
 class DateConverterMixin:

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, AsyncGenerator
+from typing import AsyncGenerator, List
 
 
 class AutocompleteClientInterface(ABC):

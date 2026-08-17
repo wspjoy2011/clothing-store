@@ -1,7 +1,7 @@
 """Interfaces for data synchronization components."""
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, AsyncIterable
+from typing import Any, AsyncIterable, Dict, List
 
 
 class DataExtractorInterface(ABC):
@@ -11,7 +11,7 @@ class DataExtractorInterface(ABC):
     def extract_products(self) -> AsyncIterable[Dict[str, Any]]:
         """
         Extract product data from source.
-        
+
         Returns:
             AsyncIterable of product data dictionaries
         """
@@ -21,7 +21,7 @@ class DataExtractorInterface(ABC):
     async def get_products_count(self) -> int:
         """
         Get total count of products to extract.
-        
+
         Returns:
             Total number of products
         """
@@ -40,7 +40,7 @@ class DataLoaderInterface(ABC):
     async def bulk_load_products(self, products: List[Dict[str, Any]]) -> None:
         """
         Load products data to destination in bulk.
-        
+
         Args:
             products: List of product data dictionaries
         """
@@ -55,7 +55,7 @@ class DataLoaderInterface(ABC):
     async def health_check(self) -> bool:
         """
         Check if destination is healthy and accessible.
-        
+
         Returns:
             True if healthy, False otherwise
         """
@@ -69,7 +69,7 @@ class DataMigratorInterface(ABC):
     async def migrate_products(self, batch_size: int = 1000) -> None:
         """
         Orchestrate full product data migration.
-        
+
         Args:
             batch_size: Number of products to process in each batch
         """

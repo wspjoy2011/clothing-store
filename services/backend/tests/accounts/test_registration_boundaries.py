@@ -2,11 +2,10 @@ import pytest
 
 from apps.accounts.dto.users import CreateUserDTO
 from apps.accounts.repositories.exceptions import TokenCreationError
-from apps.accounts.services.account import AccountService
 from apps.accounts.services.exceptions import UserCreationError
+from apps.accounts.services.registration import RegistrationService
 from tests.accounts.fakes import (
     FakeEmailSender,
-    FakeJWTManager,
     FakePasswordManager,
     FakeTokenRepository,
     FakeTransactionManager,
@@ -19,9 +18,9 @@ def build_service(
         token_repository: FakeTokenRepository,
         email_sender: FakeEmailSender,
         transaction_manager: FakeTransactionManager
-) -> AccountService:
+) -> RegistrationService:
     """
-    Assemble an account service from test doubles
+    Assemble a registration service from test doubles
 
     Args:
         token_repository: Repository issuing activation tokens
@@ -31,12 +30,11 @@ def build_service(
     Returns:
         Service wired for the test
     """
-    return AccountService(
+    return RegistrationService(
         user_repository=FakeUserRepository(),
         user_group_repository=FakeUserGroupRepository(),
         token_repository=token_repository,
         password_manager=FakePasswordManager(),
-        jwt_manager=FakeJWTManager(),
         email_sender=email_sender,
         transaction_manager=transaction_manager
     )
@@ -89,12 +87,11 @@ async def test_the_password_is_hashed_outside_the_transaction():
     """Hashing happens before the transaction opens, so no connection waits on it"""
     password_manager = FakePasswordManager()
     transaction_manager = FakeTransactionManager()
-    service = AccountService(
+    service = RegistrationService(
         user_repository=FakeUserRepository(),
         user_group_repository=FakeUserGroupRepository(),
         token_repository=FakeTokenRepository(),
         password_manager=password_manager,
-        jwt_manager=FakeJWTManager(),
         email_sender=FakeEmailSender(),
         transaction_manager=transaction_manager
     )

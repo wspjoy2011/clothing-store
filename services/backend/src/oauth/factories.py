@@ -2,12 +2,12 @@
 OAuth provider factory implementation.
 """
 
-from typing import Dict, Any, Callable
+from typing import Any, Callable, Dict
 
-from oauth.interfaces import OAuthProviderInterface, OAuthProviderFactoryInterface
-from oauth.exceptions import ProviderNotSupportedError, ConfigurationError
-from oauth.providers.google import GoogleOAuthProvider
+from oauth.exceptions import ConfigurationError, ProviderNotSupportedError
+from oauth.interfaces import OAuthProviderFactoryInterface, OAuthProviderInterface
 from oauth.providers.facebook import FacebookOAuthProvider
+from oauth.providers.google import GoogleOAuthProvider
 
 
 class OAuthProviderFactory(OAuthProviderFactoryInterface):
