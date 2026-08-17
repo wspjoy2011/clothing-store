@@ -32,6 +32,9 @@ STACK_SERVICES = ("db", "mailhog", "web")
 REQUEST_TIMEOUT = 120
 STOCK_PROBE_PRODUCT_ID = 999_000_001
 STOCK_PROBE_UNITS = 3
+PAGINATION_PROBE_PRODUCT_ID = 999_000_100
+PAGINATION_PROBE_PRODUCTS = 2
+API_ORIGIN = "http://localhost:8000"
 
 
 def find_project_root() -> str:
@@ -524,6 +527,8 @@ def command_scenarios(arguments, ledger: Ledger) -> int:
             results.extend(check_stock_limit(base, cart_token, STOCK_PROBE_PRODUCT_ID))
             results.extend(check_concurrent_stock_limit(base, STOCK_PROBE_PRODUCT_ID, STOCK_PROBE_UNITS))
 
+    results.extend(check_pagination_links(arguments, base, ledger))
+    results.extend(check_refresh_rotation(arguments, base, ledger))
     results.extend(check_rate_limit(base))
 
     print_results(results)
@@ -712,6 +717,132 @@ def check_rate_limit(base: str) -> List[Tuple[str, bool, str]]:
         served > 0 and refused > 0 and served + refused == len(codes),
         f"{EMAIL_DISPATCH_BURST} in a row -> {served} served, {refused} refused, "
         f"other {sorted({code for code in codes if code not in (200, 429)})}"
+    )]
+
+
+def activate_user(arguments, address: str) -> bool:
+    """
+    Activate a registered account straight in the database
+
+    The activation link is delivered by mail, which a scenario cannot read, so the
+    row is flipped directly. Nothing else about the account is touched.
+
+    Args:
+        arguments: Parsed command line arguments
+        address: Address of the account to activate
+
+    Returns:
+        True when the account is active
+    """
+    project_root = find_project_root()
+    docker = detect_docker(arguments.distro)
+    env_file = os.path.join(project_root, "services", "backend", ".env")
+
+    if not address.startswith(TEST_EMAIL_PREFIX):
+        raise ValueError(f"refusing to activate an account outside the {TEST_EMAIL_PREFIX} prefix")
+
+    statement = f"UPDATE accounts_users SET is_active = TRUE WHERE email = '{address}';"
+
+    user = read_env_value(env_file, "POSTGRES_USER") or "admin"
+    database = read_env_value(env_file, "POSTGRES_DB") or "clothing_store"
+    code, output = compose(
+        docker, project_root, env_file,
+        ["exec", "-T", "db", "psql", "-U", user, "-d", database, "-c", statement],
+        timeout=120
+    )
+
+    if code != 0:
+        print(f"could not activate {address}: {output.strip()[:200]}")
+
+    return code == 0
+
+
+def check_refresh_rotation(arguments, base: str, ledger: Ledger) -> List[Tuple[str, bool, str]]:
+    """
+    Check that refreshing replaces the token it was given
+
+    Rotation spans the token store and two requests, so only a live stack shows
+    whether the presented token really stopped working.
+
+    Args:
+        arguments: Parsed command line arguments
+        base: API base URL
+        ledger: Journal recording the account
+
+    Returns:
+        Scenario results
+    """
+    address = f"{TEST_EMAIL_PREFIX}{uuid.uuid4().hex[:12]}@example.com"
+    password = "E2ePassword123!"
+    ledger.record("created", "db_row", address, table="accounts_users", note="refresh rotation scenario")
+
+    status, _ = request("POST", f"{base}/accounts/register", {"email": address, "password": password})
+    if status != 201 or not activate_user(arguments, address):
+        return [("refresh rotation could be checked", False, f"account could not be prepared (register {status})")]
+
+    status, body = request("POST", f"{base}/accounts/login", {"email": address, "password": password})
+    first_refresh = body.get("refresh_token")
+    if status != 200 or not first_refresh:
+        return [("refresh rotation could be checked", False, f"login answered {status}")]
+
+    status, body = request("POST", f"{base}/accounts/refresh", {"refresh_token": first_refresh})
+    second_refresh = body.get("refresh_token")
+
+    results = [(
+        "refreshing returns a new refresh token",
+        status == 200 and bool(second_refresh) and second_refresh != first_refresh,
+        f"status {status}, token changed: {bool(second_refresh) and second_refresh != first_refresh}"
+    )]
+
+    replayed, _ = request("POST", f"{base}/accounts/refresh", {"refresh_token": first_refresh})
+    results.append((
+        "the replaced refresh token stops working",
+        replayed == 401,
+        f"replaying the old token answered {replayed}"
+    ))
+
+    if second_refresh:
+        status, body = request("POST", f"{base}/accounts/refresh", {"refresh_token": second_refresh})
+        results.append((
+            "the new refresh token works",
+            status == 200 and bool(body.get("access_token")),
+            f"status {status}"
+        ))
+
+    return results
+
+
+def check_pagination_links(arguments, base: str, ledger: Ledger) -> List[Tuple[str, bool, str]]:
+    """
+    Check that the link the catalogue hands the client can be followed
+
+    Two products are seeded so the listing spans more than one page: the dataset is
+    not loaded on the stand, and an empty catalogue returns no links to follow.
+
+    Args:
+        arguments: Parsed command line arguments
+        base: API base URL
+        ledger: Journal recording the rows
+
+    Returns:
+        Scenario results
+    """
+    for offset in range(PAGINATION_PROBE_PRODUCTS):
+        if not seed_test_product(arguments, ledger, PAGINATION_PROBE_PRODUCT_ID + offset, 1):
+            return [("pagination links could be checked", False, "probe products could not be seeded")]
+
+    status, body = request("GET", f"{base}/catalog/products?page=1&per_page=1")
+    next_page = body.get("next_page") if isinstance(body, dict) else None
+
+    if status != 200 or not next_page:
+        return [("the catalogue offers a next page link", False, f"status {status}, link {next_page}")]
+
+    followed, _ = request("GET", f"{API_ORIGIN}{next_page}")
+
+    return [(
+        "the next page link the catalogue returns can be followed",
+        followed == 200,
+        f"following {next_page} answered {followed}"
     )]
 
 

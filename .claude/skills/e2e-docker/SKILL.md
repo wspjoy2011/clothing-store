@@ -33,6 +33,17 @@ If the backend has no `.env`, the script generates a disposable one from `.env.s
 
 `up` also writes a compose override that runs the API without the reloading development server. The reloader watches a bind mount, sees phantom changes and restarts every couple of minutes, which drops in-flight requests and makes every scenario fail at random. The override also raises the rate limits the scenarios spend themselves — left at production values, a suite that registers a dozen accounts exhausts its own quota and the next run fails on 429 rather than on code — and shortens the email dispatch window to one second, so the scenario that proves the limiter still refuses a burst leaves no spent quota behind. The override is recorded in the ledger and removed during cleanup.
 
+## Changing code while the stand runs
+
+The override runs the API without the reloader, so the container keeps serving the
+code it started with. After editing backend source, restart the service before
+re-running scenarios — otherwise the scenarios test the previous build and the
+disagreement looks like a bug in the change:
+
+```
+docker restart clothing-store-backend
+```
+
 ## Monitoring
 
 Run `monitor` alongside a long check to see the stack state on a timer:
