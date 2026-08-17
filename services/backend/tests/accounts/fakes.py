@@ -67,15 +67,29 @@ class FakeEmailSender:
 
 
 class FakeUserRepository:
-    """User repository backed by an in-memory list"""
+    """User repository backed by an in-memory list
+
+    Writes answer the way the real ones do, from the number of rows they matched:
+    updating somebody who is not there reports False rather than success.
+    """
 
     def __init__(self):
         self.users: List[UserDTO] = []
         self.next_id = 1
+        self.password_updates: List[tuple] = []
 
     async def get_user_by_email(self, email: str) -> Optional[UserDTO]:
         """Find a user by address"""
         return next((user for user in self.users if user.email == email), None)
+
+    async def get_user_password_hash(self, user_id: int) -> Optional[str]:
+        """Report the stored hash of a user"""
+        return next((f"hashed:stored" for user in self.users if user.id == user_id), None)
+
+    async def update_user_password(self, user_id: int, hashed_password: str) -> bool:
+        """Record the update and report whether any stored user matched"""
+        self.password_updates.append((user_id, hashed_password))
+        return any(user.id == user_id for user in self.users)
 
     async def update_user_status(self, user_id: int, is_active: bool) -> bool:
         """Mark a stored user as active or inactive"""
@@ -129,11 +143,21 @@ class FakeTokenRepository:
 
 
 class FakePasswordManager:
-    """Password manager performing a reversible transformation"""
+    """Password manager performing a reversible transformation
 
-    @staticmethod
-    async def hash_password(password: str) -> str:
-        """Return a recognisable stand-in for a hash"""
+    Every hashing call records whether a transaction was open at the time. The
+    real one costs tens of milliseconds of CPU, so hashing while holding a pooled
+    connection is what exhausts the pool under a burst of registrations.
+    """
+
+    def __init__(self):
+        self.hashed_inside_transaction: List[bool] = []
+
+    async def hash_password(self, password: str) -> str:
+        """Record the transaction state and return a recognisable stand-in"""
+        from db.transaction import get_current_transaction
+
+        self.hashed_inside_transaction.append(get_current_transaction() is not None)
         return f"hashed:{password}"
 
     @staticmethod
@@ -159,3 +183,8 @@ class FakeJWTManager:
     def get_token_expiration(token: str) -> datetime:
         """Return a fixed expiration far enough in the future"""
         return datetime(2027, 1, 1, tzinfo=timezone.utc)
+
+    @staticmethod
+    def verify_refresh_token(token: str) -> dict:
+        """Report the payload a valid refresh token would carry"""
+        return {"user_id": 1, "email": "user@example.com", "group_id": 1, "group_name": "user", "type": "refresh"}

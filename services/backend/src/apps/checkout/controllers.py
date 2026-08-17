@@ -4,7 +4,7 @@ from apps.checkout.dto import CartItemResponseDTO, CartResponseDTO, AddToCartReq
 from apps.checkout.interfaces import CartServiceInterface
 from apps.checkout.schemas import CartTokenResponse, CartResponse, CartItemResponse, GetCartByTokenRequest, \
     AddToCartRequest, UpdateCartItemRequest
-from apps.checkout.exceptions import CartTokenCreationError, CartNotFoundError, CartValidationError, \
+from apps.checkout.exceptions import CartStorageError, CartTokenCreationError, CartNotFoundError, CartValidationError, \
     ProductNotFoundError, InsufficientStockError
 from security.dto import JWTPayloadDTO
 from settings.logging_config import get_logger
@@ -312,6 +312,12 @@ async def remove_cart_item_by_token_controller(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
+    except CartStorageError as e:
+        logger.error(f"Cart item {item_id} could not be removed: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The item could not be removed right now. Please try again."
+        )
     except Exception as e:
         logger.error(f"Unexpected error removing cart item {item_id} by token: {e}")
         raise HTTPException(
@@ -356,6 +362,12 @@ async def remove_cart_item_for_user_controller(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
+        )
+    except CartStorageError as e:
+        logger.error(f"Cart item {item_id} could not be removed: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The item could not be removed right now. Please try again."
         )
     except Exception as e:
         logger.error(f"Unexpected error removing cart item {item_id} for user: {e}")

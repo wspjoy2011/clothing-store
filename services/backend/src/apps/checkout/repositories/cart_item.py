@@ -3,6 +3,7 @@ from typing import Optional, List
 import psycopg
 
 from apps.checkout.dto import CartItemDTO, AddToCartRequestDTO, UpdateCartItemRequestDTO
+from apps.checkout.exceptions.repositories import CartStorageError
 from apps.checkout.interfaces.repositories import CartItemRepositoryInterface
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
 from settings.logging_config import get_logger
@@ -193,7 +194,11 @@ class CartItemRepository(CartItemRepositoryInterface):
             cart_id: ID of the cart (for ownership validation)
 
         Returns:
-            True if removed successfully, False if item not found or doesn't belong to cart
+            True if removed, False if no such item belongs to that cart
+
+        Raises:
+            CartStorageError: If the statement could not be carried out, which is
+                not the same answer as "no such item"
         """
         query = f"""
             DELETE FROM {self.APP_NAME}_cart_items 
@@ -211,10 +216,10 @@ class CartItemRepository(CartItemRepositoryInterface):
             )
         except psycopg.Error as e:
             logger.error(f"Database error removing cart item {item_id} from cart {cart_id}: {e}")
-            return False
+            raise CartStorageError(f"Cart item {item_id} could not be removed from cart {cart_id}", e)
         except Exception as e:
             logger.error(f"Failed to remove cart item {item_id} from cart {cart_id}: {e}")
-            return False
+            raise CartStorageError(f"Cart item {item_id} could not be removed from cart {cart_id}", e)
         else:
             if result:
                 logger.info(f"Removed cart item {item_id} from cart {cart_id}")
@@ -231,7 +236,10 @@ class CartItemRepository(CartItemRepositoryInterface):
             cart_id: ID of the cart to clear
 
         Returns:
-            True if cleared successfully, False otherwise
+            True once the cart holds no items
+
+        Raises:
+            CartStorageError: If the statement could not be carried out
         """
         query = f"DELETE FROM {self.APP_NAME}_cart_items WHERE cart_id = %s"
 
@@ -243,10 +251,10 @@ class CartItemRepository(CartItemRepositoryInterface):
             )
         except psycopg.Error as e:
             logger.error(f"Database error clearing cart {cart_id}: {e}")
-            return False
+            raise CartStorageError(f"Cart {cart_id} could not be cleared", e)
         except Exception as e:
             logger.error(f"Failed to clear cart {cart_id}: {e}")
-            return False
+            raise CartStorageError(f"Cart {cart_id} could not be cleared", e)
 
         logger.info(f"Cleared all items from cart {cart_id}")
         return True

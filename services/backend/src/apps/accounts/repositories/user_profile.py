@@ -105,10 +105,10 @@ class UserProfileRepository(BaseRepository, UserProfileRepositoryInterface):
         query, params = self._build_delete_query("user_profiles")
 
         try:
-            result = await self._execute_custom_query_single(query, params, "Delete profile")
+            affected = await self._execute_custom_update_query(query, params, "Delete profile")
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise ProfileDeletionError(f"Failed to delete profile for user with ID: {user_id}", e)
             raise ProfileDeletionError(f"Unexpected error deleting profile for user with ID: {user_id}", e)
 
-        return result is not None
+        return affected > 0

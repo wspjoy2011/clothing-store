@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 
@@ -73,6 +74,10 @@ class JWTManager(JWTManagerInterface):
         """
         Create a new refresh token.
 
+        Every token carries a unique identifier: the rest of the payload is the same
+        for the same user within a second, so two issues would otherwise be the same
+        string, and neither rotation nor a per-session logout could tell them apart.
+
         Args:
             data: Dictionary containing the payload data
 
@@ -88,6 +93,7 @@ class JWTManager(JWTManagerInterface):
             to_encode.update({
                 "exp": expire,
                 "iat": datetime.now(timezone.utc),
+                "jti": str(uuid.uuid4()),
                 "type": "refresh"
             })
         except Exception as e:

@@ -120,6 +120,13 @@ class AccountService(AccountServiceInterface):
                 or the activation token could not be created
             UserPasswordError: Password processing errors
         """
+        try:
+            hashed_password = await self._password_manager.hash_password(user_data.password)
+            logger.debug(f"Password hashed successfully for user: {user_data.email}")
+        except (EmptyPasswordError, PasswordTooLongError, HashingError) as e:
+            logger.error(f"Password hashing failed for user {user_data.email}: {e}")
+            raise UserPasswordError(f"Password processing failed: {e}", e)
+
         async with self._transaction_manager.atomic():
             existing_user = await self._user_repository.get_user_by_email(user_data.email)
             if existing_user:
@@ -133,13 +140,6 @@ class AccountService(AccountServiceInterface):
                 raise UserCreationError("Default user group 'user' not found. Please contact administrator.")
 
             logger.debug(f"Default group found: ID={default_group.id}, name='{default_group.name}'")
-
-            try:
-                hashed_password = await self._password_manager.hash_password(user_data.password)
-                logger.debug(f"Password hashed successfully for user: {user_data.email}")
-            except (EmptyPasswordError, PasswordTooLongError, HashingError) as e:
-                logger.error(f"Password hashing failed for user {user_data.email}: {e}")
-                raise UserPasswordError(f"Password processing failed: {e}", e)
 
             user_data_with_hash = CreateUserDTO(
                 email=user_data.email,
@@ -439,16 +439,20 @@ class AccountService(AccountServiceInterface):
         """
         Request password reset by email
 
-        Sends reset email if user exists (security - always returns True)
+        Business logic: Replace any previous token in one transaction, so a failure
+        cannot leave the user with neither the old link nor a new one, then send the
+        email outside it. An unknown or inactive address is answered as success, so
+        the endpoint does not reveal who is registered
 
         Args:
             request_data: Password reset request data containing email
 
         Returns:
-            True if process completed (always returns True for security)
+            True if process completed
 
         Raises:
-            BaseEmailError: If email sending fails (only for existing users)
+            PasswordResetError: If the reset token could not be replaced
+            PasswordResetEmailError: If the email could not be sent
         """
         logger.info(f"Starting password reset request for email: {request_data.email}")
 
@@ -464,20 +468,25 @@ class AccountService(AccountServiceInterface):
             return True
 
         try:
-            await self._token_repository.delete_password_reset_tokens_by_user_id(user.id)
-            logger.info(f"Deleted existing password reset tokens for user {user.id}")
+            async with self._transaction_manager.atomic():
+                await self._token_repository.delete_password_reset_tokens_by_user_id(user.id)
+                logger.info(f"Deleted existing password reset tokens for user {user.id}")
 
-            reset_token = await self._create_password_reset_token(user.id)
-            logger.info(f"Password reset token created for user: {request_data.email}, user_id: {user.id}")
+                reset_token = await self._create_password_reset_token(user.id)
+                logger.info(f"Password reset token created for user: {request_data.email}, user_id: {user.id}")
+        except TokenCreationError as e:
+            logger.error(
+                f"Password reset not started for user {user.id}: the replacement token could not be created, "
+                f"so the previous one was kept: {e}"
+            )
+            raise PasswordResetError("Password reset could not be started. Please try again.", e)
 
+        try:
             await self._send_password_reset_email(request_data.email, reset_token)
             logger.info(f"Password reset email sent successfully to {request_data.email}")
 
             return True
 
-        except TokenCreationError as e:
-            logger.error(f"Failed to create password reset token for user {user.id}: {e}")
-            return True
         except BaseEmailError as e:
             logger.error(f"Failed to send password reset email to {request_data.email}: {e}")
             raise PasswordResetEmailError(
@@ -543,6 +552,9 @@ class AccountService(AccountServiceInterface):
             except UserUpdateError as e:
                 logger.error(f"Failed to update password for user {user.id}: {e}")
                 raise PasswordResetError(f"Failed to update password: {e}", e)
+
+            revoked = await self._token_repository.delete_user_refresh_tokens(user.id)
+            logger.info(f"Revoked {revoked} refresh tokens of user {user.id} after the password reset")
 
             try:
                 await self._token_repository.delete_password_reset_token(confirm_data.token)
@@ -629,6 +641,9 @@ class AccountService(AccountServiceInterface):
                 logger.error(f"Failed to update password for user {user.id}: {e}")
                 raise PasswordChangeError(f"Failed to update password: {e}", e)
 
+            revoked = await self._token_repository.delete_user_refresh_tokens(user.id)
+            logger.info(f"Revoked {revoked} refresh tokens of user {user.id} after the password change")
+
         try:
             await self._send_password_change_notification_email(email)
             logger.info(f"Password change notification email sent to {email}")
@@ -637,15 +652,19 @@ class AccountService(AccountServiceInterface):
 
         logger.info(f"Password change completed successfully for user: {email}")
 
-    async def refresh_access_token(self, refresh_token: str) -> str:
+    async def refresh_access_token(self, refresh_token: str) -> LoginResponseDTO:
         """
-        Refresh access token using refresh token
+        Exchange a refresh token for a new pair, invalidating the one presented
+
+        Business logic: Verify the token, confirm it is still stored, then issue a
+        new pair and replace the stored token in one transaction, so a leaked
+        refresh token stops working as soon as its owner uses it once
 
         Args:
             refresh_token: Valid refresh token
 
         Returns:
-            New access token string
+            New access and refresh tokens
 
         Raises:
             InvalidRefreshTokenError: If refresh token is invalid, expired, or not found in database
@@ -674,14 +693,15 @@ class AccountService(AccountServiceInterface):
 
         try:
             stored_token = await self._token_repository.get_refresh_token_by_token(refresh_token)
-            if not stored_token:
-                logger.warning(f"Refresh token not found in database for user_id: {user_id}")
-                raise InvalidRefreshTokenError("Refresh token not found or expired")
-
-            logger.debug(f"Refresh token found in database for user_id: {user_id}")
         except Exception as e:
             logger.error(f"Error checking refresh token in database: {e}")
             raise TokenValidationError(f"Failed to validate refresh token: {str(e)}", e)
+
+        if not stored_token:
+            logger.warning(f"Refresh token not found in database for user_id: {user_id}")
+            raise InvalidRefreshTokenError("Refresh token not found or expired")
+
+        logger.debug(f"Refresh token found in database for user_id: {user_id}")
 
         try:
             user = await self._user_repository.get_user_by_id(user_id)
@@ -703,9 +723,19 @@ class AccountService(AccountServiceInterface):
             }
 
             new_access_token = self._jwt_manager.create_access_token(token_payload)
-            logger.info(f"New access token created for user: {user.email}")
+            new_refresh_token = self._jwt_manager.create_refresh_token(token_payload)
+            logger.info(f"New token pair created for user: {user.email}")
 
-            return new_access_token
+            async with self._transaction_manager.atomic():
+                await self._token_repository.delete_refresh_token(refresh_token)
+                await self._store_refresh_token(user.id, new_refresh_token)
+
+            logger.info(f"Refresh token rotated for user {user.id}")
+
+            return LoginResponseDTO(
+                access_token=new_access_token,
+                refresh_token=new_refresh_token
+            )
 
         except SecurityTokenCreationError as e:
             logger.error(f"Failed to create new access token for user {user.id}: {e}")

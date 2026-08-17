@@ -27,9 +27,20 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         super().__init__(dao, query_builder)
 
     async def get_activation_token_by_token(self, token: str) -> Optional[ActivationTokenDTO]:
-        """Get activation token by token string"""
+        """
+        Get activation token by token string, expired or not
+
+        Expiry is left to the caller: a token filtered out here is indistinguishable
+        from one that never existed, and the two deserve different answers.
+
+        Args:
+            token: Token string to look up
+
+        Returns:
+            ActivationTokenDTO if a row exists, None otherwise
+        """
         self._build_activation_token_query()
-        self._query_builder.where("token = %s AND expires_at > CURRENT_TIMESTAMP", token)
+        self._query_builder.where("token = %s", token)
 
         result = await self._execute_query_single("Get activation token by token")
         return self.map_to_activation_token_dto(result) if result else None
@@ -92,13 +103,13 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         params = [token]
 
         try:
-            result = await self._execute_custom_query_single(query, params, "Delete activation token")
+            affected = await self._execute_custom_update_query(query, params, "Delete activation token")
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise TokenDeletionError(f"Failed to delete activation token: {token}", e)
             raise TokenDeletionError(f"Unexpected error deleting activation token: {token}", e)
 
-        return result is not None
+        return affected > 0
 
     async def delete_activation_tokens_by_user_id(self, user_id: int) -> bool:
         """Delete all activation tokens for user"""
@@ -106,18 +117,29 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         params = [user_id]
 
         try:
-            result = await self._execute_custom_update_query(query, params, "Delete activation tokens by user ID")
-            logger.info(f"Deleted activation tokens for user {user_id}")
-            return result
+            affected = await self._execute_custom_update_query(query, params, "Delete activation tokens by user ID")
+            logger.info(f"Deleted {affected} activation tokens for user {user_id}")
+            return affected > 0
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise TokenDeletionError(f"Failed to delete activation tokens for user ID: {user_id}", e)
             raise TokenDeletionError(f"Unexpected error deleting activation tokens for user ID: {user_id}", e)
 
     async def get_password_reset_token_by_token(self, token: str) -> Optional[PasswordResetTokenDTO]:
-        """Get password reset token by token string"""
+        """
+        Get password reset token by token string, expired or not
+
+        Expiry is left to the caller: a token filtered out here is indistinguishable
+        from one that never existed, and the two deserve different answers.
+
+        Args:
+            token: Token string to look up
+
+        Returns:
+            PasswordResetTokenDTO if a row exists, None otherwise
+        """
         self._build_password_reset_token_query()
-        self._query_builder.where("token = %s AND expires_at > CURRENT_TIMESTAMP", token)
+        self._query_builder.where("token = %s", token)
 
         result = await self._execute_query_single("Get password reset token by token")
         return self.map_to_password_reset_token_dto(result) if result else None
@@ -163,13 +185,13 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         params = [token]
 
         try:
-            result = await self._execute_custom_query_single(query, params, "Delete password reset token")
+            affected = await self._execute_custom_update_query(query, params, "Delete password reset token")
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise TokenDeletionError(f"Failed to delete password reset token: {token}", e)
             raise TokenDeletionError(f"Unexpected error deleting password reset token: {token}", e)
 
-        return result is not None
+        return affected > 0
 
     async def delete_password_reset_tokens_by_user_id(self, user_id: int) -> bool:
         """Delete all password reset tokens for user"""
@@ -177,7 +199,7 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         params = [user_id]
 
         try:
-            result = await self._execute_custom_update_query(query, params, "Delete password reset tokens by user ID")
+            affected = await self._execute_custom_update_query(query, params, "Delete password reset tokens by user ID")
             logger.info(f"Deleted password reset tokens for user {user_id}")
             return result
         except Exception as e:
@@ -230,13 +252,13 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         params = [token]
 
         try:
-            result = await self._execute_custom_query_single(query, params, "Delete refresh token")
+            affected = await self._execute_custom_update_query(query, params, "Delete refresh token")
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise TokenDeletionError(f"Failed to delete refresh token: {token}", e)
             raise TokenDeletionError(f"Unexpected error deleting refresh token: {token}", e)
 
-        return result is not None
+        return affected > 0
 
     async def delete_expired_tokens(self) -> int:
         """Delete all expired tokens"""
@@ -249,15 +271,13 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         total_deleted = 0
         for query in queries:
             try:
-                result = await self._execute_custom_query_single(query, [], "Delete expired tokens")
-                if result:
-                    total_deleted += 1
+                total_deleted += await self._execute_custom_update_query(query, [], "Delete expired tokens")
             except Exception as e:
                 if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                     raise TokenDeletionError("Failed to delete expired tokens", e)
                 raise TokenDeletionError("Unexpected error deleting expired tokens", e)
 
-        logger.info(f"Total expired token types deleted: {total_deleted}")
+        logger.info(f"Total expired tokens deleted: {total_deleted}")
         return total_deleted
 
     async def delete_user_refresh_tokens(self, user_id: int) -> int:
@@ -266,13 +286,13 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         params = [user_id]
 
         try:
-            result = await self._execute_custom_query_single(query, params, "Delete user refresh tokens")
+            affected = await self._execute_custom_update_query(query, params, "Delete user refresh tokens")
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise TokenDeletionError(f"Failed to delete refresh tokens for user ID: {user_id}", e)
             raise TokenDeletionError(f"Unexpected error deleting refresh tokens for user ID: {user_id}", e)
 
-        return 1 if result is not None else 0
+        return affected
 
     def _build_activation_token_query(self) -> None:
         """Build base activation token query"""

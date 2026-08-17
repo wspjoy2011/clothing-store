@@ -489,6 +489,19 @@ class ProductRepository(ProductRepositoryInterface):
 
         return [self._build_product_dto_from_row(tuple(row)) for row in result]
 
+    def _conditions_touch_inventory(self) -> bool:
+        """
+        Report whether the conditions gathered so far read inventory columns
+
+        The inventory row is unique per product, so joining it cannot change how
+        many products match. Counting through the join is pure work: on a catalogue
+        of tens of thousands of rows it scans a second table for every page view.
+
+        Returns:
+            True when a condition refers to the inventory alias
+        """
+        return any("i." in condition for condition in self._query_builder.get_where_conditions())
+
     async def _get_products_count(
             self,
             filter_spec: Optional[FilterSpecificationInterface] = None,
@@ -508,9 +521,7 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             Number of products matching the criteria
         """
-        self._query_builder.reset().select("COUNT(*)").from_table(f"{self.APP_NAME}_products p").join(
-            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
-        )
+        self._query_builder.reset().select("COUNT(*)").from_table(f"{self.APP_NAME}_products p")
 
         if category_spec and not category_spec.is_empty():
             self._apply_category_spec_with_alias(category_spec)
@@ -525,6 +536,11 @@ class ProductRepository(ProductRepositoryInterface):
             where_sql, _ = self._split_search_sql(search_sql)
             where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
             self._parse_sql_conditions(where_sql, search_params[:1])
+
+        if self._conditions_touch_inventory():
+            self._query_builder.join(
+                f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
+            )
 
         query, params = self._query_builder.build()
 

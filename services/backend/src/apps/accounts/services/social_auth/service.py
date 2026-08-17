@@ -129,8 +129,7 @@ class SocialAuthService(SocialAuthServiceInterface):
         self._validate_profile(user_profile)
 
         try:
-            async with self._transaction_manager.atomic():
-                auth_result = await self._handle_user(user_profile)
+            auth_result = await self._handle_user(user_profile)
 
             if not auth_result.user_exists:
                 try:
@@ -234,6 +233,10 @@ class SocialAuthService(SocialAuthServiceInterface):
         """
         Handle user lookup/creation.
 
+        Hashing runs outside a transaction: it costs tens of milliseconds of CPU,
+        and holding a pooled connection with an open transaction meanwhile is what
+        exhausts the pool under a burst of logins.
+
         Args:
             profile: Social user profile
 
@@ -252,7 +255,8 @@ class SocialAuthService(SocialAuthServiceInterface):
 
             if not existing_user.is_active:
                 try:
-                    await self._user_repository.update_user_status(existing_user.id, True)
+                    async with self._transaction_manager.atomic():
+                        await self._user_repository.update_user_status(existing_user.id, True)
                     logger.info(f"User {existing_user.id} activated through {profile.provider} auth")
                 except Exception as e:
                     logger.error(f"Failed to activate user {existing_user.id}: {e}")
@@ -292,8 +296,9 @@ class SocialAuthService(SocialAuthServiceInterface):
         )
 
         try:
-            created_user = await self._user_repository.create_user(user_data)
-            await self._user_repository.update_user_status(created_user.id, True)
+            async with self._transaction_manager.atomic():
+                created_user = await self._user_repository.create_user(user_data)
+                await self._user_repository.update_user_status(created_user.id, True)
         except RepoUserCreationError as e:
             logger.error(f"User creation failed for {profile.email}: {e}")
             raise SocialUserLookupError(

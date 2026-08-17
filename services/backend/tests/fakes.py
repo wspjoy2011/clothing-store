@@ -9,12 +9,17 @@ class CommitFailed(Exception):
 
 
 class FakeCursor:
-    """Cursor returning preloaded rows and recording executed statements"""
+    """Cursor returning preloaded rows and recording executed statements
+
+    rowcount mirrors psycopg: it reports how many rows the statement affected,
+    which is -1 until a statement has run.
+    """
 
     def __init__(self, connection: "FakeConnection", row_factory: Optional[Any]):
         self._connection = connection
         self.row_factory = row_factory
         self.description: Optional[List[Tuple[str, ...]]] = connection.description
+        self.rowcount: int = -1
 
     async def __aenter__(self) -> "FakeCursor":
         return self
@@ -25,6 +30,7 @@ class FakeCursor:
     async def execute(self, query: str, params: Optional[List[Any]] = None) -> None:
         """Record the executed statement on the owning connection"""
         self._connection.executed.append((query, params))
+        self.rowcount = self._connection.rowcount
 
     async def fetchone(self) -> Optional[Any]:
         """Return the first preloaded row"""
@@ -65,10 +71,12 @@ class FakeConnection:
             name: str,
             rows: Optional[List[Any]] = None,
             description: Any = UNSET,
-            fail_on_commit: bool = False
+            fail_on_commit: bool = False,
+            rowcount: int = 0
     ):
         self.name = name
         self.rows = rows if rows is not None else []
+        self.rowcount = rowcount
         self.description = [("column",)] if description is UNSET else description
         self.fail_on_commit = fail_on_commit
         self._isolation_level = None
@@ -128,11 +136,13 @@ class FakeConnectionPool:
             self,
             rows: Optional[List[Any]] = None,
             description: Any = UNSET,
-            fail_on_commit: bool = False
+            fail_on_commit: bool = False,
+            rowcount: int = 0
     ):
         self.rows = rows
         self.description = description
         self.fail_on_commit = fail_on_commit
+        self.rowcount = rowcount
         self.created: List[FakeConnection] = []
         self.idle: List[FakeConnection] = []
 
@@ -152,7 +162,8 @@ class FakeConnectionPool:
             name=f"conn#{len(self.created) + 1}",
             rows=self.rows,
             description=self.description,
-            fail_on_commit=self.fail_on_commit
+            fail_on_commit=self.fail_on_commit,
+            rowcount=self.rowcount
         )
         self.created.append(connection)
         return connection

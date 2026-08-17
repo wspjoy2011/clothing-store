@@ -5,6 +5,7 @@ Controllers for social authentication module.
 import logging
 from dataclasses import asdict
 from datetime import datetime, UTC
+from typing import Callable
 
 from fastapi import HTTPException
 
@@ -25,6 +26,7 @@ from apps.accounts.services.social_auth.exceptions import (
     SocialUserLookupError,
     SocialTokenGenerationError
 )
+from oauth.exceptions import ConfigurationError, ProviderNotSupportedError
 from oauth.factories import OAuthProviderRegistry
 
 logger = logging.getLogger(__name__)
@@ -32,21 +34,41 @@ logger = logging.getLogger(__name__)
 
 async def social_auth_controller(
         request_data: SocialAuthRequestSchema,
-        social_auth_service: SocialAuthServiceInterface,
+        resolve_service: Callable[[str], SocialAuthServiceInterface],
 ) -> SocialAuthResponseSchema:
     """
     Controller for social authentication.
 
     Args:
         request_data: Social authentication request data
-        social_auth_service: Social authentication service
+        resolve_service: Resolver building the service of the requested provider
 
     Returns:
         SocialAuthResponseSchema with authentication result
 
     Raises:
-        HTTPException: Various status codes based on error type
+        HTTPException: 422 for an unsupported provider, other codes by error type
     """
+    try:
+        social_auth_service = resolve_service(request_data.provider)
+    except ConfigurationError as e:
+        logger.error(f"Sign-in through {request_data.provider} is not configured: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Sign-in through {request_data.provider} is unavailable. Please use another method."
+        )
+    except ProviderNotSupportedError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "success": False,
+                "error_type": "ProviderNotSupportedError",
+                "error_message": f"Provider '{request_data.provider}' is not supported",
+                "provider": request_data.provider,
+                "details": {"supported_providers": e.supported_providers}
+            }
+        )
+
     try:
         auth_request = SocialAuthRequest(
             provider=request_data.provider,

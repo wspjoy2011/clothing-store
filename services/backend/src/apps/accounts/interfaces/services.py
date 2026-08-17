@@ -178,15 +178,18 @@ class AccountServiceInterface(ABC):
         pass
 
     @abstractmethod
-    async def refresh_access_token(self, refresh_token: str) -> str:
+    async def refresh_access_token(self, refresh_token: str) -> LoginResponseDTO:
         """
-        Refresh access token using refresh token
+        Exchange a refresh token for a new pair, invalidating the one presented
+
+        The presented token stops working once it is exchanged, so a leaked one is
+        useful only until its owner refreshes.
 
         Args:
             refresh_token: Valid refresh token
 
         Returns:
-            New access token string
+            New access and refresh tokens
 
         Raises:
             InvalidRefreshTokenError: If refresh token is invalid, expired, or not found in database

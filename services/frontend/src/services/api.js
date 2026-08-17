@@ -37,16 +37,28 @@ const getRefreshToken = () => {
     }
 };
 
-const updateAccessToken = (newAccessToken) => {
+/**
+ * Store a freshly issued token pair
+ *
+ * The refresh token is replaced on every refresh: the server invalidates the one
+ * that was presented, so keeping the old one would log the user out on the next
+ * refresh.
+ *
+ * @param {string} newAccessToken - Access token to use from now on
+ * @param {string} newRefreshToken - Refresh token replacing the presented one
+ * @returns {void}
+ */
+const updateTokens = (newAccessToken, newRefreshToken) => {
     try {
         const authTokens = localStorage.getItem('auth-tokens');
         if (authTokens) {
             const tokens = JSON.parse(authTokens);
             tokens.accessToken = newAccessToken;
+            tokens.refreshToken = newRefreshToken;
             localStorage.setItem('auth-tokens', JSON.stringify(tokens));
         }
     } catch (error) {
-        console.error('Failed to update access token:', error);
+        console.error('Failed to update tokens:', error);
     }
 };
 
@@ -88,12 +100,12 @@ const refreshAccessToken = async () => {
         }
     );
 
-    if (!refreshResponse.data.access_token) {
-        throw new Error('No access token in refresh response');
+    if (!refreshResponse.data.access_token || !refreshResponse.data.refresh_token) {
+        throw new Error('Incomplete token pair in refresh response');
     }
 
     const newAccessToken = refreshResponse.data.access_token;
-    updateAccessToken(newAccessToken);
+    updateTokens(newAccessToken, refreshResponse.data.refresh_token);
 
     console.log('Tokens refreshed successfully');
     return newAccessToken;

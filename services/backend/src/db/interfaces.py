@@ -39,6 +39,23 @@ class DAOInterface(ABC):
         """
         pass
 
+    @abstractmethod
+    async def execute_write(self, query: str, params: Optional[List[Any]] = None) -> int:
+        """
+        Execute a statement that changes rows and report how many it changed
+
+        Runs inside the caller's active transaction when there is one, otherwise
+        acquires its own connection from the pool.
+
+        Args:
+            query: SQL statement to execute
+            params: Statement parameters
+
+        Returns:
+            Number of rows the statement affected
+        """
+        pass
+
 
 class TransactionManagerInterface(ABC):
     """Interface for managing database transaction boundaries"""

@@ -369,9 +369,16 @@ async def request_password_reset_controller(
     try:
         await account_service.request_password_reset(reset_request_dto)
     except PasswordResetEmailError as e:
+        logger.error(f"Password reset email could not be sent for {request_data.email}: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=str(e)
+            status_code=503,
+            detail="Password reset email could not be sent. Please try again."
+        )
+    except PasswordResetError as e:
+        logger.error(f"Password reset could not be started for {request_data.email}: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Password reset could not be started. Please try again."
         )
     except Exception as e:
         logger.error(f"Unexpected error during password reset request for email {request_data.email}: {e}")
@@ -526,13 +533,13 @@ async def refresh_access_token_controller(
         account_service: Account service for business logic
 
     Returns:
-        RefreshTokenResponse with new access token
+        RefreshTokenResponse with the new token pair
 
     Raises:
         HTTPException: 401 for invalid/expired tokens, 404 if user not found, 500 for server errors
     """
     try:
-        new_access_token = await account_service.refresh_access_token(token_data.refresh_token)
+        tokens = await account_service.refresh_access_token(token_data.refresh_token)
     except InvalidRefreshTokenError as e:
         raise HTTPException(
             status_code=401,
@@ -561,7 +568,8 @@ async def refresh_access_token_controller(
         )
     else:
         return RefreshTokenResponse(
-            access_token=new_access_token,
-            token_type="bearer",
+            access_token=tokens.access_token,
+            refresh_token=tokens.refresh_token,
+            token_type=tokens.token_type,
             expires_in=config.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )

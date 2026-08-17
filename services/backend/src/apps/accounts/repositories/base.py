@@ -100,20 +100,34 @@ class BaseRepository(AccountsRepositoryMixin):
         else:
             return result or []
 
-    async def _execute_custom_update_query(self, query: str, params: List, log_prefix: str) -> bool:
-        """Execute custom UPDATE/DELETE query and return number of affected rows"""
+    async def _execute_custom_update_query(self, query: str, params: List, log_prefix: str) -> int:
+        """
+        Execute a statement that changes rows and report how many it changed
+
+        The count is what callers need: a statement matching no row raises nothing,
+        so its absence of failure says nothing about whether anything changed.
+
+        Args:
+            query: SQL statement to execute
+            params: Statement parameters
+            log_prefix: Name of the operation for the log
+
+        Returns:
+            Number of rows the statement affected
+
+        Raises:
+            DatabaseQueryError: If the statement fails
+        """
         logger.info(f"{log_prefix} query: {query}")
 
         try:
-            cursor = await self._dao.execute(query, params)
+            return await self._dao.execute_write(query, params)
         except (psycopg.Error, psycopg.DatabaseError) as e:
             logger.error(f"Database error in custom update query: {e}")
             raise DatabaseQueryError(f"{log_prefix} failed", e)
         except Exception as e:
             logger.error(f"Unexpected error in custom update query: {e}")
             raise DatabaseQueryError(f"{log_prefix} failed with unexpected error", e)
-        else:
-            return True
 
     def _build_delete_query(self, table_name: str) -> tuple[str, list]:
         """Build DELETE query using current WHERE conditions"""
