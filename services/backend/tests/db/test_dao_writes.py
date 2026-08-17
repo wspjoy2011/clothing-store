@@ -47,3 +47,24 @@ async def test_a_write_outside_a_transaction_takes_its_own_connection():
 
     assert len(pool.created) == 1
     assert pool.created[0].returned_to_pool is True
+
+
+async def test_a_write_outside_a_transaction_is_committed():
+    """Leaving the pooled connection commits the write, as psycopg does"""
+    pool = FakeConnectionPool(rowcount=1)
+    dao = PostgreSQLDAO(pool)
+
+    await dao.execute_write(UPDATE, [True, 1])
+
+    assert pool.created[0].events == ["COMMIT"]
+
+
+async def test_a_read_outside_a_transaction_is_also_closed_off():
+    """A statement taken on a borrowed connection never leaves it mid-transaction"""
+    pool = FakeConnectionPool(rows=[("value",)])
+    dao = PostgreSQLDAO(pool)
+
+    await dao.execute("SELECT column FROM t", [], fetch_one=True)
+
+    assert pool.created[0].events == ["COMMIT"]
+    assert pool.created[0].pending_work is False

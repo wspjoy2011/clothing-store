@@ -123,62 +123,8 @@ class CartServiceInterface(ABC):
         """
         pass
 
-    @abstractmethod
-    async def clear_cart(
-            self,
-            user_id: Optional[int] = None,
-            token: Optional[str] = None
-    ) -> bool:
-        """
-        Clear all items from cart
 
-        Business logic: Validate ownership, clear all items, return success status
 
-        Args:
-            user_id: ID of authenticated user (mutually exclusive with token)
-            token: Cart token for anonymous user (mutually exclusive with user_id)
-
-        Returns:
-            True if cleared successfully
-        """
-        pass
-
-    @abstractmethod
-    async def get_cart_summary(
-            self,
-            user_id: Optional[int] = None,
-            token: Optional[str] = None
-    )-> Optional[CartSummaryDTO]:
-        """
-        Get cart summary with totals (lightweight operation)
-
-        Business logic: Get cart, calculate totals without full product details
-
-        Args:
-            user_id: ID of authenticated user (mutually exclusive with token)
-            token: Cart token for anonymous user (mutually exclusive with user_id)
-
-        Returns:
-            Cart summary with totals or None if cart doesn't exist
-        """
-        pass
-
-    @abstractmethod
-    async def merge_anonymous_cart(self, user_id: int, token: str) -> CartResponseDTO:
-        """
-        Merge anonymous cart to user cart when user logs in
-
-        Business logic: Get both carts, merge items (handle duplicates),
-        delete anonymous cart, return merged user cart
-
-        Args:
-            user_id: ID of the user who just logged in
-            token: Token of the anonymous cart to merge
-
-        Returns:
-            Merged user cart with all items
-        """
-        pass
 
     @abstractmethod
     async def validate_cart_items_availability(

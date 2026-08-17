@@ -117,11 +117,31 @@ async def test_execute_returns_none_for_statements_without_a_result_set():
     assert result is None
 
 
-async def test_execute_passes_the_model_class_as_row_factory():
-    """model_class is turned into a psycopg row factory"""
-    pool = FakeConnectionPool(rows=[Row(column="value")])
+async def test_a_model_class_maps_the_raw_row_into_that_class():
+    """The raw row really passes through the model factory, not around it"""
+    pool = FakeConnectionPool(rows=[("value",)], description=[("column",)])
     dao = PostgreSQLDAO(pool)
 
-    result = await dao.execute("SELECT 1", [], fetch_one=True, model_class=Row)
+    result = await dao.execute("SELECT column FROM t", [], fetch_one=True, model_class=Row)
 
     assert result == Row(column="value")
+
+
+async def test_as_dict_maps_the_raw_row_into_a_dictionary():
+    """as_dict maps through the dictionary factory, keyed by column name"""
+    pool = FakeConnectionPool(rows=[("value",)], description=[("column",)])
+    dao = PostgreSQLDAO(pool)
+
+    result = await dao.execute("SELECT column FROM t", [], fetch_one=True, as_dict=True)
+
+    assert result == {"column": "value"}
+
+
+async def test_rows_are_returned_raw_when_no_mapping_was_asked_for():
+    """Without a factory the row arrives as the database returned it"""
+    pool = FakeConnectionPool(rows=[("value",)], description=[("column",)])
+    dao = PostgreSQLDAO(pool)
+
+    result = await dao.execute("SELECT column FROM t", [], fetch_one=True)
+
+    assert result == ("value",)

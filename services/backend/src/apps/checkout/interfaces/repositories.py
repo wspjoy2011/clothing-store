@@ -39,41 +39,6 @@ class CartTokenRepositoryInterface(ABC):
         """
         pass
 
-    @abstractmethod
-    async def get_cart_token_by_id(self, token_id: int) -> Optional[CartTokenDTO]:
-        """
-        Get cart token by ID
-
-        Args:
-            token_id: ID of the token to retrieve
-
-        Returns:
-            CartTokenDTO if found, None otherwise
-        """
-        pass
-
-    @abstractmethod
-    async def delete_expired_tokens(self) -> int:
-        """
-        Delete all expired tokens
-
-        Returns:
-            Number of deleted tokens
-        """
-        pass
-
-    @abstractmethod
-    async def is_token_valid(self, token: str) -> bool:
-        """
-        Check if token is valid and not expired
-
-        Args:
-            token: Token string to validate
-
-        Returns:
-            True if token is valid, False otherwise
-        """
-        pass
 
 
 class CartRepositoryInterface(ABC):
@@ -131,45 +96,7 @@ class CartRepositoryInterface(ABC):
         """
         pass
 
-    @abstractmethod
-    async def get_cart_by_id(self, cart_id: int) -> Optional[CartDTO]:
-        """
-        Get cart by cart ID
 
-        Args:
-            cart_id: ID of the cart
-
-        Returns:
-            CartDTO if found, None otherwise
-        """
-        pass
-
-    @abstractmethod
-    async def delete_cart(self, cart_id: int) -> bool:
-        """
-        Delete cart by ID
-
-        Args:
-            cart_id: ID of the cart to delete
-
-        Returns:
-            True if deleted successfully, False otherwise
-        """
-        pass
-
-    @abstractmethod
-    async def merge_carts(self, source_cart_id: int, target_cart_id: int) -> bool:
-        """
-        Merge items from source cart to target cart and delete source cart
-
-        Args:
-            source_cart_id: ID of the cart to merge from
-            target_cart_id: ID of the cart to merge to
-
-        Returns:
-            True if merged successfully, False otherwise
-        """
-        pass
 
 
 class CartItemRepositoryInterface(ABC):
@@ -257,41 +184,5 @@ class CartItemRepositoryInterface(ABC):
         """
         pass
 
-    @abstractmethod
-    async def clear_cart_items(self, cart_id: int) -> bool:
-        """
-        Remove all items from cart
 
-        Args:
-            cart_id: ID of the cart to clear
 
-        Returns:
-            True if cleared successfully, False otherwise
-        """
-        pass
-
-    @abstractmethod
-    async def get_cart_items_count(self, cart_id: int) -> int:
-        """
-        Get total count of items in cart
-
-        Args:
-            cart_id: ID of the cart
-
-        Returns:
-            Number of items in the cart
-        """
-        pass
-
-    @abstractmethod
-    async def get_cart_total_quantity(self, cart_id: int) -> int:
-        """
-        Get total quantity of all items in cart
-
-        Args:
-            cart_id: ID of the cart
-
-        Returns:
-            Total quantity of all items
-        """
-        pass

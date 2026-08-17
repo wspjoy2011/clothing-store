@@ -316,25 +316,8 @@ class CartService(CartServiceInterface):
 
         return success
 
-    async def clear_cart(
-            self,
-            user_id: Optional[int] = None,
-            token: Optional[str] = None
-    ) -> bool:
-        """Not implemented yet"""
-        raise NotImplementedError("clear_cart method is not implemented yet")
 
-    async def get_cart_summary(
-            self,
-            user_id: Optional[int] = None,
-            token: Optional[str] = None
-    ) -> Optional[CartSummaryDTO]:
-        """Not implemented yet"""
-        raise NotImplementedError("get_cart_summary method is not implemented yet")
 
-    async def merge_anonymous_cart(self, user_id: int, token: str) -> CartResponseDTO:
-        """Not implemented yet"""
-        raise NotImplementedError("merge_anonymous_cart method is not implemented yet")
 
     async def validate_cart_items_availability(
             self,
