@@ -20,6 +20,8 @@ class GoogleOAuthProvider(OAuthProviderInterface):
     _GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
     _GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
     _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+    _GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+    _REQUEST_TIMEOUT = 10.0
 
     def __init__(self, client_id: str, client_secret: str):
         """
@@ -45,7 +47,12 @@ class GoogleOAuthProvider(OAuthProviderInterface):
 
     async def verify_token(self, access_token: str) -> Dict[str, Any]:
         """
-        Verify Google access token using Authlib and get user info.
+        Verify that the token was issued to this application, then read the profile
+
+        The audience check is what makes the token ours: Google's userinfo endpoint
+        answers for any valid token, including one issued to somebody else's client,
+        so a token accepted without checking its audience lets the holder of any
+        Google token sign in as its owner.
 
         Args:
             access_token: Google access token
@@ -54,7 +61,8 @@ class GoogleOAuthProvider(OAuthProviderInterface):
             User data from Google
 
         Raises:
-            TokenVerificationError: If token verification fails
+            TokenVerificationError: If the token is rejected, belongs to another
+                application, or the profile cannot be read
         """
         if not access_token:
             raise TokenVerificationError(
@@ -63,19 +71,10 @@ class GoogleOAuthProvider(OAuthProviderInterface):
             )
 
         try:
-            self._oauth_client.token = {"access_token": access_token}
-
-            response = await self._oauth_client.get(self._GOOGLE_USERINFO_URL)
-
-            if response.status_code != 200:
-                raise TokenVerificationError(
-                    self.provider_name,
-                    f"Failed to get user info: {response.text}",
-                    response.status_code
-                )
-
-            user_data = response.json()
-            return user_data
+            async with httpx.AsyncClient(timeout=self._REQUEST_TIMEOUT) as client:
+                token_info = await self._read_token_info(client, access_token)
+                self._require_own_audience(token_info)
+                return await self._read_user_info(client, access_token)
 
         except AuthlibBaseError as e:
             raise TokenVerificationError(
@@ -94,6 +93,77 @@ class GoogleOAuthProvider(OAuthProviderInterface):
                 self.provider_name,
                 f"Unexpected error during token verification: {str(e)}"
             )
+
+    async def _read_token_info(self, client: httpx.AsyncClient, access_token: str) -> Dict[str, Any]:
+        """
+        Ask Google what the token is and who it was issued to
+
+        Args:
+            client: HTTP client used for this verification
+            access_token: Token presented by the caller
+
+        Returns:
+            Token metadata as reported by Google
+
+        Raises:
+            TokenVerificationError: If Google does not recognise the token
+        """
+        response = await client.get(
+            self._GOOGLE_TOKENINFO_URL,
+            params={"access_token": access_token}
+        )
+
+        if response.status_code != 200:
+            raise TokenVerificationError(
+                self.provider_name,
+                "Token was rejected by Google"
+            )
+
+        return response.json()
+
+    def _require_own_audience(self, token_info: Dict[str, Any]) -> None:
+        """
+        Refuse a token that was issued to a different OAuth client
+
+        Args:
+            token_info: Token metadata as reported by Google
+
+        Raises:
+            TokenVerificationError: If the audience is not this application
+        """
+        if token_info.get("aud") != self._client_id:
+            raise TokenVerificationError(
+                self.provider_name,
+                "Token was issued to another application"
+            )
+
+    async def _read_user_info(self, client: httpx.AsyncClient, access_token: str) -> Dict[str, Any]:
+        """
+        Read the profile of the token owner
+
+        Args:
+            client: HTTP client used for this verification
+            access_token: Token already confirmed to be ours
+
+        Returns:
+            Raw profile data from Google
+
+        Raises:
+            TokenVerificationError: If the profile cannot be read
+        """
+        response = await client.get(
+            self._GOOGLE_USERINFO_URL,
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+
+        if response.status_code != 200:
+            raise TokenVerificationError(
+                self.provider_name,
+                "Profile could not be read from Google",
+                response.status_code
+            )
+
+        return response.json()
 
     def extract_user_info(self, raw_data: Dict[str, Any]) -> OAuthUserInfo:
         """
@@ -132,7 +202,7 @@ class GoogleOAuthProvider(OAuthProviderInterface):
             last_name = raw_data.get("family_name")
             avatar_url = raw_data.get("picture")
             locale = raw_data.get("locale")
-            verified_email = raw_data.get("verified_email", True)
+            verified_email = raw_data.get("verified_email", False)
 
             if isinstance(verified_email, str):
                 verified_email = verified_email.lower() in ("true", "1", "yes")
