@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, List, Any
+from typing import Any, List, Optional, Tuple
 
 from apps.catalog.interfaces.specifications import SearchSpecificationInterface
 from apps.catalog.specifications.clauses import PRODUCT_ALIAS, SqlClause

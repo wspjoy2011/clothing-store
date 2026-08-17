@@ -1,19 +1,17 @@
 from datetime import datetime, timezone
-from typing import Any, List, Optional
+from typing import Any, List
 
 import pytest
 
 from apps.accounts.dto.password_reset import PasswordResetRequestDTO
 from apps.accounts.dto.users import UserDTO
 from apps.accounts.repositories.exceptions import TokenCreationError
-from apps.accounts.services.account import AccountService
 from apps.accounts.services.exceptions import PasswordResetError
+from apps.accounts.services.password import PasswordService
 from tests.accounts.fakes import (
     FakeEmailSender,
-    FakeJWTManager,
     FakePasswordManager,
     FakeTransactionManager,
-    FakeUserGroupRepository,
     FakeUserRepository,
 )
 
@@ -68,9 +66,9 @@ def build_service(
         token_repository: ResetTokenRepository,
         email_sender: FakeEmailSender,
         transactions: FakeTransactionManager
-) -> AccountService:
+) -> PasswordService:
     """
-    Assemble an account service around one active user
+    Assemble a password service around one active user
 
     Args:
         token_repository: Repository issuing reset tokens
@@ -80,12 +78,10 @@ def build_service(
     Returns:
         Service wired for the test
     """
-    return AccountService(
+    return PasswordService(
         user_repository=RepositoryWithActiveUser(),
-        user_group_repository=FakeUserGroupRepository(),
         token_repository=token_repository,
         password_manager=FakePasswordManager(),
-        jwt_manager=FakeJWTManager(),
         email_sender=email_sender,
         transaction_manager=transactions
     )
@@ -144,12 +140,10 @@ async def test_the_reset_email_is_sent_outside_the_transaction():
 async def test_an_unknown_address_is_answered_as_success():
     """An address nobody registered gets the same answer, revealing nothing"""
     tokens = ResetTokenRepository()
-    service = AccountService(
+    service = PasswordService(
         user_repository=FakeUserRepository(),
-        user_group_repository=FakeUserGroupRepository(),
         token_repository=tokens,
         password_manager=FakePasswordManager(),
-        jwt_manager=FakeJWTManager(),
         email_sender=FakeEmailSender(),
         transaction_manager=FakeTransactionManager()
     )

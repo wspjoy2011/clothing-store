@@ -1,6 +1,4 @@
 from functools import lru_cache
-from typing import AsyncGenerator
-from contextlib import asynccontextmanager
 
 from search.autocomplete import ElasticsearchAutocompleteClient
 from search.interfaces import AutocompleteClientInterface

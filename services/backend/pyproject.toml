@@ -37,6 +37,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
+    "ruff>=0.16.3",
 ]
 
 [tool.uv]
@@ -58,10 +59,50 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 65
+fail_under = 67
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
     "@abstractmethod",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "F",    # unused imports and names, undefined names
+    "E",    # style errors
+    "W",    # style warnings
+    "I",    # import order
+    "B",    # likely bugs
+    "C4",   # comprehensions
+]
+ignore = [
+    "B008",  # Depends(...) in a default is how FastAPI declares dependencies
+    "B904",  # domain exceptions carry the cause as an argument, not through "from"
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Endpoint descriptions and payload examples are prose and sample tokens: wrapping them helps nobody
+"src/apps/*/routes*.py" = ["E501"]
+"src/apps/*/schemas/examples/*.py" = ["E501"]
+"src/apps/*/schemas/jwt_token.py" = ["E501"]
+# Environment has to be set before the settings module is imported
+"tests/conftest.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "apps",
+    "db",
+    "migrations",
+    "notifications",
+    "oauth",
+    "search",
+    "security",
+    "settings",
+    "tests",
 ]

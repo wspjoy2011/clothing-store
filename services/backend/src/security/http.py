@@ -1,17 +1,17 @@
 from typing import Annotated
 
-from fastapi import Request, HTTPException, status, Depends
+from fastapi import Depends, HTTPException, Request, status
 
 from security.dependencies import get_jwt_manager
 from security.dto import JWTPayloadDTO
-from security.interfaces import JWTManagerInterface
 from security.exceptions import (
     EmptyTokenError,
     ExpiredTokenError,
     InvalidTokenError,
     InvalidTokenTypeError,
-    TokenVerificationError
+    TokenVerificationError,
 )
+from security.interfaces import JWTManagerInterface
 
 
 def get_token(request: Request) -> str:

@@ -55,7 +55,10 @@ class FakeCursor:
         self.description: Optional[List[Tuple[str, ...]]] = connection.description
         self.rowcount: int = -1
         self._encoding = ENCODING
-        self.pgresult = FakeResult([column[0] for column in connection.description])             if connection.description else None
+        self.pgresult = (
+            FakeResult([column[0] for column in connection.description])
+            if connection.description else None
+        )
 
     async def __aenter__(self) -> "FakeCursor":
         return self
@@ -286,7 +289,7 @@ class FakeTransactionManager:
         Yields:
             Control to the wrapped block
         """
-        from db.transaction import _current_transaction, TransactionState
+        from db.transaction import TransactionState, _current_transaction
 
         self.entered += 1
         self.isolation_levels.append(isolation_level)

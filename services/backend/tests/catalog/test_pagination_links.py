@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from urllib.parse import urlparse
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.dto.catalog import CatalogDTO, PaginationDTO

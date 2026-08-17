@@ -1,14 +1,25 @@
 """Test doubles for the account services."""
 
-from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from typing import Any, AsyncIterator, List, Optional
+from typing import Any, List, Optional
 
 from apps.accounts.dto.users import UserDTO
-from db.transaction import get_current_transaction, TransactionState
+from db.transaction import get_current_transaction
 from notifications.exceptions.email import BaseEmailError
-from tests.fakes import FakeConnection, FakeTransactionManager
+from tests.fakes import FakeTransactionManager
+
+# Re-exported for the account tests
+__all__ = [
+    "FakeEmailSender",
+    "FakeJWTManager",
+    "FakePasswordManager",
+    "FakeTokenRepository",
+    "FakeTransactionManager",
+    "FakeUserGroupRepository",
+    "FakeUserRepository",
+    "SentEmail",
+]
 
 
 @dataclass
@@ -84,7 +95,7 @@ class FakeUserRepository:
 
     async def get_user_password_hash(self, user_id: int) -> Optional[str]:
         """Report the stored hash of a user"""
-        return next((f"hashed:stored" for user in self.users if user.id == user_id), None)
+        return next(("hashed:stored" for user in self.users if user.id == user_id), None)
 
     async def update_user_password(self, user_id: int, hashed_password: str) -> bool:
         """Record the update and report whether any stored user matched"""

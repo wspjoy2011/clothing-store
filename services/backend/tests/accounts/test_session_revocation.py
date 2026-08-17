@@ -4,14 +4,15 @@ from typing import Any, List, Optional
 import pytest
 
 from apps.accounts.dto.password_reset import PasswordChangeDTO
-from apps.accounts.dto.users import UserDTO
-from apps.accounts.services.account import AccountService
+from apps.accounts.dto.users import UserDTO, UserLoginDTO
+from apps.accounts.services.authentication import AuthenticationService
+from apps.accounts.services.exceptions import InvalidRefreshTokenError
+from apps.accounts.services.password import PasswordService
 from tests.accounts.fakes import (
     FakeEmailSender,
     FakeJWTManager,
     FakePasswordManager,
     FakeTransactionManager,
-    FakeUserGroupRepository,
     FakeUserRepository,
 )
 
@@ -85,9 +86,12 @@ class RepositoryWithActiveUser(FakeUserRepository):
         return next((user for user in self.users if user.id == user_id), None)
 
 
-def build_service(tokens: SessionTokenRepository, transactions: FakeTransactionManager) -> AccountService:
+def build_password_service(
+        tokens: SessionTokenRepository,
+        transactions: FakeTransactionManager
+) -> PasswordService:
     """
-    Assemble an account service around one active user
+    Assemble the password service around one active user
 
     Args:
         tokens: Repository tracking refresh tokens
@@ -96,13 +100,34 @@ def build_service(tokens: SessionTokenRepository, transactions: FakeTransactionM
     Returns:
         Service wired for the test
     """
-    return AccountService(
+    return PasswordService(
         user_repository=RepositoryWithActiveUser(),
-        user_group_repository=FakeUserGroupRepository(),
+        token_repository=tokens,
+        password_manager=FakePasswordManager(),
+        email_sender=FakeEmailSender(),
+        transaction_manager=transactions
+    )
+
+
+def build_authentication_service(
+        tokens: SessionTokenRepository,
+        transactions: FakeTransactionManager
+) -> AuthenticationService:
+    """
+    Assemble the authentication service around one active user
+
+    Args:
+        tokens: Repository tracking refresh tokens
+        transactions: Manager exposing transaction state
+
+    Returns:
+        Service wired for the test
+    """
+    return AuthenticationService(
+        user_repository=RepositoryWithActiveUser(),
         token_repository=tokens,
         password_manager=FakePasswordManager(),
         jwt_manager=FakeJWTManager(),
-        email_sender=FakeEmailSender(),
         transaction_manager=transactions
     )
 
@@ -111,7 +136,7 @@ async def test_changing_the_password_revokes_the_issued_sessions():
     """A stolen refresh token stops working once the owner changes the password"""
     tokens = SessionTokenRepository()
     transactions = FakeTransactionManager()
-    service = build_service(tokens, transactions)
+    service = build_password_service(tokens, transactions)
 
     await service.change_password(
         ADDRESS,
@@ -125,7 +150,7 @@ async def test_changing_the_password_revokes_the_issued_sessions():
 async def test_the_sessions_are_revoked_in_the_transaction_that_writes_the_password():
     """Revocation and the new password commit together or not at all"""
     tokens = SessionTokenRepository()
-    service = build_service(tokens, FakeTransactionManager())
+    service = build_password_service(tokens, FakeTransactionManager())
 
     await service.change_password(
         ADDRESS,
@@ -138,7 +163,7 @@ async def test_the_sessions_are_revoked_in_the_transaction_that_writes_the_passw
 async def test_refreshing_replaces_the_token_that_was_presented():
     """The presented refresh token is invalidated as part of the exchange"""
     tokens = SessionTokenRepository()
-    service = build_service(tokens, FakeTransactionManager())
+    service = build_authentication_service(tokens, FakeTransactionManager())
 
     result = await service.refresh_access_token(PRESENTED_REFRESH)
 
@@ -150,10 +175,8 @@ async def test_refreshing_replaces_the_token_that_was_presented():
 
 async def test_a_rotated_token_cannot_be_used_again():
     """Presenting the exchanged token a second time is refused"""
-    from apps.accounts.services.exceptions import InvalidRefreshTokenError
-
     tokens = SessionTokenRepository()
-    service = build_service(tokens, FakeTransactionManager())
+    service = build_authentication_service(tokens, FakeTransactionManager())
 
     await service.refresh_access_token(PRESENTED_REFRESH)
 
@@ -165,9 +188,30 @@ async def test_the_rotation_is_one_unit_of_work():
     """Removing the old token and storing the new one commit together"""
     tokens = SessionTokenRepository()
     transactions = FakeTransactionManager()
-    service = build_service(tokens, transactions)
+    service = build_authentication_service(tokens, transactions)
 
     await service.refresh_access_token(PRESENTED_REFRESH)
 
     assert transactions.committed == 1
     assert transactions.rolled_back == 0
+
+
+async def test_signing_in_stores_the_refresh_token():
+    """A session is only resumable if its refresh token was stored"""
+    tokens = SessionTokenRepository(stored_refresh=None)
+    service = build_authentication_service(tokens, FakeTransactionManager())
+
+    result = await service.login_user(UserLoginDTO(email=ADDRESS, password="current"))
+
+    assert result.refresh_token == "refresh-token"
+    assert [stored.token for stored in tokens.created] == ["refresh-token"]
+
+
+async def test_signing_in_stores_the_token_for_the_user_who_signed_in():
+    """The stored token belongs to the account that authenticated"""
+    tokens = SessionTokenRepository(stored_refresh=None)
+    service = build_authentication_service(tokens, FakeTransactionManager())
+
+    await service.login_user(UserLoginDTO(email=ADDRESS, password="current"))
+
+    assert [stored.user_id for stored in tokens.created] == [1]

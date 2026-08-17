@@ -1,19 +1,11 @@
-from typing import Optional, List
+from typing import List, Optional
 
 import psycopg
 
-from apps.accounts.dto.tokens import (
-    ActivationTokenDTO,
-    PasswordResetTokenDTO,
-    RefreshTokenDTO,
-    CreateTokenDTO
-)
+from apps.accounts.dto.tokens import ActivationTokenDTO, CreateTokenDTO, PasswordResetTokenDTO, RefreshTokenDTO
 from apps.accounts.interfaces.repositories import TokenRepositoryInterface
-from apps.accounts.repositories.exceptions import (
-    TokenCreationError,
-    TokenDeletionError
-)
 from apps.accounts.repositories.base import BaseRepository
+from apps.accounts.repositories.exceptions import TokenCreationError, TokenDeletionError
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
 from settings.logging_config import get_logger
 
@@ -76,7 +68,7 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         query = f"""
             INSERT INTO {self.APP_NAME}_activation_tokens (token, expires_at, user_id)
             VALUES (%s, %s, %s)
-            ON CONFLICT (user_id) DO UPDATE SET 
+            ON CONFLICT (user_id) DO UPDATE SET
                 token = EXCLUDED.token,
                 expires_at = EXCLUDED.expires_at
             RETURNING id, token, expires_at, user_id
@@ -157,7 +149,7 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         query = f"""
             INSERT INTO {self.APP_NAME}_password_reset_tokens (token, expires_at, user_id)
             VALUES (%s, %s, %s)
-            ON CONFLICT (user_id) DO UPDATE SET 
+            ON CONFLICT (user_id) DO UPDATE SET
                 token = EXCLUDED.token,
                 expires_at = EXCLUDED.expires_at
             RETURNING id, token, expires_at, user_id
@@ -200,8 +192,8 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
 
         try:
             affected = await self._execute_custom_update_query(query, params, "Delete password reset tokens by user ID")
-            logger.info(f"Deleted password reset tokens for user {user_id}")
-            return result
+            logger.info(f"Deleted {affected} password reset tokens for user {user_id}")
+            return affected > 0
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise TokenDeletionError(f"Failed to delete password reset tokens for user ID: {user_id}", e)

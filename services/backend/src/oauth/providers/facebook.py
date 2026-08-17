@@ -1,12 +1,12 @@
 """Facebook OAuth provider implementation."""
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 import httpx
 
-from oauth.interfaces import OAuthProviderInterface
 from oauth.dto import OAuthUserInfo
-from oauth.exceptions import TokenVerificationError, UserInfoError, ConfigurationError, OAuthError
+from oauth.exceptions import ConfigurationError, OAuthError, TokenVerificationError, UserInfoError
+from oauth.interfaces import OAuthProviderInterface
 
 
 class FacebookOAuthProvider(OAuthProviderInterface):

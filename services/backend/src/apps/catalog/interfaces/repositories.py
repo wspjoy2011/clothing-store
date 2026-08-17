@@ -5,11 +5,11 @@ from apps.catalog.dto.category import CategoryMenuDTO, MasterCategoryInfoDTO
 from apps.catalog.dto.filters import FiltersDTO
 from apps.catalog.dto.products import InventoryHoldDTO, ProductDTO
 from apps.catalog.interfaces.specifications import (
-    PaginationSpecificationInterface,
-    OrderingSpecificationInterface,
+    CategorySpecificationInterface,
     FilterSpecificationInterface,
+    OrderingSpecificationInterface,
+    PaginationSpecificationInterface,
     SearchSpecificationInterface,
-    CategorySpecificationInterface
 )
 
 

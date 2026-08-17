@@ -1,7 +1,5 @@
 from typing import Optional
 
-import psycopg
-
 from apps.checkout.dto import CartDTO
 from apps.checkout.interfaces.repositories import CartRepositoryInterface
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface

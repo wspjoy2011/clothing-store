@@ -2,11 +2,10 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from apps.checkout.dto import (
-    CartTokenResponseDTO,
-    CartResponseDTO,
-    CartItemResponseDTO,
-    CartSummaryDTO,
     AddToCartRequestDTO,
+    CartItemResponseDTO,
+    CartResponseDTO,
+    CartTokenResponseDTO,
     UpdateCartItemRequestDTO,
 )
 

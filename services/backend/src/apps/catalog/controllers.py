@@ -3,24 +3,24 @@ from urllib.parse import urlencode
 
 from fastapi import HTTPException
 
-from apps.catalog.dto.category import (
-    ArticleTypeInfoDTO,
-    CategoryMenuDTO,
-    MasterCategoryInfoDTO,
-    SubCategoryInfoDTO
-)
-from apps.catalog.dto.products import ProductDTO, InventoryDTO
+from apps.catalog.dto.category import ArticleTypeInfoDTO, CategoryMenuDTO, MasterCategoryInfoDTO, SubCategoryInfoDTO
+from apps.catalog.dto.products import InventoryDTO, ProductDTO
 from apps.catalog.interfaces.services import CatalogServiceInterface
-from apps.catalog.schemas.filters import FiltersResponseSchema, CheckboxFilterSchema, RangeFilterSchema, \
-    AvailabilityFilterSchema, PriceRangeFilterSchema
+from apps.catalog.schemas.filters import (
+    AvailabilityFilterSchema,
+    CheckboxFilterSchema,
+    FiltersResponseSchema,
+    PriceRangeFilterSchema,
+    RangeFilterSchema,
+)
 from apps.catalog.schemas.responses import (
+    ArticleTypeSchema,
+    CategoryMenuResponseSchema,
+    InventorySchema,
+    MasterCategorySchema,
     ProductListResponseSchema,
     ProductSchema,
-    InventorySchema,
-    CategoryMenuResponseSchema,
-    MasterCategorySchema,
     SubCategorySchema,
-    ArticleTypeSchema
 )
 from settings.api import CATALOG_CATEGORIES_PATH, CATALOG_PRODUCTS_PATH
 

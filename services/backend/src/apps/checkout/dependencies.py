@@ -1,19 +1,15 @@
 from fastapi import Depends
 
-from apps.checkout.interfaces import (
-    CartTokenRepositoryInterface,
-    CartRepositoryInterface,
-    CartItemRepositoryInterface,
-    CartServiceInterface
-)
-from apps.checkout.repositories import (
-    CartTokenRepository,
-    CartRepository,
-    CartItemRepository
-)
-from apps.checkout.services import CartService
 from apps.catalog.dependencies import get_catalog_service
 from apps.catalog.interfaces.services import CatalogServiceInterface
+from apps.checkout.interfaces import (
+    CartItemRepositoryInterface,
+    CartRepositoryInterface,
+    CartServiceInterface,
+    CartTokenRepositoryInterface,
+)
+from apps.checkout.repositories import CartItemRepository, CartRepository, CartTokenRepository
+from apps.checkout.services import CartService
 from db.dependencies import get_database_dao, get_query_builder, get_transaction_manager
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface, TransactionManagerInterface
 

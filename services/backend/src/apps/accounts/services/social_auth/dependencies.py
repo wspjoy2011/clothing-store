@@ -6,28 +6,24 @@ from typing import Callable
 
 from fastapi import Depends
 
-from oauth.dependencies import get_oauth_registry
-from oauth.factories import OAuthProviderRegistry
-from oauth.exceptions import ProviderNotSupportedError
-from settings.config import config
-from apps.accounts.services.social_auth.service import SocialAuthService
-from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
+from apps.accounts.dependencies import get_token_repository, get_user_group_repository, get_user_repository
 from apps.accounts.interfaces.repositories import (
-    UserRepositoryInterface,
+    TokenRepositoryInterface,
     UserGroupRepositoryInterface,
-    TokenRepositoryInterface
+    UserRepositoryInterface,
 )
-from apps.accounts.dependencies import (
-    get_user_repository,
-    get_user_group_repository,
-    get_token_repository
-)
-from security.dependencies import get_password_manager, get_jwt_manager
-from security.interfaces import PasswordManagerInterface, JWTManagerInterface
-from notifications.dependencies import get_email_sender_dependency
-from notifications.email.interfaces import EmailSenderInterface
+from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
+from apps.accounts.services.social_auth.service import SocialAuthService
 from db.dependencies import get_transaction_manager
 from db.interfaces import TransactionManagerInterface
+from notifications.dependencies import get_email_sender_dependency
+from notifications.email.interfaces import EmailSenderInterface
+from oauth.dependencies import get_oauth_registry
+from oauth.exceptions import ProviderNotSupportedError
+from oauth.factories import OAuthProviderRegistry
+from security.dependencies import get_jwt_manager, get_password_manager
+from security.interfaces import JWTManagerInterface, PasswordManagerInterface
+from settings.config import config
 
 
 def get_social_auth_service_resolver(

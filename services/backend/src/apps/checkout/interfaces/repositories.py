@@ -1,13 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List, Optional
 
-from apps.checkout.dto import (
-    CartTokenDTO,
-    CartDTO,
-    CartItemDTO,
-    AddToCartRequestDTO,
-    UpdateCartItemRequestDTO
-)
+from apps.checkout.dto import AddToCartRequestDTO, CartDTO, CartItemDTO, CartTokenDTO, UpdateCartItemRequestDTO
 
 
 class CartTokenRepositoryInterface(ABC):

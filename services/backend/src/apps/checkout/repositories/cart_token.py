@@ -1,5 +1,4 @@
 from typing import Optional
-from datetime import datetime, timezone
 
 from apps.checkout.dto import CartTokenDTO
 from apps.checkout.interfaces.repositories import CartTokenRepositoryInterface

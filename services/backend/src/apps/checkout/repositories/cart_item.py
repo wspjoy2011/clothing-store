@@ -1,8 +1,8 @@
-from typing import Optional, List
+from typing import List, Optional
 
 import psycopg
 
-from apps.checkout.dto import CartItemDTO, AddToCartRequestDTO, UpdateCartItemRequestDTO
+from apps.checkout.dto import AddToCartRequestDTO, CartItemDTO, UpdateCartItemRequestDTO
 from apps.checkout.exceptions.repositories import CartStorageError
 from apps.checkout.interfaces.repositories import CartItemRepositoryInterface
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
@@ -60,7 +60,9 @@ class CartItemRepository(CartItemRepositoryInterface):
         )
 
         logger.info(
-            f"Added/updated item in cart {cart_id}: product {request_data.product_id}, quantity {request_data.quantity}")
+            f"Added/updated item in cart {cart_id}: product {request_data.product_id}, "
+            f"quantity {request_data.quantity}"
+        )
         return result
 
     async def get_cart_item_by_id(self, item_id: int) -> Optional[CartItemDTO]:
@@ -201,7 +203,7 @@ class CartItemRepository(CartItemRepositoryInterface):
                 not the same answer as "no such item"
         """
         query = f"""
-            DELETE FROM {self.APP_NAME}_cart_items 
+            DELETE FROM {self.APP_NAME}_cart_items
             WHERE id = %s AND cart_id = %s
             RETURNING id
         """

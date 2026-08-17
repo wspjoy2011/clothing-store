@@ -1,4 +1,4 @@
-from typing import Self, Tuple, List, Any
+from typing import Any, List, Self, Tuple
 
 from db.interfaces import SQLQueryBuilderInterface
 
@@ -98,11 +98,11 @@ class SQLQueryBuilder(SQLQueryBuilderInterface):
         params = [*self._where_params, *self._order_by_params]
 
         if self._limit_value is not None:
-            query += f" LIMIT %s"
+            query += " LIMIT %s"
             params.append(self._limit_value)
 
         if self._offset_value is not None:
-            query += f" OFFSET %s"
+            query += " OFFSET %s"
             params.append(self._offset_value)
 
         return query, params

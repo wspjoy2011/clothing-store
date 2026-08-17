@@ -1,8 +1,8 @@
 """Dependencies for security components"""
 
-from security.passwords import PasswordManager
+from security.interfaces import JWTManagerInterface, PasswordManagerInterface
 from security.jwt_token import JWTManager
-from security.interfaces import PasswordManagerInterface, JWTManagerInterface
+from security.passwords import PasswordManager
 from settings.config import config
 
 

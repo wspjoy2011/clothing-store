@@ -2,16 +2,17 @@ from pathlib import Path
 from typing import Tuple
 
 import pandas as pd
+
 from etl.models.dto import (
-    MasterCategoryDTO,
-    SubCategoryDTO,
     ArticleTypeDTO,
     BaseColourDTO,
-    SeasonDTO,
-    UsageTypeDTO,
-    ProductDTO,
-    ImageDTO,
     ETLResultDTO,
+    ImageDTO,
+    MasterCategoryDTO,
+    ProductDTO,
+    SeasonDTO,
+    SubCategoryDTO,
+    UsageTypeDTO,
 )
 
 

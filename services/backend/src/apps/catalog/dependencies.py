@@ -1,16 +1,8 @@
 from fastapi import Depends
 
-from apps.catalog.factories import (
-    create_pagination_specification,
-    create_ordering_specification,
-    create_product_filter_specification,
-    create_search_specification,
-    create_category_specification
-)
-from apps.catalog.interfaces.repositories import (
-    ProductRepositoryInterface,
-    CategoryRepositoryInterface
-)
+from apps.catalog.factories import SpecificationFactory
+from apps.catalog.interfaces.factories import SpecificationFactoryInterface
+from apps.catalog.interfaces.repositories import CategoryRepositoryInterface, ProductRepositoryInterface
 from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.repositories.category import CategoryRepository
 from apps.catalog.repositories.product import ProductRepository
@@ -51,64 +43,25 @@ async def get_category_repository(
     return CategoryRepository(dao)
 
 
-def get_pagination_specification_factory() -> callable:
+
+
+
+
+
+def get_specification_factory() -> SpecificationFactoryInterface:
     """
-    Dependency for getting pagination specification factory.
+    Dependency for getting the specification factory
 
     Returns:
-        Function to create pagination specifications
+        Factory building the specifications of a catalogue query
     """
-    return create_pagination_specification
-
-
-def get_ordering_specification_factory() -> callable:
-    """
-    Dependency for getting ordering specification factory.
-
-    Returns:
-        Function to create ordering specifications
-    """
-    return create_ordering_specification
-
-
-def get_filter_specification_factory() -> callable:
-    """
-    Dependency for getting filter specification factory.
-
-    Returns:
-        Function to create filter specifications
-    """
-    return create_product_filter_specification
-
-
-def get_search_specification_factory() -> callable:
-    """
-    Get factory for creating search specifications
-
-    Returns:
-        Factory function for creating search specifications
-    """
-    return create_search_specification
-
-
-def get_category_specification_factory() -> callable:
-    """
-    Dependency for getting category specification factory.
-
-    Returns:
-        Function to create category specifications
-    """
-    return create_category_specification
+    return SpecificationFactory()
 
 
 async def get_catalog_service(
         product_repository: ProductRepositoryInterface = Depends(get_product_repository),
         category_repository: CategoryRepositoryInterface = Depends(get_category_repository),
-        pagination_specification_factory: callable = Depends(get_pagination_specification_factory),
-        ordering_specification_factory: callable = Depends(get_ordering_specification_factory),
-        filter_specification_factory: callable = Depends(get_filter_specification_factory),
-        search_specification_factory: callable = Depends(get_search_specification_factory),
-        category_specification_factory: callable = Depends(get_category_specification_factory),
+        specifications: SpecificationFactoryInterface = Depends(get_specification_factory),
         autocomplete_client: AutocompleteClientInterface = Depends(get_autocomplete_client),
 ) -> CatalogServiceInterface:
     """
@@ -117,11 +70,7 @@ async def get_catalog_service(
     Args:
         product_repository: Repository for accessing product data
         category_repository: Repository for accessing category data
-        pagination_specification_factory: Factory for creating pagination specifications
-        ordering_specification_factory: Factory for creating ordering specifications
-        filter_specification_factory: Factory for creating filter specifications
-        search_specification_factory: Factory for creating search specifications
-        category_specification_factory: Factory for creating category specifications
+        specifications: Factory building the specifications of a query
         autocomplete_client: Autocomplete client for product suggestions
 
     Returns:
@@ -130,10 +79,6 @@ async def get_catalog_service(
     return CatalogService(
         product_repository=product_repository,
         category_repository=category_repository,
-        pagination_specification_factory=pagination_specification_factory,
-        ordering_specification_factory=ordering_specification_factory,
-        filter_specification_factory=filter_specification_factory,
-        search_specification_factory=search_specification_factory,
-        category_specification_factory=category_specification_factory,
+        specifications=specifications,
         autocomplete_client=autocomplete_client,
     )

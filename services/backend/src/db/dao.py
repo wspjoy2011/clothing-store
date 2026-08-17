@@ -1,15 +1,7 @@
-from typing import (
-    Any,
-    List,
-    Optional,
-    TypeVar,
-    Type,
-    Union,
-    Dict
-)
+from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from psycopg import AsyncConnection
-from psycopg.rows import dict_row, class_row
+from psycopg.rows import class_row, dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from db.interfaces import DAOInterface

@@ -1,19 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List, Optional
 
-from apps.accounts.dto.users import (
-    UserDTO,
-    UserWithProfileDTO,
-    UserGroupDTO,
-    UserProfileDTO,
-    CreateUserDTO
-)
-from apps.accounts.dto.tokens import (
-    ActivationTokenDTO,
-    PasswordResetTokenDTO,
-    RefreshTokenDTO,
-    CreateTokenDTO
-)
+from apps.accounts.dto.tokens import ActivationTokenDTO, CreateTokenDTO, PasswordResetTokenDTO, RefreshTokenDTO
+from apps.accounts.dto.users import CreateUserDTO, UserDTO, UserGroupDTO, UserWithProfileDTO
 
 
 class UserRepositoryInterface(ABC):

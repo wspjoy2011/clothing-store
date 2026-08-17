@@ -51,11 +51,7 @@ def build_service(inventory: Optional[InventoryHoldDTO]) -> CatalogService:
     return CatalogService(
         product_repository=FakeProductRepository(inventory),
         category_repository=None,
-        pagination_specification_factory=None,
-        ordering_specification_factory=None,
-        filter_specification_factory=None,
-        search_specification_factory=None,
-        category_specification_factory=None,
+        specifications=None,
         autocomplete_client=None
     )
 
@@ -94,11 +90,7 @@ async def test_the_inventory_row_is_locked():
     service = CatalogService(
         product_repository=repository,
         category_repository=None,
-        pagination_specification_factory=None,
-        ordering_specification_factory=None,
-        filter_specification_factory=None,
-        search_specification_factory=None,
-        category_specification_factory=None,
+        specifications=None,
         autocomplete_client=None
     )
 

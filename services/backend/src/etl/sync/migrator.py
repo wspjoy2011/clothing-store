@@ -1,10 +1,10 @@
 """Data migration orchestrator for synchronizing products between PostgreSQL and Elasticsearch."""
 
 import asyncio
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from etl.sync.interfaces import DataExtractorInterface, DataLoaderInterface, DataMigratorInterface
 from etl.sync.exceptions import MigrationError
+from etl.sync.interfaces import DataExtractorInterface, DataLoaderInterface, DataMigratorInterface
 from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "data_migrator")
@@ -20,7 +20,7 @@ class ProductDataMigrator(DataMigratorInterface):
     ):
         """
         Initialize product data migrator.
-        
+
         Args:
             extractor: Data extractor instance (PostgreSQL)
             loader: Data loader instance (Elasticsearch)
@@ -32,7 +32,7 @@ class ProductDataMigrator(DataMigratorInterface):
     async def migrate_products(self, batch_size: int = 1000) -> None:
         """
         Orchestrate full product data migration process.
-        
+
         Steps:
         1. Health check for destination
         2. Create index if needed
@@ -40,10 +40,10 @@ class ProductDataMigrator(DataMigratorInterface):
         4. Clear existing data
         5. Extract and load in batches
         6. Final verification
-        
+
         Args:
             batch_size: Number of products to process in each batch
-            
+
         Raises:
             MigrationError: When migration process fails
         """
@@ -76,7 +76,7 @@ class ProductDataMigrator(DataMigratorInterface):
     async def _perform_health_check(self) -> None:
         """
         Perform health check for destination system.
-        
+
         Raises:
             MigrationError: When health check fails
         """
@@ -91,7 +91,7 @@ class ProductDataMigrator(DataMigratorInterface):
     async def _ensure_index_exists(self) -> None:
         """
         Ensure destination index exists with proper mapping.
-        
+
         Raises:
             MigrationError: When index creation fails
         """
@@ -106,10 +106,10 @@ class ProductDataMigrator(DataMigratorInterface):
     async def _get_total_products_count(self) -> int:
         """
         Get total count of products to migrate.
-        
+
         Returns:
             Total number of products
-            
+
         Raises:
             MigrationError: When count query fails
         """
@@ -125,7 +125,7 @@ class ProductDataMigrator(DataMigratorInterface):
     async def _clear_destination(self) -> None:
         """
         Clear existing data from destination.
-        
+
         Raises:
             MigrationError: When clearing fails
         """
@@ -140,14 +140,14 @@ class ProductDataMigrator(DataMigratorInterface):
     async def _extract_and_load_batches(self, batch_size: int, total_count: int) -> int:
         """
         Extract and load products in batches.
-        
+
         Args:
             batch_size: Size of each batch
             total_count: Total expected products count
-            
+
         Returns:
             Number of successfully migrated products
-            
+
         Raises:
             MigrationError: When batch processing fails
         """
@@ -187,11 +187,11 @@ class ProductDataMigrator(DataMigratorInterface):
     async def _process_batch(self, batch: List[Dict[str, Any]], batch_number: int) -> None:
         """
         Process a single batch of products.
-        
+
         Args:
             batch: List of products to process
             batch_number: Current batch number for logging
-            
+
         Raises:
             MigrationError: When batch processing fails
         """
@@ -204,11 +204,11 @@ class ProductDataMigrator(DataMigratorInterface):
     async def _verify_migration(self, expected_count: int, actual_count: int) -> None:
         """
         Verify migration results.
-        
+
         Args:
             expected_count: Expected number of products
             actual_count: Actually migrated products
-            
+
         Raises:
             MigrationError: When counts don't match
         """

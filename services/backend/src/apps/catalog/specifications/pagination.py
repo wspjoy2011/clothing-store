@@ -1,4 +1,3 @@
-from typing import Any
 
 from apps.catalog.interfaces.specifications import PaginationSpecificationInterface
 

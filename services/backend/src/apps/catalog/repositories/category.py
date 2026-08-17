@@ -1,12 +1,7 @@
 import time
-from typing import Optional, ClassVar, Tuple
+from typing import ClassVar, Optional, Tuple
 
-from apps.catalog.dto.category import (
-    CategoryMenuDTO,
-    MasterCategoryInfoDTO,
-    SubCategoryInfoDTO,
-    ArticleTypeInfoDTO
-)
+from apps.catalog.dto.category import ArticleTypeInfoDTO, CategoryMenuDTO, MasterCategoryInfoDTO, SubCategoryInfoDTO
 from apps.catalog.interfaces.repositories import CategoryRepositoryInterface
 from db.interfaces import DAOInterface
 from settings.logging_config import get_logger
@@ -148,23 +143,23 @@ class CategoryRepository(CategoryRepositoryInterface):
             SQL query string
         """
         query = f"""
-            SELECT 
+            SELECT
                 mc.master_category_id,
                 mc.name as master_name,
                 sc.sub_category_id,
                 sc.name as sub_name,
                 at.article_type_id,
                 at.name as article_name
-            FROM 
+            FROM
                 {self.APP_NAME}_master_category mc
-            LEFT JOIN 
+            LEFT JOIN
                 {self.APP_NAME}_sub_category sc ON mc.master_category_id = sc.master_category_id
-            LEFT JOIN 
+            LEFT JOIN
                 {self.APP_NAME}_article_type at ON sc.sub_category_id = at.sub_category_id
         """
 
         if master_category_id is not None:
-            query += f" WHERE mc.master_category_id = %s"
+            query += " WHERE mc.master_category_id = %s"
 
         query += " ORDER BY mc.name, sc.name, at.name"
 

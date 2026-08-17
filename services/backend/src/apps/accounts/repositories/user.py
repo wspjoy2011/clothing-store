@@ -1,15 +1,11 @@
-from typing import Optional, List
+from typing import List, Optional
 
 import psycopg
 
-from apps.accounts.dto.users import UserDTO, UserWithProfileDTO, CreateUserDTO
+from apps.accounts.dto.users import CreateUserDTO, UserDTO, UserWithProfileDTO
 from apps.accounts.interfaces.repositories import UserRepositoryInterface
-from apps.accounts.repositories.exceptions import (
-    UserCreationError,
-    UserUpdateError,
-    UserDeletionError
-)
 from apps.accounts.repositories.base import BaseRepository
+from apps.accounts.repositories.exceptions import UserCreationError, UserDeletionError, UserUpdateError
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
 from settings.logging_config import get_logger
 

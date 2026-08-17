@@ -1,11 +1,4 @@
-from typing import (
-    List,
-    Tuple,
-    Any,
-    Optional,
-    Union,
-    Set
-)
+from typing import Any, List, Optional, Set, Union
 
 from apps.catalog.interfaces.specifications import FilterSpecificationInterface
 from apps.catalog.specifications.clauses import EFFECTIVE_PRICE, INVENTORY_ALIAS, PRODUCT_ALIAS, SqlClause

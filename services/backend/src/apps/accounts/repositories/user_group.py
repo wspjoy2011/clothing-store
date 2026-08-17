@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import List, Optional
 
 from apps.accounts.dto.users import UserGroupDTO
 from apps.accounts.interfaces.repositories import UserGroupRepositoryInterface

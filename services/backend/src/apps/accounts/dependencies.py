@@ -1,21 +1,27 @@
 from fastapi import Depends
 
 from apps.accounts.interfaces.repositories import (
-    UserRepositoryInterface,
+    TokenRepositoryInterface,
     UserGroupRepositoryInterface,
-    TokenRepositoryInterface
+    UserRepositoryInterface,
 )
-from apps.accounts.interfaces.services import AccountServiceInterface
+from apps.accounts.interfaces.services import (
+    AuthenticationServiceInterface,
+    PasswordServiceInterface,
+    RegistrationServiceInterface,
+)
+from apps.accounts.repositories.token import TokenRepository
 from apps.accounts.repositories.user import UserRepository
 from apps.accounts.repositories.user_group import UserGroupRepository
-from apps.accounts.repositories.token import TokenRepository
-from apps.accounts.services.account import AccountService
+from apps.accounts.services.authentication import AuthenticationService
+from apps.accounts.services.password import PasswordService
+from apps.accounts.services.registration import RegistrationService
 from db.dependencies import get_database_dao, get_query_builder, get_transaction_manager
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface, TransactionManagerInterface
 from notifications.dependencies import get_email_sender_dependency
 from notifications.email.interfaces import EmailSenderInterface
-from security.dependencies import get_password_manager, get_jwt_manager
-from security.interfaces import PasswordManagerInterface, JWTManagerInterface
+from security.dependencies import get_jwt_manager, get_password_manager
+from security.interfaces import JWTManagerInterface, PasswordManagerInterface
 
 
 async def get_user_repository(
@@ -70,36 +76,91 @@ async def get_token_repository(
     return TokenRepository(dao, query_builder)
 
 
-async def get_account_service(
+async def get_registration_service(
         user_repository: UserRepositoryInterface = Depends(get_user_repository),
         user_group_repository: UserGroupRepositoryInterface = Depends(get_user_group_repository),
         token_repository: TokenRepositoryInterface = Depends(get_token_repository),
         password_manager: PasswordManagerInterface = Depends(get_password_manager),
-        jwt_manager: JWTManagerInterface = Depends(get_jwt_manager),
         email_sender: EmailSenderInterface = Depends(get_email_sender_dependency),
         transaction_manager: TransactionManagerInterface = Depends(get_transaction_manager)
-) -> AccountServiceInterface:
+) -> RegistrationServiceInterface:
     """
-    Dependency for getting account service.
+    Dependency for getting the registration service
 
     Args:
         user_repository: Repository for user data operations
         user_group_repository: Repository for user group operations
         token_repository: Repository for token operations
         password_manager: Manager for password hashing and verification
-        jwt_manager: Manager for JWT token operations
         email_sender: Email sender for notifications
         transaction_manager: Manager owning transaction boundaries
 
     Returns:
-        Initialized account service
+        Initialized registration service
     """
-    return AccountService(
+    return RegistrationService(
         user_repository=user_repository,
         user_group_repository=user_group_repository,
         token_repository=token_repository,
         password_manager=password_manager,
+        email_sender=email_sender,
+        transaction_manager=transaction_manager
+    )
+
+
+async def get_authentication_service(
+        user_repository: UserRepositoryInterface = Depends(get_user_repository),
+        token_repository: TokenRepositoryInterface = Depends(get_token_repository),
+        password_manager: PasswordManagerInterface = Depends(get_password_manager),
+        jwt_manager: JWTManagerInterface = Depends(get_jwt_manager),
+        transaction_manager: TransactionManagerInterface = Depends(get_transaction_manager)
+) -> AuthenticationServiceInterface:
+    """
+    Dependency for getting the authentication service
+
+    Args:
+        user_repository: Repository for user data operations
+        token_repository: Repository for token operations
+        password_manager: Manager for password hashing and verification
+        jwt_manager: Manager for JWT token operations
+        transaction_manager: Manager owning transaction boundaries
+
+    Returns:
+        Initialized authentication service
+    """
+    return AuthenticationService(
+        user_repository=user_repository,
+        token_repository=token_repository,
+        password_manager=password_manager,
         jwt_manager=jwt_manager,
+        transaction_manager=transaction_manager
+    )
+
+
+async def get_password_service(
+        user_repository: UserRepositoryInterface = Depends(get_user_repository),
+        token_repository: TokenRepositoryInterface = Depends(get_token_repository),
+        password_manager: PasswordManagerInterface = Depends(get_password_manager),
+        email_sender: EmailSenderInterface = Depends(get_email_sender_dependency),
+        transaction_manager: TransactionManagerInterface = Depends(get_transaction_manager)
+) -> PasswordServiceInterface:
+    """
+    Dependency for getting the password service
+
+    Args:
+        user_repository: Repository for user data operations
+        token_repository: Repository for token operations
+        password_manager: Manager for password hashing and verification
+        email_sender: Email sender for notifications
+        transaction_manager: Manager owning transaction boundaries
+
+    Returns:
+        Initialized password service
+    """
+    return PasswordService(
+        user_repository=user_repository,
+        token_repository=token_repository,
+        password_manager=password_manager,
         email_sender=email_sender,
         transaction_manager=transaction_manager
     )

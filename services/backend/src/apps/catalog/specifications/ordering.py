@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Optional
 
 from apps.catalog.interfaces.specifications import OrderingSpecificationInterface
 from apps.catalog.specifications.clauses import EFFECTIVE_PRICE, PRODUCT_ALIAS

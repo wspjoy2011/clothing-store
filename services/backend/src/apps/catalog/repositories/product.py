@@ -1,30 +1,25 @@
-from typing import Any, Dict, List, Optional, Tuple
 from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 from apps.catalog.dto.filters import (
-    FiltersDTO,
-    CheckboxFilterDTO,
-    RangeFilterDTO,
     AvailabilityFilterDTO,
-    PriceRangeFilterDTO
+    CheckboxFilterDTO,
+    FiltersDTO,
+    PriceRangeFilterDTO,
+    RangeFilterDTO,
 )
-from apps.catalog.dto.products import ProductDTO, InventoryDTO, InventoryHoldDTO
+from apps.catalog.dto.products import InventoryDTO, InventoryHoldDTO, ProductDTO
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.specifications import (
-    PaginationSpecificationInterface,
-    OrderingSpecificationInterface,
+    CategorySpecificationInterface,
     FilterSpecificationInterface,
+    OrderingSpecificationInterface,
+    PaginationSpecificationInterface,
     SearchSpecificationInterface,
-    CategorySpecificationInterface
 )
-from apps.catalog.specifications.clauses import (
-    EFFECTIVE_PRICE,
-    INVENTORY_ALIAS,
-    PRODUCT_ALIAS,
-    SqlClause
-)
+from apps.catalog.specifications.clauses import EFFECTIVE_PRICE, INVENTORY_ALIAS, PRODUCT_ALIAS, SqlClause
 from db.interfaces import DAOInterface
-from db.transaction import get_current_transaction, NoActiveTransactionError
+from db.transaction import NoActiveTransactionError, get_current_transaction
 from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "app")

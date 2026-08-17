@@ -1,12 +1,10 @@
-from typing import List, AsyncGenerator
 from contextlib import asynccontextmanager
-from elasticsearch import AsyncElasticsearch, ApiError, ConnectionError
+from typing import AsyncGenerator, List
 
+from elasticsearch import ApiError, AsyncElasticsearch, ConnectionError
+
+from search.exceptions import AutocompleteError, ElasticsearchConnectionError
 from search.interfaces import AutocompleteClientInterface
-from search.exceptions import (
-    ElasticsearchConnectionError,
-    AutocompleteError
-)
 from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "elasticsearch")

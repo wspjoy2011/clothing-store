@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from apps.accounts.dependencies import get_account_service
+from apps.accounts.dependencies import get_authentication_service, get_registration_service
 from apps.accounts.dto.users import UserDTO
 from main import app
 from security.rate_limit import limiter
@@ -13,8 +13,8 @@ LOGIN_URL = "/api/v1/accounts/login"
 REGISTRATION_LIMIT_PER_MINUTE = 5
 
 
-class FakeAccountService:
-    """Account service that registers anybody without touching a database"""
+class FakeRegistrationService:
+    """Registration service that registers anybody without touching a database"""
 
     def __init__(self):
         self.registrations = 0
@@ -34,12 +34,26 @@ class FakeAccountService:
         )
 
 
+class FakeAuthenticationService:
+    """Authentication service that never has to be reached"""
+
+    async def login_user(self, login_dto):
+        """Refuse any sign-in, since no test here should get this far"""
+        raise AssertionError("the schema should have refused this request before the service")
+
+
 @pytest.fixture
-def service() -> FakeAccountService:
-    """Serve a fake account service to the application and reset the limiter"""
+def service() -> FakeRegistrationService:
+    """Serve fake account services to the application and reset the limiter
+
+    Both are overridden: leaving one real would make the application build a
+    connection pool while resolving dependencies, and the test would wait out its
+    timeout instead of exercising the endpoint.
+    """
     limiter.reset()
-    fake = FakeAccountService()
-    app.dependency_overrides[get_account_service] = lambda: fake
+    fake = FakeRegistrationService()
+    app.dependency_overrides[get_registration_service] = lambda: fake
+    app.dependency_overrides[get_authentication_service] = lambda: FakeAuthenticationService()
     yield fake
     app.dependency_overrides.clear()
     limiter.reset()

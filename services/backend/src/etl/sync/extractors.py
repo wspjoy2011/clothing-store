@@ -1,11 +1,11 @@
 """Data extractors for various sources."""
 
-from typing import Dict, Any, AsyncIterable
-from psycopg import AsyncConnection
-from psycopg import sql
+from typing import Any, AsyncIterable, Dict
 
-from etl.sync.interfaces import DataExtractorInterface
+from psycopg import AsyncConnection, sql
+
 from etl.sync.exceptions import DataExtractionError
+from etl.sync.interfaces import DataExtractorInterface
 from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "sync_extractors")
@@ -17,7 +17,7 @@ class PostgreSQLProductExtractor(DataExtractorInterface):
     def __init__(self, connection: AsyncConnection):
         """
         Initialize PostgreSQL product extractor.
-        
+
         Args:
             connection: PostgreSQL async connection from pool
         """
@@ -27,7 +27,7 @@ class PostgreSQLProductExtractor(DataExtractorInterface):
     def extract_products(self) -> AsyncIterable[Dict[str, Any]]:
         """
         Extract product data from catalog_products table.
-        
+
         Returns:
             AsyncIterable of product data dictionaries with id and product_display_name
         """
@@ -36,10 +36,10 @@ class PostgreSQLProductExtractor(DataExtractorInterface):
     async def _extract_products_generator(self) -> AsyncIterable[Dict[str, Any]]:
         """
         Internal generator for extracting product data.
-        
+
         Yields:
             Product data dictionaries with id and product_display_name
-            
+
         Raises:
             DataExtractionError: When extraction fails
         """
@@ -77,10 +77,10 @@ class PostgreSQLProductExtractor(DataExtractorInterface):
     async def get_products_count(self) -> int:
         """
         Get total count of products to extract.
-        
+
         Returns:
             Total number of valid products
-            
+
         Raises:
             DataExtractionError: When count query fails
         """

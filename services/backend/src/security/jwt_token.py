@@ -1,19 +1,19 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any
+from typing import Any, Dict
 
 from jose import jwt
-from jose.exceptions import JWTError, JWTClaimsError, ExpiredSignatureError
+from jose.exceptions import ExpiredSignatureError, JWTClaimsError, JWTError
 
-from security.interfaces import JWTManagerInterface
 from security.exceptions import (
+    EmptyTokenError,
+    ExpiredTokenError,
+    InvalidTokenError,
+    InvalidTokenTypeError,
     TokenCreationError,
     TokenVerificationError,
-    InvalidTokenError,
-    ExpiredTokenError,
-    InvalidTokenTypeError,
-    EmptyTokenError
 )
+from security.interfaces import JWTManagerInterface
 
 
 class JWTManager(JWTManagerInterface):

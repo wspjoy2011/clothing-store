@@ -5,8 +5,8 @@ from async_lru import alru_cache
 from psycopg_pool import AsyncConnectionPool
 from tqdm.asyncio import tqdm_asyncio
 
-from settings.logging_config import get_logger
 from etl.models.dto import ETLResultDTO
+from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "elt")
 
@@ -129,13 +129,13 @@ class DatabaseSeeder:
         logger.info("Updating product slugs using create_slug function...")
 
         update_query = f"""
-            UPDATE {self.APP_NAME}_products 
+            UPDATE {self.APP_NAME}_products
             SET slug = create_slug(product_display_name, product_id)
             WHERE slug IS NULL OR slug = '';
         """
 
         await conn.execute(update_query)
-        logger.info(f"Updated slugs for products")
+        logger.info("Updated slugs for products")
 
         count_query = f"SELECT COUNT(*) FROM {self.APP_NAME}_products WHERE slug IS NOT NULL AND slug != '';"
         count_result = await conn.execute(count_query)
@@ -176,7 +176,7 @@ class DatabaseSeeder:
         for i in tqdm_asyncio(batch_indices, desc="Bulk insert inventory"):
             batch = inventory_params[i: i + self.BATCH_SIZE]
             sql = f"""
-                  INSERT INTO {self.APP_NAME}_product_inventory 
+                  INSERT INTO {self.APP_NAME}_product_inventory
                   (product_id, base_price, sale_price, currency, stock_quantity, reserved_quantity, is_active)
                   VALUES """
             values_part = ', '.join(['(%s,%s,%s,%s,%s,%s,%s)'] * len(batch))

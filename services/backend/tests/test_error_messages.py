@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from apps.accounts.dependencies import get_account_service
+from apps.accounts.dependencies import get_authentication_service, get_password_service, get_registration_service
 from apps.accounts.services.exceptions import (
     EmailAlreadyExistsError,
     InvalidCredentialsError,
@@ -31,7 +31,7 @@ FORBIDDEN_FRAGMENTS = [
 
 
 class FailingAccountService:
-    """Account service failing every call with a technical message"""
+    """Stand-in for any account service, failing every call with a technical message"""
 
     def __init__(self, error: Exception):
         self.error = error
@@ -85,7 +85,7 @@ def assert_no_internals(body: str) -> None:
 ])
 def test_registration_failures_report_no_internals(error):
     """Whatever the registration failure, the body names the outcome only"""
-    app.dependency_overrides[get_account_service] = lambda: FailingAccountService(error)
+    app.dependency_overrides[get_registration_service] = lambda: FailingAccountService(error)
     try:
         with TestClient(app) as client:
             response = client.post(
@@ -105,7 +105,7 @@ def test_registration_failures_report_no_internals(error):
 ])
 def test_login_failures_report_no_internals(error):
     """Sign-in refusals never carry the reason they were refused"""
-    app.dependency_overrides[get_account_service] = lambda: FailingAccountService(error)
+    app.dependency_overrides[get_authentication_service] = lambda: FailingAccountService(error)
     try:
         with TestClient(app) as client:
             response = client.post(
@@ -123,7 +123,7 @@ def test_an_unknown_account_and_a_wrong_password_answer_the_same():
     """The refusal does not reveal which accounts exist"""
     answers = []
     for error in (UserNotFoundError(INTERNAL_TEXT), InvalidCredentialsError(INTERNAL_TEXT)):
-        app.dependency_overrides[get_account_service] = lambda error=error: FailingAccountService(error)
+        app.dependency_overrides[get_authentication_service] = lambda error=error: FailingAccountService(error)
         try:
             with TestClient(app) as client:
                 response = client.post(
@@ -139,7 +139,7 @@ def test_an_unknown_account_and_a_wrong_password_answer_the_same():
 
 def test_password_reset_failures_report_no_internals():
     """A reset that could not be started says so without naming the storage"""
-    app.dependency_overrides[get_account_service] = lambda: FailingAccountService(
+    app.dependency_overrides[get_password_service] = lambda: FailingAccountService(
         PasswordResetError(INTERNAL_TEXT)
     )
     try:

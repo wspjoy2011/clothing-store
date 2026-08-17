@@ -1,15 +1,16 @@
 from typing import Optional
 
+from apps.catalog.interfaces.factories import SpecificationFactoryInterface
 from apps.catalog.interfaces.specifications import (
-    PaginationSpecificationInterface,
-    OrderingSpecificationInterface,
+    CategorySpecificationInterface,
     FilterSpecificationInterface,
+    OrderingSpecificationInterface,
+    PaginationSpecificationInterface,
     SearchSpecificationInterface,
-    CategorySpecificationInterface
 )
 from apps.catalog.specifications.filtering import ProductFilterSpecification
-from apps.catalog.specifications.pagination import PaginationSpecification
 from apps.catalog.specifications.ordering import OrderingSpecification
+from apps.catalog.specifications.pagination import PaginationSpecification
 from apps.catalog.specifications.search import ProductSearchSpecification
 
 
@@ -98,3 +99,42 @@ def create_category_specification(
         sub_category_id=sub_category_id,
         article_type_id=article_type_id
     )
+
+
+class SpecificationFactory(SpecificationFactoryInterface):
+    """Builds catalogue specifications from the values a request carries"""
+
+    def pagination(self, page: int, per_page: int) -> PaginationSpecificationInterface:
+        """Build the pagination of one page"""
+        return create_pagination_specification(page, per_page)
+
+    def ordering(self, ordering: Optional[str] = None) -> OrderingSpecificationInterface:
+        """Build the ordering the client asked for"""
+        return create_ordering_specification(ordering)
+
+    def filters(
+            self,
+            min_year: Optional[int] = None,
+            max_year: Optional[int] = None,
+            min_price: Optional[float] = None,
+            max_price: Optional[float] = None,
+            gender: Optional[str] = None,
+            is_available: Optional[bool] = None
+    ) -> FilterSpecificationInterface:
+        """Build the filter over product and inventory attributes"""
+        return create_product_filter_specification(
+            min_year, max_year, min_price, max_price, gender, is_available
+        )
+
+    def search(self, query: Optional[str] = None) -> SearchSpecificationInterface:
+        """Build the full-text search of a query"""
+        return create_search_specification(query)
+
+    def category(
+            self,
+            master_category_id: int,
+            sub_category_id: Optional[int] = None,
+            article_type_id: Optional[int] = None
+    ) -> CategorySpecificationInterface:
+        """Build the selection of one branch of the category tree"""
+        return create_category_specification(master_category_id, sub_category_id, article_type_id)

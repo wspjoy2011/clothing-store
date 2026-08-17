@@ -10,7 +10,7 @@ from apps.checkout.dto.tokens import CartTokenDTO
 from apps.checkout.interfaces.repositories import (
     CartItemRepositoryInterface,
     CartRepositoryInterface,
-    CartTokenRepositoryInterface
+    CartTokenRepositoryInterface,
 )
 
 
