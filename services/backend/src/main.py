@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 
+from settings.api import API_VERSION_PREFIX
 from settings.config import config
 from settings.logging_config import get_logger
 from apps.catalog.routes import router as catalog_router
@@ -64,8 +65,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         },
     )
 
-
-API_VERSION_PREFIX = "/api/v1"
 
 app.include_router(catalog_router, prefix=f"{API_VERSION_PREFIX}")
 app.include_router(accounts_router, prefix=f"{API_VERSION_PREFIX}")

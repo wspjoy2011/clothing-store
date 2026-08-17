@@ -16,6 +16,7 @@ from apps.catalog.schemas.responses import (
     SubCategorySchema,
     ArticleTypeSchema
 )
+from settings.api import CATALOG_CATEGORIES_PATH, CATALOG_PRODUCTS_PATH
 
 
 def _build_url_with_filters(
@@ -136,7 +137,7 @@ async def get_product_list_controller(
     products = [_convert_product_dto_to_schema(product) for product in catalog_dto.products]
 
     total_pages = catalog_dto.pagination.total_pages
-    base_url = "/api/v1.0/catalog/products"
+    base_url = CATALOG_PRODUCTS_PATH
 
     prev_page = _build_url_with_filters(
         base_url, page - 1, per_page, ordering, min_year, max_year,
@@ -365,7 +366,7 @@ async def get_products_by_category_controller(
 
     total_pages = catalog_dto.pagination.total_pages
 
-    base_path_parts = ["/api/v1/catalog/categories", str(master_category_id)]
+    base_path_parts = [CATALOG_CATEGORIES_PATH, str(master_category_id)]
     if sub_category_id:
         base_path_parts.append(str(sub_category_id))
         if article_type_id:
