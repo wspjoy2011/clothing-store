@@ -2,6 +2,30 @@
 
 Working guidelines for the clothing-store codebase.
 
+## Backend architecture
+
+Request path: **route → controller → service → repository → DAO**. Each layer calls the next one only. No layer is skipped and none is called backwards.
+
+- **Route** — HTTP surface: path, status codes, `Depends`. No logic.
+- **Controller** — converts Schema ↔ DTO through `_convert_<src>_to_<dst>` helpers and maps domain exceptions to `HTTPException`.
+- **Service** — business logic, and the only layer that opens a transaction boundary.
+- **Repository** — SQL for one aggregate, returns DTOs.
+- **DAO** — executes statements and reuses the connection of the active transaction.
+
+**DTO inside, Schema at the edge.** DTOs are `@dataclass`, schemas are pydantic. A schema never travels deeper than the controller, a DTO never reaches the client, and the conversion lives nowhere else.
+
+**Every dependency sits behind an `ABC`** in the module's `interfaces/` and is wired in its `dependencies.py`. Implementations are injected, never imported directly by their consumer.
+
+**A module is a package** under `apps/<name>/`: `dto`, `exceptions`, `interfaces`, `repositories`, `schemas`, `services`, plus `controllers.py`, `routes.py`, `dependencies.py`. Reference: `apps/checkout`.
+
+**Modules talk through service interfaces.** Reach another module by its `…ServiceInterface`, never by its repositories or tables.
+
+**Transactions.** The service owns the boundary via `transaction_manager.atomic()`. A locking read (`SELECT … FOR UPDATE`) is valid only inside one — outside, the lock dies with the statement. Take the lock before reading anything the decision depends on.
+
+**No ORM.** SQL is written by hand; schema changes ship as a migration.
+
+**Errors.** Domain exceptions live in the module's `exceptions/`. Outward they describe the failed action, inward each layer logs what it alone knows.
+
 ## Comments and documentation
 
 - **Zero comments in code by default.** All documentation lives in docstrings.
