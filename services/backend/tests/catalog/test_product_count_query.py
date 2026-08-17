@@ -3,7 +3,6 @@ from typing import Any, List, Optional
 from apps.catalog.repositories.product import ProductRepository
 from apps.catalog.specifications.filtering import ProductFilterSpecification
 from apps.catalog.specifications.search import ProductSearchSpecification
-from db.query_builder import SQLQueryBuilder
 
 COUNT = 42
 
@@ -28,7 +27,7 @@ def build_repository() -> tuple:
         Repository and the DAO behind it
     """
     dao = RecordingDAO()
-    return ProductRepository(dao, SQLQueryBuilder("catalog_products")), dao
+    return ProductRepository(dao), dao
 
 
 def price_filter() -> ProductFilterSpecification:

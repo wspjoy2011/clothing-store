@@ -8,6 +8,7 @@ from typing import (
 )
 
 from apps.catalog.interfaces.specifications import FilterSpecificationInterface
+from apps.catalog.specifications.clauses import EFFECTIVE_PRICE, INVENTORY_ALIAS, PRODUCT_ALIAS, SqlClause
 
 
 class ProductFilterSpecification(FilterSpecificationInterface):
@@ -94,50 +95,62 @@ class ProductFilterSpecification(FilterSpecificationInterface):
                 self._is_available is None
         )
 
-    def to_sql(self) -> Tuple[str, List[Any]]:
+    def to_clause(self) -> SqlClause:
         """
-        Convert filter specification to SQL WHERE clause with parameters
+        Build the predicates this filter contributes
+
+        Every column is already qualified with the alias the repository uses, so
+        nothing downstream has to rewrite the text to make it valid.
 
         Returns:
-            Tuple containing SQL WHERE clause and list of parameters
+            Conditions with the values they bind
         """
         conditions = []
         params = []
 
         if self._min_year is not None:
-            conditions.append("year >= %s")
+            conditions.append(f"{PRODUCT_ALIAS}.year >= %s")
             params.append(self._min_year)
 
         if self._max_year is not None:
-            conditions.append("year <= %s")
+            conditions.append(f"{PRODUCT_ALIAS}.year <= %s")
             params.append(self._max_year)
 
         if self._min_price is not None:
-            conditions.append("COALESCE(inventory.sale_price, inventory.base_price) >= %s")
+            conditions.append(f"{EFFECTIVE_PRICE} >= %s")
             params.append(self._min_price)
 
         if self._max_price is not None:
-            conditions.append("COALESCE(inventory.sale_price, inventory.base_price) <= %s")
+            conditions.append(f"{EFFECTIVE_PRICE} <= %s")
             params.append(self._max_price)
 
-        if self._genders and len(self._genders) > 0:
-            placeholders = ', '.join(['%s'] * len(self._genders))
-            conditions.append(f"gender IN ({placeholders})")
+        if self._genders:
+            placeholders = ", ".join(["%s"] * len(self._genders))
+            conditions.append(f"{PRODUCT_ALIAS}.gender IN ({placeholders})")
             params.extend(self._genders)
 
         if self._is_available is not None:
-            if self._is_available:
-                conditions.append("inventory.is_active = %s AND inventory.is_in_stock = %s")
-                params.extend([True, True])
-            else:
-                conditions.append("(inventory.is_active = %s OR inventory.is_in_stock = %s OR inventory.id IS NULL)")
-                params.extend([False, False])
+            conditions.append(self._availability_condition())
 
-        if conditions:
-            where_clause = "WHERE " + " AND ".join(conditions)
-            return where_clause, params
+        return SqlClause(conditions=conditions, params=params)
 
-        return "", []
+    def _availability_condition(self) -> str:
+        """
+        Build the condition describing what "available" means
+
+        Availability is both flags at once: a deactivated product is unavailable
+        however much stock sits on the shelf.
+
+        Returns:
+            Condition matching available or unavailable products
+        """
+        if self._is_available:
+            return f"({INVENTORY_ALIAS}.is_active AND {INVENTORY_ALIAS}.is_in_stock)"
+
+        return (
+            f"(NOT {INVENTORY_ALIAS}.is_active OR NOT {INVENTORY_ALIAS}.is_in_stock "
+            f"OR {INVENTORY_ALIAS}.id IS NULL)"
+        )
 
     def add_filter(self, field: str, value: Any) -> None:
         """

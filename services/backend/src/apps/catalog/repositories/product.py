@@ -1,5 +1,4 @@
-import re
-from typing import Optional, List, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from decimal import Decimal
 
 from apps.catalog.dto.filters import (
@@ -18,28 +17,78 @@ from apps.catalog.interfaces.specifications import (
     SearchSpecificationInterface,
     CategorySpecificationInterface
 )
-from db.interfaces import DAOInterface, SQLQueryBuilderInterface
+from apps.catalog.specifications.clauses import (
+    EFFECTIVE_PRICE,
+    INVENTORY_ALIAS,
+    PRODUCT_ALIAS,
+    SqlClause
+)
+from db.interfaces import DAOInterface
 from db.transaction import get_current_transaction, NoActiveTransactionError
 from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "app")
 
+# Projection
+PRODUCT_COLUMNS = (
+    f"{PRODUCT_ALIAS}.product_id",
+    f"{PRODUCT_ALIAS}.gender",
+    f"{PRODUCT_ALIAS}.year",
+    f"{PRODUCT_ALIAS}.product_display_name",
+    f"{PRODUCT_ALIAS}.image_url",
+    f"{PRODUCT_ALIAS}.slug",
+    f"{INVENTORY_ALIAS}.id",
+    f"{INVENTORY_ALIAS}.base_price",
+    f"{INVENTORY_ALIAS}.sale_price",
+    f"{INVENTORY_ALIAS}.currency",
+    f"{INVENTORY_ALIAS}.stock_quantity",
+    f"{INVENTORY_ALIAS}.reserved_quantity",
+    f"{INVENTORY_ALIAS}.available_quantity",
+    f"{INVENTORY_ALIAS}.is_active",
+    f"{INVENTORY_ALIAS}.is_in_stock",
+    f"{INVENTORY_ALIAS}.created_at",
+    f"{INVENTORY_ALIAS}.updated_at"
+)
+
+AVAILABLE_CONDITION = f"({INVENTORY_ALIAS}.is_active AND {INVENTORY_ALIAS}.is_in_stock)"
+UNAVAILABLE_CONDITION = (
+    f"(NOT {INVENTORY_ALIAS}.is_active OR NOT {INVENTORY_ALIAS}.is_in_stock "
+    f"OR {INVENTORY_ALIAS}.id IS NULL)"
+)
+
 
 class ProductRepository(ProductRepositoryInterface):
-    """Repository implementation for product operations using SQL database"""
+    """Repository implementation for product operations using SQL database
+
+    Every read is rendered from one template: a projection, the product table with
+    its inventory, the joins and conditions the specifications contributed, and the
+    ordering. Specifications hand over predicates with their parameters, so no step
+    has to take a fragment apart or rewrite its column names.
+    """
 
     APP_NAME = "catalog"
 
-    def __init__(self, dao: DAOInterface, query_builder: SQLQueryBuilderInterface):
+    def __init__(self, dao: DAOInterface):
         """
         Initialize product repository
 
         Args:
             dao: Data Access Object for database operations
-            query_builder: SQL query builder for constructing queries
         """
         self._dao = dao
-        self._query_builder = query_builder
+
+    @property
+    def _products_table(self) -> str:
+        """Products table with the alias every condition is written against"""
+        return f"{self.APP_NAME}_products {PRODUCT_ALIAS}"
+
+    @property
+    def _inventory_join(self) -> str:
+        """Join bringing in the inventory row of a product"""
+        return (
+            f"LEFT JOIN {self.APP_NAME}_product_inventory {INVENTORY_ALIAS} "
+            f"ON {PRODUCT_ALIAS}.product_id = {INVENTORY_ALIAS}.product_id"
+        )
 
     async def lock_inventory(self, product_id: int) -> Optional[InventoryHoldDTO]:
         """
@@ -54,6 +103,9 @@ class ProductRepository(ProductRepositoryInterface):
 
         Returns:
             State of the held row, or None when the product has no inventory row
+
+        Raises:
+            NoActiveTransactionError: If called outside a transaction
         """
         if get_current_transaction() is None:
             raise NoActiveTransactionError(
@@ -92,30 +144,7 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             ProductDTO if found, None otherwise
         """
-        query = f"""
-            SELECT 
-                p.product_id, p.gender, p.year, p.product_display_name, p.image_url, p.slug,
-                i.id, i.base_price, i.sale_price, i.currency, i.stock_quantity, 
-                i.reserved_quantity, i.available_quantity, i.is_active, i.is_in_stock,
-                i.created_at, i.updated_at
-            FROM {self.APP_NAME}_products p
-            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
-            WHERE p.product_id = %s
-        """
-
-        logger.info(f"Get product by ID query: {query}")
-        logger.info(f"Get product by ID params: [{product_id}]")
-
-        result = await self._dao.execute(query, [product_id], fetch_one=True)
-
-        if not result:
-            return None
-
-        if isinstance(result, (list, tuple)):
-            return self._build_product_dto_from_row(tuple(result))
-        else:
-            logger.error(f"Unexpected result type: {type(result)}")
-            return None
+        return await self._get_one_product(f"{PRODUCT_ALIAS}.product_id = %s", product_id)
 
     async def get_product_by_slug(self, slug: str) -> Optional[ProductDTO]:
         """
@@ -127,30 +156,7 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             ProductDTO if found, None otherwise
         """
-        query = f"""
-            SELECT 
-                p.product_id, p.gender, p.year, p.product_display_name, p.image_url, p.slug,
-                i.id, i.base_price, i.sale_price, i.currency, i.stock_quantity, 
-                i.reserved_quantity, i.available_quantity, i.is_active, i.is_in_stock,
-                i.created_at, i.updated_at
-            FROM {self.APP_NAME}_products p
-            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
-            WHERE p.slug = %s
-        """
-
-        logger.info(f"Get product by slug query: {query}")
-        logger.info(f"Get product by slug params: [{slug}]")
-
-        result = await self._dao.execute(query, [slug], fetch_one=True)
-
-        if not result:
-            return None
-
-        if isinstance(result, (list, tuple)):
-            return self._build_product_dto_from_row(tuple(result))
-        else:
-            logger.error(f"Unexpected result type: {type(result)}")
-            return None
+        return await self._get_one_product(f"{PRODUCT_ALIAS}.slug = %s", slug)
 
     async def get_products_with_specifications(
             self,
@@ -171,13 +177,7 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             List of product DTOs
         """
-        return await self._get_products_with_specs(
-            pagination_spec=pagination_spec,
-            ordering_spec=ordering_spec,
-            filter_spec=filter_spec,
-            search_spec=search_spec,
-            log_prefix="Final"
-        )
+        return await self._list_products(pagination_spec, ordering_spec, filter_spec, search_spec)
 
     async def get_products_with_specifications_by_categories(
             self,
@@ -200,13 +200,8 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             List of product DTOs
         """
-        return await self._get_products_with_specs(
-            pagination_spec=pagination_spec,
-            ordering_spec=ordering_spec,
-            filter_spec=filter_spec,
-            search_spec=search_spec,
-            category_spec=category_spec,
-            log_prefix="Category products"
+        return await self._list_products(
+            pagination_spec, ordering_spec, filter_spec, search_spec, category_spec
         )
 
     async def get_products_count(
@@ -224,11 +219,7 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             Number of products in the database
         """
-        return await self._get_products_count(
-            filter_spec=filter_spec,
-            search_spec=search_spec,
-            log_prefix="Final count"
-        )
+        return await self._count_products(filter_spec, search_spec)
 
     async def get_products_count_by_categories(
             self,
@@ -247,226 +238,164 @@ class ProductRepository(ProductRepositoryInterface):
         Returns:
             Number of products matching the criteria
         """
-        return await self._get_products_count(
-            filter_spec=filter_spec,
-            search_spec=search_spec,
-            category_spec=category_spec,
-            log_prefix="Category products count"
-        )
+        return await self._count_products(filter_spec, search_spec, category_spec)
 
     async def get_available_filters(
             self,
             search_spec: Optional[SearchSpecificationInterface] = None
     ) -> Optional[FiltersDTO]:
         """
-        Get available filters and their possible values based on the actual data
+        Get available filters and their ranges, optionally limited to a search
 
         Args:
-            search_spec: Optional search specification to limit filters to relevant options
+            search_spec: Optional search specification narrowing the options
 
         Returns:
-            FiltersDTO object containing all available filters or None if catalog is empty
+            FiltersDTO with the available options, or None when nothing matches
         """
-        if not search_spec or search_spec.is_empty():
-            return await self._get_all_filters()
-
-        return await self._get_filtered_filters(search_spec)
+        return await self._describe_filters(search_spec=search_spec)
 
     async def get_available_filters_by_categories(
             self,
-            category_spec: CategorySpecificationInterface,
+            category_spec: CategorySpecificationInterface
     ) -> Optional[FiltersDTO]:
         """
-        Get available filters and their possible values based on products in specific categories
+        Get available filters and their ranges within one category branch
 
         Args:
             category_spec: Specification for category filtering
 
         Returns:
-            FiltersDTO object containing all available filters for the specified categories or None if no products found
+            FiltersDTO with the available options, or None when nothing matches
         """
-        if category_spec.is_empty():
-            return await self._get_all_filters()
+        return await self._describe_filters(category_spec=category_spec)
 
-        return await self._get_category_filters(category_spec)
-
-    async def _get_availability_counts(
+    def _collect_clause(
             self,
-            category_spec: Optional[CategorySpecificationInterface] = None,
-            search_spec: Optional[SearchSpecificationInterface] = None
-    ) -> Tuple[int, int]:
-        """Get availability counts with optional category and search filters"""
-        base_query = f"""
-            SELECT COUNT(*) FROM {self.APP_NAME}_products p
-            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+            filter_spec: Optional[FilterSpecificationInterface] = None,
+            search_spec: Optional[SearchSpecificationInterface] = None,
+            category_spec: Optional[CategorySpecificationInterface] = None
+    ) -> SqlClause:
         """
-
-        category_joins = ""
-        if category_spec and not category_spec.is_empty():
-            category_joins = f"""
-            JOIN {self.APP_NAME}_article_type at ON p.article_type_id = at.article_type_id 
-            JOIN {self.APP_NAME}_sub_category sc ON at.sub_category_id = sc.sub_category_id 
-            JOIN {self.APP_NAME}_master_category mc ON sc.master_category_id = mc.master_category_id
-            """
-
-        available_conditions, available_params = self._build_conditions_and_params(
-            ["i.is_in_stock = %s"], category_spec, search_spec
-        )
-        available_params.insert(0, True)
-
-        available_query = base_query + category_joins + " WHERE " + " AND ".join(available_conditions)
-        logger.info(f"Available count query: {available_query}")
-        logger.info(f"Available count params: {available_params}")
-
-        available_result = await self._dao.execute(available_query, available_params)
-        available_count = available_result[0][0] if available_result else 0
-        logger.info(f"Available count result: {available_count}")
-
-        unavailable_conditions, unavailable_params = self._build_conditions_and_params(
-            ["(i.is_in_stock = %s OR i.id IS NULL)"], category_spec, search_spec
-        )
-        unavailable_params.insert(0, False)
-
-        unavailable_query = base_query + category_joins + " WHERE " + " AND ".join(unavailable_conditions)
-        logger.info(f"Unavailable count query: {unavailable_query}")
-        logger.info(f"Unavailable count params: {unavailable_params}")
-
-        unavailable_result = await self._dao.execute(unavailable_query, unavailable_params)
-        unavailable_count = unavailable_result[0][0] if unavailable_result else 0
-        logger.info(f"Unavailable count result: {unavailable_count}")
-
-        return available_count, unavailable_count
-
-    async def _get_gender_counts(
-            self,
-            category_spec: Optional[CategorySpecificationInterface] = None,
-            search_spec: Optional[SearchSpecificationInterface] = None
-    ) -> dict:
-        """
-        Get counts for each gender value
+        Gather the conditions of every specification that narrows the result
 
         Args:
-            category_spec: Optional category specification to filter by
-            search_spec: Optional search specification to filter by
+            filter_spec: Optional specification for filtering results
+            search_spec: Optional specification for search
+            category_spec: Optional specification for category filtering
 
         Returns:
-            Dictionary with gender values as keys and counts as values
+            Combined joins, conditions and parameters
         """
-        base_query = f"""
-            SELECT p.gender, COUNT(*) as count 
-            FROM {self.APP_NAME}_products p
-            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
+        clause = SqlClause()
+
+        for specification in (category_spec, filter_spec, search_spec):
+            if specification is not None and not specification.is_empty():
+                clause = clause.merge(specification.to_clause())
+
+        return clause
+
+    @staticmethod
+    def _order_by(
+            ordering_spec: Optional[OrderingSpecificationInterface],
+            search_spec: Optional[SearchSpecificationInterface]
+    ) -> Tuple[List[str], List[Any]]:
         """
+        Decide the order of results and the parameters it binds
 
-        category_joins = ""
-        if category_spec and not category_spec.is_empty():
-            category_joins = f"""
-            JOIN {self.APP_NAME}_article_type at ON p.article_type_id = at.article_type_id 
-            JOIN {self.APP_NAME}_sub_category sc ON at.sub_category_id = sc.sub_category_id 
-            JOIN {self.APP_NAME}_master_category mc ON sc.master_category_id = mc.master_category_id
-            """
-
-        conditions, params = self._build_conditions_and_params(
-            ["p.gender IS NOT NULL"], category_spec, search_spec
-        )
-
-        where_clause = " WHERE " + " AND ".join(conditions)
-        group_by = " GROUP BY p.gender"
-
-        gender_query = base_query + category_joins + where_clause + group_by
-        logger.info(f"Gender counts query: {gender_query}")
-        logger.info(f"Gender counts params: {params}")
-
-        result = await self._dao.execute(gender_query, params)
-
-        gender_counts = {}
-        if result:
-            for row in result:
-                gender_counts[row[0]] = row[1]
-
-        logger.info(f"Gender counts result: {gender_counts}")
-
-        return gender_counts
-
-    async def _get_category_filters(self, category_spec: CategorySpecificationInterface) -> Optional[FiltersDTO]:
-        """
-        Get filters for specific categories
+        Relevance leads only when the client asked for no particular order.
+        Ranking first regardless would make a requested sort a no-op, because a
+        relevance score almost never ties.
 
         Args:
-            category_spec: Specification for category filtering
+            ordering_spec: Optional specification for ordering results
+            search_spec: Optional specification for search
 
         Returns:
-            FiltersDTO object with available filters for categories or None if no products found
+            Ordering expressions and their parameters
         """
-        category_sql, category_params = category_spec.to_sql()
+        requested = ordering_spec.to_order_by() if ordering_spec is not None else []
+        relevance, relevance_params = (
+            search_spec.relevance_order() if search_spec is not None and not search_spec.is_empty()
+            else ("", [])
+        )
 
-        count_query = f"""
-            SELECT COUNT(*) FROM {self.APP_NAME}_products p
-            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
-            {category_sql.replace(f'{self.APP_NAME}_products', 'p')}
+        if not relevance:
+            return requested, []
+
+        if ordering_spec is None or ordering_spec.is_default:
+            return [relevance, *requested], relevance_params
+
+        return [*requested, relevance], relevance_params
+
+    def _render(
+            self,
+            projection: str,
+            clause: SqlClause,
+            order_by: Optional[List[str]] = None,
+            group_by: Optional[str] = None,
+            join_inventory: bool = True
+    ) -> str:
         """
-        logger.info(f"Category filters count query: {count_query}")
-        logger.info(f"Category filters count params: {category_params}")
+        Render one statement from the template every read shares
 
-        count_result = await self._dao.execute(count_query, category_params, fetch_one=True)
+        Args:
+            projection: Columns or aggregates to select
+            clause: Joins and conditions to apply
+            order_by: Optional ordering expressions
+            group_by: Optional grouping expression
+            join_inventory: Whether the inventory row is needed
 
-        if not count_result or count_result[0] == 0:
+        Returns:
+            Complete statement without its pagination
+        """
+        parts = [f"SELECT {projection}", f"FROM {self._products_table}"]
+
+        if join_inventory:
+            parts.append(self._inventory_join)
+
+        parts.extend(clause.joins)
+
+        if clause.conditions:
+            parts.append(f"WHERE {' AND '.join(clause.conditions)}")
+
+        if group_by:
+            parts.append(f"GROUP BY {group_by}")
+
+        if order_by:
+            parts.append(f"ORDER BY {', '.join(order_by)}")
+
+        return "\n".join(parts)
+
+    async def _get_one_product(self, condition: str, value: Any) -> Optional[ProductDTO]:
+        """
+        Read one product by a single condition
+
+        Args:
+            condition: Condition selecting the product
+            value: Value the condition binds
+
+        Returns:
+            ProductDTO if found, None otherwise
+        """
+        query = self._render(", ".join(PRODUCT_COLUMNS), SqlClause(conditions=[condition]))
+        result = await self._dao.execute(query, [value], fetch_one=True)
+
+        if not result:
             return None
 
-        gender_counts = await self._get_gender_counts(category_spec=category_spec)
-        gender_values = list(gender_counts.keys()) if gender_counts else []
+        return self._build_product_dto_from_row(tuple(result))
 
-        logger.info(f"Category filters - Gender counts result: {gender_counts}")
-
-        year_query = f"""
-            SELECT MIN(p.year), MAX(p.year) FROM {self.APP_NAME}_products p
-            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
-            {category_sql.replace(f'{self.APP_NAME}_products', 'p')} AND p.year IS NOT NULL
-        """
-        logger.info(f"Category filters year query: {year_query}")
-        logger.info(f"Category filters year params: {category_params}")
-
-        year_result = await self._dao.execute(year_query, category_params, fetch_one=True)
-        min_year, max_year = year_result if year_result else (None, None)
-
-        price_query = f"""
-            SELECT 
-                MIN(COALESCE(i.sale_price, i.base_price)), 
-                MAX(COALESCE(i.sale_price, i.base_price))
-            FROM {self.APP_NAME}_products p
-            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
-            {category_sql.replace(f'{self.APP_NAME}_products', 'p')} 
-            AND i.id IS NOT NULL
-        """
-        logger.info(f"Category filters price query: {price_query}")
-        logger.info(f"Category filters price params: {category_params}")
-
-        price_result = await self._dao.execute(price_query, category_params, fetch_one=True)
-        min_price, max_price = price_result if price_result else (None, None)
-
-        available_count, unavailable_count = await self._get_availability_counts(category_spec=category_spec)
-
-        return FiltersDTO(
-            gender=CheckboxFilterDTO(values=gender_values, count=gender_counts) if gender_values else None,
-            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
-            price=PriceRangeFilterDTO(min=float(min_price), max=float(max_price)) if min_price and max_price else None,
-            is_available=AvailabilityFilterDTO(
-                available_count=available_count,
-                unavailable_count=unavailable_count
-            )
-        )
-
-    async def _get_products_with_specs(
+    async def _list_products(
             self,
             pagination_spec: PaginationSpecificationInterface,
             ordering_spec: Optional[OrderingSpecificationInterface] = None,
             filter_spec: Optional[FilterSpecificationInterface] = None,
             search_spec: Optional[SearchSpecificationInterface] = None,
-            category_spec: Optional[CategorySpecificationInterface] = None,
-            log_prefix: str = "Products"
+            category_spec: Optional[CategorySpecificationInterface] = None
     ) -> List[ProductDTO]:
         """
-        Get products with specifications applied using query builder
+        Read one page of products matching the specifications
 
         Args:
             pagination_spec: Specification for pagination
@@ -474,17 +403,17 @@ class ProductRepository(ProductRepositoryInterface):
             filter_spec: Optional specification for filtering results
             search_spec: Optional specification for search
             category_spec: Optional specification for category filtering
-            log_prefix: Prefix for logging messages
 
         Returns:
-            List of product DTOs matching the specifications
+            List of product DTOs
         """
-        self._prepare_query_builder_with_inventory(filter_spec, search_spec, ordering_spec, category_spec)
-        self._query_builder.limit(pagination_spec.get_limit()).offset(pagination_spec.get_offset())
+        clause = self._collect_clause(filter_spec, search_spec, category_spec)
+        order_by, order_params = self._order_by(ordering_spec, search_spec)
 
-        query, params = self._query_builder.build()
-        logger.info(f"{log_prefix} query: {query}")
-        logger.info(f"{log_prefix} params: {params}")
+        query = f"{self._render(', '.join(PRODUCT_COLUMNS), clause, order_by)}\nLIMIT %s OFFSET %s"
+        params = [*clause.params, *order_params, pagination_spec.get_limit(), pagination_spec.get_offset()]
+
+        logger.info(f"Products query: {query}")
 
         result = await self._dao.execute(query, params)
 
@@ -493,441 +422,211 @@ class ProductRepository(ProductRepositoryInterface):
 
         return [self._build_product_dto_from_row(tuple(row)) for row in result]
 
-    def _conditions_touch_inventory(self) -> bool:
-        """
-        Report whether the conditions gathered so far read inventory columns
-
-        The inventory row is unique per product, so joining it cannot change how
-        many products match. Counting through the join is pure work: on a catalogue
-        of tens of thousands of rows it scans a second table for every page view.
-
-        Returns:
-            True when a condition refers to the inventory alias
-        """
-        return any("i." in condition for condition in self._query_builder.get_where_conditions())
-
-    async def _get_products_count(
+    async def _count_products(
             self,
             filter_spec: Optional[FilterSpecificationInterface] = None,
             search_spec: Optional[SearchSpecificationInterface] = None,
-            category_spec: Optional[CategorySpecificationInterface] = None,
-            log_prefix: str = "Count"
+            category_spec: Optional[CategorySpecificationInterface] = None
     ) -> int:
         """
-        Get count of products matching specifications
+        Count the products matching the specifications
+
+        The inventory row is unique per product, so joining it cannot change the
+        count: it is joined only when a condition reads its columns.
 
         Args:
             filter_spec: Optional specification for filtering results
             search_spec: Optional specification for search
             category_spec: Optional specification for category filtering
-            log_prefix: Prefix for logging messages
 
         Returns:
             Number of products matching the criteria
         """
-        self._query_builder.reset().select("COUNT(*)").from_table(f"{self.APP_NAME}_products p")
+        clause = self._collect_clause(filter_spec, search_spec, category_spec)
+        query = self._render(
+            "COUNT(*)",
+            clause,
+            join_inventory=self._reads_inventory(clause)
+        )
 
-        if category_spec and not category_spec.is_empty():
-            self._apply_category_spec_with_alias(category_spec)
-
-        if filter_spec and not filter_spec.is_empty():
-            filter_sql, filter_params = filter_spec.to_sql()
-            filter_sql = self._prefix_columns_with_alias(filter_sql, 'p')
-            self._parse_sql_conditions(filter_sql, filter_params)
-
-        if search_spec and not search_spec.is_empty():
-            search_sql, search_params = search_spec.to_sql()
-            where_sql, _ = self._split_search_sql(search_sql)
-            where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
-            self._parse_sql_conditions(where_sql, search_params[:1])
-
-        if self._conditions_touch_inventory():
-            self._query_builder.join(
-                f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
-            )
-
-        query, params = self._query_builder.build()
-
-        logger.info(f"{log_prefix} query: {query}")
-        logger.info(f"{log_prefix} params: {params}")
-
-        result = await self._dao.execute(query, params, fetch_one=True)
+        result = await self._dao.execute(query, clause.params, fetch_one=True)
         return result[0] if result else 0
 
-    async def _get_all_filters(self) -> Optional[FiltersDTO]:
+    @staticmethod
+    def _reads_inventory(clause: SqlClause) -> bool:
         """
-        Get all available filters from the entire product catalog
+        Report whether any condition reads inventory columns
+
+        Args:
+            clause: Conditions gathered from the specifications
 
         Returns:
-            FiltersDTO object containing all available filters or None if catalog is empty
+            True when the inventory row has to be joined
         """
-        count_query = f"SELECT COUNT(*) FROM {self.APP_NAME}_products"
-        logger.info(f"Filters count query: {count_query}")
+        return any(f"{INVENTORY_ALIAS}." in condition for condition in clause.conditions)
 
-        count_result = await self._dao.execute(count_query, [], fetch_one=True)
+    async def _describe_filters(
+            self,
+            search_spec: Optional[SearchSpecificationInterface] = None,
+            category_spec: Optional[CategorySpecificationInterface] = None
+    ) -> Optional[FiltersDTO]:
+        """
+        Describe the filter options available within a scope
 
-        if not count_result or count_result[0] == 0:
+        The counts are computed against the same conditions the listing applies, so
+        a figure shown next to a filter matches what selecting it returns.
+
+        Args:
+            search_spec: Optional search specification narrowing the scope
+            category_spec: Optional category specification narrowing the scope
+
+        Returns:
+            FiltersDTO with the available options, or None when nothing matches
+        """
+        scope = self._collect_clause(search_spec=search_spec, category_spec=category_spec)
+
+        if await self._count_in_scope(scope) == 0:
             return None
 
-        gender_counts = await self._get_gender_counts()
-        gender_values = list(gender_counts.keys()) if gender_counts else []
-
-        year_query = f"SELECT MIN(year), MAX(year) FROM {self.APP_NAME}_products WHERE year IS NOT NULL"
-        logger.info(f"Filters year query: {year_query}")
-
-        year_result = await self._dao.execute(year_query, [], fetch_one=True)
-        min_year, max_year = year_result if year_result else (None, None)
-
-        price_query = f"""
-            SELECT 
-                MIN(COALESCE(i.sale_price, i.base_price)), 
-                MAX(COALESCE(i.sale_price, i.base_price))
-            FROM {self.APP_NAME}_products p
-            LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id
-            WHERE i.id IS NOT NULL
-        """
-        logger.info(f"Filters price query: {price_query}")
-
-        price_result = await self._dao.execute(price_query, [], fetch_one=True)
-        min_price, max_price = price_result if price_result else (None, None)
-
-        available_count, unavailable_count = await self._get_availability_counts()
+        gender_counts = await self._gender_counts(scope)
+        min_year, max_year = await self._year_range(scope)
+        min_price, max_price = await self._price_range(scope)
+        available_count, unavailable_count = await self._availability_counts(scope)
 
         return FiltersDTO(
-            gender=CheckboxFilterDTO(values=gender_values, count=gender_counts) if gender_values else None,
+            gender=CheckboxFilterDTO(
+                values=list(gender_counts.keys()),
+                count=gender_counts
+            ) if gender_counts else None,
             year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
-            price=PriceRangeFilterDTO(min=float(min_price), max=float(max_price)) if min_price and max_price else None,
+            price=PriceRangeFilterDTO(
+                min=float(min_price),
+                max=float(max_price)
+            ) if min_price and max_price else None,
             is_available=AvailabilityFilterDTO(
                 available_count=available_count,
                 unavailable_count=unavailable_count
             )
         )
 
-    async def _get_filtered_filters(self, search_spec: SearchSpecificationInterface) -> Optional[FiltersDTO]:
+    async def _count_in_scope(self, scope: SqlClause) -> int:
         """
-        Get available filters based on search results
+        Count the products inside a scope
 
         Args:
-            search_spec: Search specification to filter available options
+            scope: Conditions defining the scope
 
         Returns:
-            FiltersDTO object with available filters for search results or None if no results
+            Number of products in the scope
         """
-        self._query_builder.reset().from_table(f"{self.APP_NAME}_products p").join(
-            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
-        )
+        query = self._render("COUNT(*)", scope, join_inventory=self._reads_inventory(scope))
+        result = await self._dao.execute(query, scope.params, fetch_one=True)
+        return result[0] if result else 0
 
-        search_sql, search_params = search_spec.to_sql()
-        where_sql, _ = self._split_search_sql(search_sql)
-        where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
-        self._parse_sql_conditions(where_sql, search_params[:1])
-
-        count_query, count_params = self._query_builder.build_count()
-        logger.info(f"Filtered filters count query: {count_query}")
-        logger.info(f"Filtered filters count params: {count_params}")
-
-        count_result = await self._dao.execute(count_query, count_params, fetch_one=True)
-
-        if not count_result or count_result[0] == 0:
-            return None
-
-        gender_counts = await self._get_gender_counts(search_spec=search_spec)
-        gender_values = list(gender_counts.keys()) if gender_counts else []
-
-        min_year, max_year = await self._get_filtered_year_range(where_sql, search_params)
-        min_price, max_price = await self._get_filtered_price_range(where_sql, search_params)
-
-        available_count, unavailable_count = await self._get_availability_counts(search_spec=search_spec)
-
-        return FiltersDTO(
-            gender=CheckboxFilterDTO(values=gender_values, count=gender_counts) if gender_values else None,
-            year=RangeFilterDTO(min=min_year, max=max_year) if min_year and max_year else None,
-            price=PriceRangeFilterDTO(min=min_price, max=max_price) if min_price and max_price else None,
-            is_available=AvailabilityFilterDTO(
-                available_count=available_count,
-                unavailable_count=unavailable_count
-            )
-        )
-
-    async def _get_filtered_gender_values(self, where_sql: str, search_params: List[Any]) -> List[str]:
+    async def _gender_counts(self, scope: SqlClause) -> Dict[str, int]:
         """
-        Get available gender values for filtered search results
+        Count the products of each gender inside a scope
 
         Args:
-            where_sql: WHERE clause SQL for filtering
-            search_params: Parameters for the WHERE clause
+            scope: Conditions defining the scope
 
         Returns:
-            List of available gender values
+            Count per gender value
         """
-        self._query_builder.reset().select("DISTINCT p.gender").from_table(f"{self.APP_NAME}_products p").join(
-            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
+        clause = scope.merge(SqlClause(conditions=[f"{PRODUCT_ALIAS}.gender IS NOT NULL"]))
+        query = self._render(
+            f"{PRODUCT_ALIAS}.gender, COUNT(*)",
+            clause,
+            group_by=f"{PRODUCT_ALIAS}.gender",
+            join_inventory=self._reads_inventory(clause)
         )
 
-        where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
-        self._parse_sql_conditions(where_sql, search_params[:1])
-        self._query_builder.where("p.gender IS NOT NULL")
+        result = await self._dao.execute(query, clause.params)
+        return {row[0]: row[1] for row in result} if result else {}
 
-        gender_query, gender_params = self._query_builder.build()
-        logger.info(f"Filtered filters gender query: {gender_query}")
-        logger.info(f"Filtered filters gender params: {gender_params}")
-
-        gender_result = await self._dao.execute(gender_query, gender_params)
-        return [row[0] for row in gender_result] if gender_result else []
-
-    async def _get_filtered_year_range(
-            self,
-            where_sql: str,
-            search_params: List[Any]
-    ) -> Tuple[Optional[int], Optional[int]]:
+    async def _year_range(self, scope: SqlClause) -> Tuple[Optional[int], Optional[int]]:
         """
-        Get available year range for filtered search results
+        Find the year range of the products inside a scope
 
         Args:
-            where_sql: WHERE clause SQL for filtering
-            search_params: Parameters for the WHERE clause
+            scope: Conditions defining the scope
 
         Returns:
-            Tuple of (min_year, max_year) or (None, None) if no results
+            Lowest and highest year, or None when no product carries one
         """
-        self._query_builder.reset().select("MIN(p.year)", "MAX(p.year)").from_table(f"{self.APP_NAME}_products p").join(
-            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
+        clause = scope.merge(SqlClause(conditions=[f"{PRODUCT_ALIAS}.year IS NOT NULL"]))
+        query = self._render(
+            f"MIN({PRODUCT_ALIAS}.year), MAX({PRODUCT_ALIAS}.year)",
+            clause,
+            join_inventory=self._reads_inventory(clause)
         )
 
-        where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
-        self._parse_sql_conditions(where_sql, search_params[:1])
-        self._query_builder.where("p.year IS NOT NULL")
+        result = await self._dao.execute(query, clause.params, fetch_one=True)
+        return tuple(result) if result else (None, None)
 
-        year_query, year_params = self._query_builder.build()
-        logger.info(f"Filtered filters year query: {year_query}")
-        logger.info(f"Filtered filters year params: {year_params}")
-
-        year_result = await self._dao.execute(year_query, year_params, fetch_one=True)
-        return year_result if year_result else (None, None)
-
-    async def _get_filtered_price_range(
-            self,
-            where_sql: str,
-            search_params: List[Any]
-    ) -> Tuple[Optional[float], Optional[float]]:
+    async def _price_range(self, scope: SqlClause) -> Tuple[Optional[Decimal], Optional[Decimal]]:
         """
-        Get available price range for filtered search results
+        Find the price range of the products inside a scope
 
         Args:
-            where_sql: WHERE clause SQL for filtering
-            search_params: Parameters for the WHERE clause
+            scope: Conditions defining the scope
 
         Returns:
-            Tuple of (min_price, max_price) or (None, None) if no results
+            Lowest and highest effective price, or None when nothing is priced
         """
-        self._query_builder.reset().select(
-            "MIN(COALESCE(i.sale_price, i.base_price))",
-            "MAX(COALESCE(i.sale_price, i.base_price))"
-        ).from_table(f"{self.APP_NAME}_products p").join(
-            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
+        clause = scope.merge(SqlClause(conditions=[f"{INVENTORY_ALIAS}.id IS NOT NULL"]))
+        query = self._render(f"MIN({EFFECTIVE_PRICE}), MAX({EFFECTIVE_PRICE})", clause)
+
+        result = await self._dao.execute(query, clause.params, fetch_one=True)
+        return tuple(result) if result else (None, None)
+
+    async def _availability_counts(self, scope: SqlClause) -> Tuple[int, int]:
+        """
+        Count the available and unavailable products inside a scope
+
+        Availability is both flags at once, exactly as the listing filter defines
+        it: counting on stock alone reported deactivated products as available and
+        then returned fewer rows than the figure promised.
+
+        Args:
+            scope: Conditions defining the scope
+
+        Returns:
+            Available and unavailable counts
+        """
+        available = scope.merge(SqlClause(conditions=[AVAILABLE_CONDITION]))
+        unavailable = scope.merge(SqlClause(conditions=[UNAVAILABLE_CONDITION]))
+
+        return (
+            await self._count_in_scope_with_inventory(available),
+            await self._count_in_scope_with_inventory(unavailable)
         )
 
-        where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
-        self._parse_sql_conditions(where_sql, search_params[:1])
-        self._query_builder.where("i.id IS NOT NULL")
-
-        price_query, price_params = self._query_builder.build()
-        logger.info(f"Filtered filters price query: {price_query}")
-        logger.info(f"Filtered filters price params: {price_params}")
-
-        price_result = await self._dao.execute(price_query, price_params, fetch_one=True)
-        if price_result and price_result[0] is not None and price_result[1] is not None:
-            return float(price_result[0]), float(price_result[1])
-        return None, None
-
-    def _prepare_query_builder_with_inventory(
-            self,
-            filter_spec: Optional[FilterSpecificationInterface],
-            search_spec: Optional[SearchSpecificationInterface],
-            ordering_spec: Optional[OrderingSpecificationInterface] = None,
-            category_spec: Optional[CategorySpecificationInterface] = None
-    ) -> None:
+    async def _count_in_scope_with_inventory(self, clause: SqlClause) -> int:
         """
-        Prepare query builder with all specifications including inventory join
+        Count products whose condition reads the inventory row
 
         Args:
-            filter_spec: Optional specification for filtering results
-            search_spec: Optional specification for search
-            ordering_spec: Optional specification for ordering results
-            category_spec: Optional specification for category filtering
-        """
-        self._query_builder.reset().select(
-            "p.product_id", "p.gender", "p.year", "p.product_display_name", "p.image_url", "p.slug",
-            "i.id", "i.base_price", "i.sale_price", "i.currency", "i.stock_quantity",
-            "i.reserved_quantity", "i.available_quantity", "i.is_active", "i.is_in_stock",
-            "i.created_at", "i.updated_at"
-        ).from_table(f"{self.APP_NAME}_products p").join(
-            f"LEFT JOIN {self.APP_NAME}_product_inventory i ON p.product_id = i.product_id"
-        )
-
-        if category_spec and not category_spec.is_empty():
-            self._apply_category_spec_with_alias(category_spec)
-
-        if filter_spec and not filter_spec.is_empty():
-            filter_sql, filter_params = filter_spec.to_sql()
-            filter_sql = self._prefix_columns_with_alias(filter_sql, 'p')
-            self._parse_sql_conditions(filter_sql, filter_params)
-
-        order_by_clauses = []
-        order_by_params = []
-
-        if search_spec and not search_spec.is_empty():
-            search_sql, search_params = search_spec.to_sql()
-            where_sql, search_order_sql = self._split_search_sql(search_sql)
-
-            where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
-            search_order_sql = self._safe_alias_replace(search_order_sql, "product_display_name", "p")
-
-            self._parse_sql_conditions(where_sql, search_params[:1])
-
-            if search_order_sql:
-                order_by_clauses.append(search_order_sql)
-                order_by_params.append(search_params[1])
-
-        if ordering_spec:
-            ordering_sql, _ = ordering_spec.to_sql()
-            ordering_sql_cleaned = ordering_sql.replace("ORDER BY", "").strip()
-            if ordering_sql_cleaned:
-                ordering_sql_cleaned = self._prefix_ordering_fields(ordering_sql_cleaned)
-                order_by_clauses.append(ordering_sql_cleaned)
-
-        if order_by_clauses:
-            final_ordering = ", ".join(order_by_clauses)
-            self._query_builder.order_by(final_ordering, *order_by_params)
-
-    def _prepare_query_builder(
-            self,
-            filter_spec: Optional[FilterSpecificationInterface],
-            search_spec: Optional[SearchSpecificationInterface],
-            ordering_spec: Optional[OrderingSpecificationInterface] = None,
-            category_spec: Optional[CategorySpecificationInterface] = None
-    ) -> None:
-        """
-        Prepare query builder with all specifications (legacy method for backward compatibility)
-
-        Args:
-            filter_spec: Optional specification for filtering results
-            search_spec: Optional specification for search
-            ordering_spec: Optional specification for ordering results
-            category_spec: Optional specification for category filtering
-        """
-        self._prepare_query_builder_with_inventory(filter_spec, search_spec, ordering_spec, category_spec)
-
-    def _apply_category_spec_with_alias(self, category_spec: CategorySpecificationInterface) -> None:
-        """
-        Apply category specification to query builder with proper table aliases
-
-        Args:
-            category_spec: Category specification with joins and filters
-        """
-        category_sql, category_params = category_spec.to_sql()
-        joins_part, where_part = category_sql.split("WHERE", 1)
-
-        joins_part = joins_part.replace(f"{self.APP_NAME}_products.article_type_id", "p.article_type_id")
-
-        for join_clause in joins_part.strip().split("JOIN"):
-            if join_clause.strip():
-                self._query_builder.join(f"JOIN {join_clause.strip()}")
-
-        self._query_builder.where(where_part.strip(), *category_params)
-
-    def _apply_category_spec(self, category_spec: CategorySpecificationInterface) -> None:
-        """
-        Apply category specification to query builder (legacy method)
-
-        Args:
-            category_spec: Category specification with joins and filters
-        """
-        self._apply_category_spec_with_alias(category_spec)
-
-    def _prefix_columns_with_alias(self, sql: str, alias: str) -> str:
-        """
-        Add table alias prefix to column names in SQL
-
-        Args:
-            sql: SQL string to modify
-            alias: Table alias to use
+            clause: Conditions including inventory columns
 
         Returns:
-            Modified SQL string with prefixed columns
+            Number of products matching
         """
-        replacements = {
-            'year >=': f'{alias}.year >=',
-            'year <=': f'{alias}.year <=',
-            'gender IN': f'{alias}.gender IN',
-            'inventory.is_active': 'i.is_active',
-            'inventory.is_in_stock': 'i.is_in_stock',
-            'inventory.id': 'i.id',
-            'COALESCE(inventory.sale_price, inventory.base_price)': 'COALESCE(i.sale_price, i.base_price)'
-        }
-
-        for old, new in replacements.items():
-            sql = sql.replace(old, new)
-
-        return sql
-
-    def _prefix_ordering_fields(self, ordering_sql: str) -> str:
-        """
-        Add table alias prefix to ordering fields
-
-        Args:
-            ordering_sql: Ordering SQL to modify
-
-        Returns:
-            Modified ordering SQL with table prefixes
-        """
-        parts = []
-
-        current_part = ""
-        paren_count = 0
-
-        for char in ordering_sql:
-            if char == '(':
-                paren_count += 1
-            elif char == ')':
-                paren_count -= 1
-            elif char == ',' and paren_count == 0:
-                parts.append(current_part.strip())
-                current_part = ""
-                continue
-            current_part += char
-
-        if current_part.strip():
-            parts.append(current_part.strip())
-
-        processed_parts = []
-        for part in parts:
-            if 'COALESCE' in part:
-                processed_parts.append(part)
-            else:
-                part = re.sub(r'\bproduct_id\b', 'p.product_id', part)
-                part = re.sub(r'\byear\b', 'p.year', part)
-                part = re.sub(r'\bid\b', 'p.product_id', part)
-                processed_parts.append(part)
-
-        return ', '.join(processed_parts)
+        query = self._render("COUNT(*)", clause)
+        result = await self._dao.execute(query, clause.params, fetch_one=True)
+        return result[0] if result else 0
 
     def _build_product_dto_from_row(self, row: tuple) -> ProductDTO:
         """
         Build ProductDTO from database row including inventory data
 
         Args:
-            row: Database result row
+            row: Database result row, in the order of PRODUCT_COLUMNS
 
         Returns:
             ProductDTO with inventory data if available
         """
         product_id = int(row[0])
-        gender = row[1]
-        year = int(row[2]) if row[2] is not None else None
-        product_display_name = row[3]
-        image_url = row[4]
-        slug = row[5]
 
         inventory = None
         if row[6] is not None:
@@ -948,97 +647,10 @@ class ProductRepository(ProductRepositoryInterface):
 
         return ProductDTO(
             product_id=product_id,
-            gender=gender,
-            year=year,
-            product_display_name=product_display_name,
-            image_url=image_url,
-            slug=slug,
+            gender=row[1],
+            year=int(row[2]) if row[2] is not None else None,
+            product_display_name=row[3],
+            image_url=row[4],
+            slug=row[5],
             inventory=inventory
         )
-
-    def _parse_sql_conditions(self, sql_conditions: str, params: List[Any]) -> None:
-        """
-        Parse and apply SQL conditions to query builder
-
-        Args:
-            sql_conditions: SQL conditions string (may include WHERE keyword)
-            params: Parameters for the SQL conditions
-        """
-        if sql_conditions.startswith("WHERE"):
-            conditions_text = sql_conditions.replace("WHERE", "").strip()
-            self._query_builder.where(conditions_text, *params)
-
-    @staticmethod
-    def _split_search_sql(search_sql: str) -> Tuple[str, str]:
-        """
-        Split search SQL into WHERE and ORDER BY parts
-
-        Args:
-            search_sql: Complete search SQL string
-
-        Returns:
-            Tuple of (where_part, order_by_part)
-        """
-        if "ORDER BY" in search_sql:
-            where_part, order_by_part = search_sql.split("ORDER BY", 1)
-            return where_part.strip(), order_by_part.strip()
-        return search_sql.strip(), ""
-
-    def _safe_alias_replace(self, sql: str, column_name: str, alias: str) -> str:
-        """
-        Safely replace column name with aliased version only if not already aliased
-
-        Args:
-            sql: SQL string to modify
-            column_name: Column name to replace (e.g., 'product_display_name')
-            alias: Table alias to add (e.g., 'p')
-
-        Returns:
-            Modified SQL string with safe alias replacement
-        """
-        aliased_column = f"{alias}.{column_name}"
-
-        if aliased_column not in sql and column_name in sql:
-            sql = sql.replace(column_name, aliased_column)
-
-        return sql
-
-    def _build_conditions_and_params(
-            self,
-            base_conditions: List[str],
-            category_spec: Optional[CategorySpecificationInterface] = None,
-            search_spec: Optional[SearchSpecificationInterface] = None
-    ) -> Tuple[List[str], List[Any]]:
-        """
-        Build common conditions and parameters for category and search specifications
-
-        Args:
-            base_conditions: Base conditions to start with
-            category_spec: Optional category specification
-            search_spec: Optional search specification
-
-        Returns:
-            Tuple of (conditions_list, parameters_list)
-        """
-        conditions = base_conditions.copy()
-        params = []
-
-        if category_spec and not category_spec.is_empty():
-            category_sql, category_params = category_spec.to_sql()
-            if "WHERE" in category_sql:
-                category_where = category_sql.split("WHERE", 1)[1].strip()
-                category_where = category_where.replace(f'{self.APP_NAME}_products', 'p')
-                conditions.append(category_where)
-                params.extend(category_params)
-
-        if search_spec and not search_spec.is_empty():
-            search_sql, search_params = search_spec.to_sql()
-            where_sql, _ = self._split_search_sql(search_sql)
-            where_sql = self._safe_alias_replace(where_sql, "product_display_name", "p")
-
-            if where_sql.startswith("WHERE"):
-                search_condition = where_sql.replace("WHERE", "").strip()
-                conditions.append(search_condition)
-                params.append(search_params[0])
-
-        return conditions, params

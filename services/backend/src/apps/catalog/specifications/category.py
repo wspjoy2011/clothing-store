@@ -1,6 +1,7 @@
 from typing import Optional, List, Any, Tuple
 
 from apps.catalog.interfaces.specifications import CategorySpecificationInterface
+from apps.catalog.specifications.clauses import PRODUCT_ALIAS, SqlClause
 
 
 class CategorySpecification(CategorySpecificationInterface):
@@ -23,25 +24,22 @@ class CategorySpecification(CategorySpecificationInterface):
         """Check if specification is empty"""
         return self._master_id is None
 
-    def to_sql(self) -> Tuple[str, List[Any]]:
+    def to_clause(self) -> SqlClause:
         """
-        Convert to SQL parts for joining and filtering by categories
+        Build the joins and predicates selecting one branch of the category tree
 
         Returns:
-            Tuple[str, List[Any]]: SQL part (joins + conditions), list of parameters
+            Joins and conditions with the identifiers they bind
         """
-        joins = []
-        conditions = []
-        params = []
+        joins = [
+            f"JOIN {self.APP_NAME}_article_type at "
+            f"ON {PRODUCT_ALIAS}.article_type_id = at.article_type_id",
+            f"JOIN {self.APP_NAME}_sub_category sc ON at.sub_category_id = sc.sub_category_id",
+            f"JOIN {self.APP_NAME}_master_category mc ON sc.master_category_id = mc.master_category_id"
+        ]
 
-        joins.append(
-            f"JOIN {self.APP_NAME}_article_type at ON {self.APP_NAME}_products.article_type_id = at.article_type_id"
-        )
-        joins.append(f"JOIN {self.APP_NAME}_sub_category sc ON at.sub_category_id = sc.sub_category_id")
-        joins.append(f"JOIN {self.APP_NAME}_master_category mc ON sc.master_category_id = mc.master_category_id")
-
-        conditions.append("mc.master_category_id = %s")
-        params.append(self._master_id)
+        conditions = ["mc.master_category_id = %s"]
+        params: List[Any] = [self._master_id]
 
         if self._sub_id is not None:
             conditions.append("sc.sub_category_id = %s")
@@ -51,6 +49,4 @@ class CategorySpecification(CategorySpecificationInterface):
             conditions.append("at.article_type_id = %s")
             params.append(self._article_id)
 
-        sql_part = " ".join(joins) + " WHERE " + " AND ".join(conditions)
-
-        return sql_part, params
+        return SqlClause(conditions=conditions, params=params, joins=joins)

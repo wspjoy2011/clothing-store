@@ -33,7 +33,7 @@ def build_repository(row: Optional[List[Any]] = None) -> tuple:
         Repository and the DAO backing it
     """
     dao = RecordingDAO(row)
-    return ProductRepository(dao=dao, query_builder=None), dao
+    return ProductRepository(dao=dao), dao
 
 
 async def test_locking_outside_a_transaction_is_refused():

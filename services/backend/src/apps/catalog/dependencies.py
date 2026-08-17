@@ -15,27 +15,25 @@ from apps.catalog.interfaces.services import CatalogServiceInterface
 from apps.catalog.repositories.category import CategoryRepository
 from apps.catalog.repositories.product import ProductRepository
 from apps.catalog.services.catalog import CatalogService
-from db.dependencies import get_database_dao, get_query_builder
-from db.interfaces import DAOInterface, SQLQueryBuilderInterface
+from db.dependencies import get_database_dao
+from db.interfaces import DAOInterface
 from search.dependencies import get_autocomplete_client
 from search.interfaces import AutocompleteClientInterface
 
 
 async def get_product_repository(
         dao: DAOInterface = Depends(get_database_dao),
-        query_builder: SQLQueryBuilderInterface = Depends(lambda: get_query_builder("catalog_products"))
 ) -> ProductRepositoryInterface:
     """
     Dependency for getting product repository.
 
     Args:
         dao: Data Access Object for database operations
-        query_builder: SQL query builder for product table
 
     Returns:
         Initialized product repository
     """
-    return ProductRepository(dao, query_builder)
+    return ProductRepository(dao)
 
 
 async def get_category_repository(
