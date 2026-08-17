@@ -8,7 +8,7 @@ from typing import Any, AsyncIterator, List, Optional
 from apps.accounts.dto.users import UserDTO
 from db.transaction import get_current_transaction, TransactionState
 from notifications.exceptions.email import BaseEmailError
-from tests.fakes import FakeConnection
+from tests.fakes import FakeConnection, FakeTransactionManager
 
 
 @dataclass
@@ -64,40 +64,6 @@ class FakeEmailSender:
     async def send_password_change_notification_email(self, email: str, login_link: str, change_time: str) -> None:
         """Record a password change notification"""
         await self._record(email, "password_change")
-
-
-class FakeTransactionManager:
-    """Transaction manager exposing an active transaction without a database"""
-
-    def __init__(self):
-        self.entered = 0
-        self.committed = 0
-        self.rolled_back = 0
-
-    @asynccontextmanager
-    async def atomic(self, isolation_level: Optional[Any] = None) -> AsyncIterator[None]:
-        """
-        Mark a transaction as active for the duration of the block
-
-        Args:
-            isolation_level: Accepted for interface compatibility
-
-        Yields:
-            Control to the wrapped block
-        """
-        from db.transaction import _current_transaction
-
-        self.entered += 1
-        token = _current_transaction.set(TransactionState(connection=FakeConnection("tx")))
-        try:
-            yield
-        except Exception:
-            self.rolled_back += 1
-            raise
-        else:
-            self.committed += 1
-        finally:
-            _current_transaction.reset(token)
 
 
 class FakeUserRepository:

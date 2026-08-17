@@ -1,4 +1,5 @@
-from typing import Any, List, Optional, Tuple
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, List, Optional, Tuple
 
 UNSET = object()
 
@@ -169,3 +170,37 @@ class FakeConnectionPool:
     def connection(self) -> _ConnectionContext:
         """Acquire a connection as an async context manager"""
         return _ConnectionContext(self)
+
+class FakeTransactionManager:
+    """Transaction manager exposing an active transaction without a database"""
+
+    def __init__(self):
+        self.entered = 0
+        self.committed = 0
+        self.rolled_back = 0
+
+    @asynccontextmanager
+    async def atomic(self, isolation_level: Optional[Any] = None) -> AsyncIterator[None]:
+        """
+        Mark a transaction as active for the duration of the block
+
+        Args:
+            isolation_level: Accepted for interface compatibility
+
+        Yields:
+            Control to the wrapped block
+        """
+        from db.transaction import _current_transaction, TransactionState
+
+        self.entered += 1
+        token = _current_transaction.set(TransactionState(connection=FakeConnection("tx")))
+        try:
+            yield
+        except Exception:
+            self.rolled_back += 1
+            raise
+        else:
+            self.committed += 1
+        finally:
+            _current_transaction.reset(token)
+

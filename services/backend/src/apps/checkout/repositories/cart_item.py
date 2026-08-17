@@ -30,17 +30,15 @@ class CartItemRepository(CartItemRepositoryInterface):
         """
         Add item to cart or update quantity if item already exists
 
-        The resulting quantity is re-checked against stock inside the statement,
-        the same way update_cart_item does: on conflict the quantities are summed,
-        and a separate check could not see that sum.
+        On conflict the quantities are summed, so the caller must validate the
+        resulting total rather than the increment, while holding the inventory row.
 
         Args:
             request_data: Data for adding item to cart
             cart_id: ID of the cart
 
         Returns:
-            Created or updated CartItemDTO, or None when stock no longer covers
-            the resulting quantity
+            Created or updated CartItemDTO
         """
         query = f"""
             INSERT INTO {self.APP_NAME}_cart_items (cart_id, product_id, quantity)
@@ -49,13 +47,6 @@ class CartItemRepository(CartItemRepositoryInterface):
             DO UPDATE SET
                 quantity = {self.APP_NAME}_cart_items.quantity + EXCLUDED.quantity,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE EXISTS (
-                SELECT 1 FROM catalog_product_inventory AS inventory
-                WHERE inventory.product_id = {self.APP_NAME}_cart_items.product_id
-                  AND inventory.is_active
-                  AND inventory.is_in_stock
-                  AND inventory.available_quantity >= {self.APP_NAME}_cart_items.quantity + EXCLUDED.quantity
-            )
             RETURNING id, cart_id, product_id, quantity, added_at, updated_at
         """
 
@@ -155,34 +146,27 @@ class CartItemRepository(CartItemRepositoryInterface):
         """
         Update cart item quantity with cart ownership and stock validation
 
-        Stock is re-checked inside the statement itself: a separate check would
-        leave a window in which a concurrent request could take the last units
-        between the check and the update.
+        Stock is validated by the caller while it holds the inventory row, so this
+        statement only enforces ownership.
 
         Args:
             request_data: Data for updating cart item
             cart_id: ID of the cart to which the item must belong
 
         Returns:
-            Updated CartItemDTO, or None when the item is absent, owned by another
-            cart, or no longer covered by the available stock
+            Updated CartItemDTO, or None when the item is absent or owned by
+            another cart
         """
         query = f"""
-            UPDATE {self.APP_NAME}_cart_items AS item
+            UPDATE {self.APP_NAME}_cart_items
             SET quantity = %s, updated_at = CURRENT_TIMESTAMP
-            FROM catalog_product_inventory AS inventory
-            WHERE item.id = %s
-              AND item.cart_id = %s
-              AND inventory.product_id = item.product_id
-              AND inventory.is_active
-              AND inventory.is_in_stock
-              AND inventory.available_quantity >= %s
-            RETURNING item.id, item.cart_id, item.product_id, item.quantity, item.added_at, item.updated_at
+            WHERE id = %s AND cart_id = %s
+            RETURNING id, cart_id, product_id, quantity, added_at, updated_at
         """
 
         result = await self._dao.execute(
             query=query,
-            params=[request_data.quantity, request_data.cart_item_id, cart_id, request_data.quantity],
+            params=[request_data.quantity, request_data.cart_item_id, cart_id],
             fetch=True,
             fetch_one=True,
             model_class=CartItemDTO
@@ -195,7 +179,7 @@ class CartItemRepository(CartItemRepositoryInterface):
         else:
             logger.warning(
                 f"Cart item {request_data.cart_item_id} not updated in cart {cart_id}: "
-                f"missing, owned by another cart, or stock no longer covers {request_data.quantity}"
+                f"it is missing or belongs to another cart"
             )
 
         return result
