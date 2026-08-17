@@ -568,5 +568,5 @@ async def refresh_access_token_controller(
             access_token=tokens.access_token,
             refresh_token=tokens.refresh_token,
             token_type=tokens.token_type,
-            expires_in=config.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            expires_in=config.access_token_lifetime_seconds
         )

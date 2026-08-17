@@ -318,9 +318,7 @@ class CatalogService(CatalogServiceInterface):
         if not inventory:
             return None
 
-        is_active, is_in_stock, available_quantity = inventory
-
-        if not is_active or not is_in_stock:
+        if not inventory.is_active or not inventory.is_in_stock:
             return None
 
-        return available_quantity
+        return inventory.available_quantity

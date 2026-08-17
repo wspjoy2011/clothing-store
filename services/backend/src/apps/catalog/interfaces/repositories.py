@@ -3,7 +3,7 @@ from typing import Optional
 
 from apps.catalog.dto.category import CategoryMenuDTO, MasterCategoryInfoDTO
 from apps.catalog.dto.filters import FiltersDTO
-from apps.catalog.dto.products import ProductDTO
+from apps.catalog.dto.products import InventoryHoldDTO, ProductDTO
 from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
     OrderingSpecificationInterface,
@@ -15,7 +15,7 @@ from apps.catalog.interfaces.specifications import (
 
 class ProductRepositoryInterface(ABC):
     @abstractmethod
-    async def lock_inventory(self, product_id: int) -> Optional[tuple]:
+    async def lock_inventory(self, product_id: int) -> Optional[InventoryHoldDTO]:
         """
         Read the inventory row of a product and hold it for the current transaction
 
@@ -23,8 +23,7 @@ class ProductRepositoryInterface(ABC):
             product_id: The ID of the product whose inventory is needed
 
         Returns:
-            Tuple of is_active, is_in_stock and available_quantity, or None when the
-            product has no inventory row
+            State of the held row, or None when the product has no inventory row
         """
         pass
 

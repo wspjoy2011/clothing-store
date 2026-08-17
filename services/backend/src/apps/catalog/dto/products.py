@@ -29,3 +29,15 @@ class ProductDTO:
     image_url: Optional[str]
     slug: str
     inventory: Optional[InventoryDTO] = None
+
+
+@dataclass(frozen=True)
+class InventoryHoldDTO:
+    """State of one held inventory row
+
+    A named object rather than a tuple: adding a column to the locking read would
+    otherwise silently shift what each unpacked variable means.
+    """
+    is_active: bool
+    is_in_stock: bool
+    available_quantity: int

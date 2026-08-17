@@ -379,7 +379,7 @@ class SocialAuthService(SocialAuthServiceInterface):
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            expires_in=3600
+            expires_in=config.access_token_lifetime_seconds
         )
 
     async def _store_refresh_token(self, user_id: int, refresh_token: str) -> None:

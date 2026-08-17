@@ -76,7 +76,7 @@ class CategoryRepository(CategoryRepositoryInterface):
 
             if master_id not in master_categories:
                 master_categories[master_id] = MasterCategoryInfoDTO(
-                    master_category_id=master_id,
+                    id=master_id,
                     name=master_name,
                     sub_categories=[]
                 )
@@ -117,7 +117,7 @@ class CategoryRepository(CategoryRepositoryInterface):
         master_id, master_name, _, _, _, _ = self._extract_row_data(category_result[0])
 
         master_category = MasterCategoryInfoDTO(
-            master_category_id=master_id,
+            id=master_id,
             name=master_name,
             sub_categories=[]
         )
@@ -205,7 +205,7 @@ class CategoryRepository(CategoryRepositoryInterface):
             article_name: Article type name
         """
         article_type = ArticleTypeInfoDTO(
-            article_type_id=article_id,
+            id=article_id,
             name=article_name
         )
 
@@ -250,7 +250,7 @@ class CategoryRepository(CategoryRepositoryInterface):
             Created subcategory
         """
         subcategory = SubCategoryInfoDTO(
-            sub_category_id=sub_id,
+            id=sub_id,
             name=sub_name,
             article_types=[]
         )

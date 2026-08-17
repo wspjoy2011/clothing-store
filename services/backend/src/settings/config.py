@@ -53,6 +53,11 @@ class AppConfig(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
     JWT_REFRESH_TOKEN_EXPIRE_MINUTES: int
 
+    @property
+    def access_token_lifetime_seconds(self) -> int:
+        """Lifetime of an access token in seconds, as clients report it"""
+        return self.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+
     # Logging
     LOG_LEVEL: str = "INFO"
 

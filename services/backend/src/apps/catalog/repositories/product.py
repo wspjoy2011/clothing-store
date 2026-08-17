@@ -9,7 +9,7 @@ from apps.catalog.dto.filters import (
     AvailabilityFilterDTO,
     PriceRangeFilterDTO
 )
-from apps.catalog.dto.products import ProductDTO, InventoryDTO
+from apps.catalog.dto.products import ProductDTO, InventoryDTO, InventoryHoldDTO
 from apps.catalog.interfaces.repositories import ProductRepositoryInterface
 from apps.catalog.interfaces.specifications import (
     PaginationSpecificationInterface,
@@ -41,7 +41,7 @@ class ProductRepository(ProductRepositoryInterface):
         self._dao = dao
         self._query_builder = query_builder
 
-    async def lock_inventory(self, product_id: int) -> Optional[tuple]:
+    async def lock_inventory(self, product_id: int) -> Optional[InventoryHoldDTO]:
         """
         Read the inventory row of a product and hold it for the current transaction
 
@@ -53,8 +53,7 @@ class ProductRepository(ProductRepositoryInterface):
             product_id: The ID of the product whose inventory is needed
 
         Returns:
-            Tuple of is_active, is_in_stock and available_quantity, or None when the
-            product has no inventory row
+            State of the held row, or None when the product has no inventory row
         """
         if get_current_transaction() is None:
             raise NoActiveTransactionError(
@@ -76,7 +75,12 @@ class ProductRepository(ProductRepositoryInterface):
             logger.info(f"No inventory row to lock for product {product_id}")
             return None
 
-        return tuple(result)
+        is_active, is_in_stock, available_quantity = tuple(result)
+        return InventoryHoldDTO(
+            is_active=is_active,
+            is_in_stock=is_in_stock,
+            available_quantity=available_quantity
+        )
 
     async def get_product_by_id(self, product_id: int) -> Optional[ProductDTO]:
         """

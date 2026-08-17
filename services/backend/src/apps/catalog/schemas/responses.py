@@ -12,8 +12,6 @@ class InventorySchema(BaseModel):
     base_price: Decimal
     sale_price: Optional[Decimal] = None
     currency: str
-    stock_quantity: int
-    reserved_quantity: int
     available_quantity: int
     is_active: bool
     is_in_stock: bool
