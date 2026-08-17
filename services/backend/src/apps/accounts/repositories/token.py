@@ -27,9 +27,20 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
         super().__init__(dao, query_builder)
 
     async def get_activation_token_by_token(self, token: str) -> Optional[ActivationTokenDTO]:
-        """Get activation token by token string"""
+        """
+        Get activation token by token string, expired or not
+
+        Expiry is left to the caller: a token filtered out here is indistinguishable
+        from one that never existed, and the two deserve different answers.
+
+        Args:
+            token: Token string to look up
+
+        Returns:
+            ActivationTokenDTO if a row exists, None otherwise
+        """
         self._build_activation_token_query()
-        self._query_builder.where("token = %s AND expires_at > CURRENT_TIMESTAMP", token)
+        self._query_builder.where("token = %s", token)
 
         result = await self._execute_query_single("Get activation token by token")
         return self.map_to_activation_token_dto(result) if result else None
@@ -115,9 +126,20 @@ class TokenRepository(BaseRepository, TokenRepositoryInterface):
             raise TokenDeletionError(f"Unexpected error deleting activation tokens for user ID: {user_id}", e)
 
     async def get_password_reset_token_by_token(self, token: str) -> Optional[PasswordResetTokenDTO]:
-        """Get password reset token by token string"""
+        """
+        Get password reset token by token string, expired or not
+
+        Expiry is left to the caller: a token filtered out here is indistinguishable
+        from one that never existed, and the two deserve different answers.
+
+        Args:
+            token: Token string to look up
+
+        Returns:
+            PasswordResetTokenDTO if a row exists, None otherwise
+        """
         self._build_password_reset_token_query()
-        self._query_builder.where("token = %s AND expires_at > CURRENT_TIMESTAMP", token)
+        self._query_builder.where("token = %s", token)
 
         result = await self._execute_query_single("Get password reset token by token")
         return self.map_to_password_reset_token_dto(result) if result else None
