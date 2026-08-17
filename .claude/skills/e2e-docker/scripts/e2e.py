@@ -34,6 +34,9 @@ STOCK_PROBE_PRODUCT_ID = 999_000_001
 STOCK_PROBE_UNITS = 3
 PAGINATION_PROBE_PRODUCT_ID = 999_000_100
 PAGINATION_PROBE_PRODUCTS = 2
+CATALOG_PROBE_PRODUCT_ID = 999_000_200
+CATALOG_PROBE_PRODUCTS = 3
+CATALOG_PROBE_BASE_PRICE = 17.50
 API_ORIGIN = "http://localhost:8000"
 
 
@@ -528,6 +531,7 @@ def command_scenarios(arguments, ledger: Ledger) -> int:
             results.extend(check_concurrent_stock_limit(base, STOCK_PROBE_PRODUCT_ID, STOCK_PROBE_UNITS))
 
     results.extend(check_pagination_links(arguments, base, ledger))
+    results.extend(check_catalog_queries(arguments, base, ledger))
     results.extend(check_refresh_rotation(arguments, base, ledger))
     results.extend(check_rate_limit(base))
 
@@ -536,7 +540,7 @@ def command_scenarios(arguments, ledger: Ledger) -> int:
     return 0 if all(passed for _, passed, _ in results) else 1
 
 
-def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) -> bool:
+def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int, price: float = 10.00) -> bool:
     """
     Insert one product with a known stock level
 
@@ -548,6 +552,7 @@ def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) ->
         ledger: Journal recording the rows
         product_id: Identifier to insert
         stock: Units to make available
+        price: Base price to give the product
 
     Returns:
         True when the product is in place
@@ -559,6 +564,9 @@ def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) ->
     if not isinstance(product_id, int) or not isinstance(stock, int):
         raise TypeError("product_id and stock must be integers: they are interpolated into SQL")
 
+    if not isinstance(price, (int, float)):
+        raise TypeError("price must be numeric: it is interpolated into SQL")
+
     ledger.record("created", "db_row", str(product_id), table="catalog_products", note="stock scenario")
     ledger.record("created", "db_row", str(product_id), table="catalog_product_inventory", note="stock scenario")
 
@@ -569,8 +577,8 @@ def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) ->
         f"'http://example.com/e2e.jpg', 'e2e-stock-probe-{product_id}') "
         f"ON CONFLICT (product_id) DO NOTHING; "
         f"INSERT INTO catalog_product_inventory (product_id, base_price, stock_quantity, is_active) "
-        f"VALUES ({product_id}, 10.00, {stock}, TRUE) "
-        f"ON CONFLICT (product_id) DO UPDATE SET stock_quantity = {stock};"
+        f"VALUES ({product_id}, {price:.2f}, {stock}, TRUE) "
+        f"ON CONFLICT (product_id) DO UPDATE SET stock_quantity = {stock}, base_price = {price:.2f};"
     )
 
     user = read_env_value(env_file, "POSTGRES_USER") or "admin"
@@ -844,6 +852,86 @@ def check_pagination_links(arguments, base: str, ledger: Ledger) -> List[Tuple[s
         followed == 200,
         f"following {next_page} answered {followed}"
     )]
+
+
+def check_catalog_queries(arguments, base: str, ledger: Ledger) -> List[Tuple[str, bool, str]]:
+    """
+    Check the catalogue answers filters, sorting and counts consistently
+
+    These read paths are assembled from specifications, so only a real database
+    shows whether the statement they produce is valid and means what it says.
+
+    Args:
+        arguments: Parsed command line arguments
+        base: API base URL
+        ledger: Journal recording the rows
+
+    Returns:
+        Scenario results
+    """
+    results: List[Tuple[str, bool, str]] = []
+
+    for offset in range(CATALOG_PROBE_PRODUCTS):
+        probe_price = CATALOG_PROBE_BASE_PRICE * (offset + 1)
+        if not seed_test_product(
+                arguments, ledger, CATALOG_PROBE_PRODUCT_ID + offset, offset + 1, probe_price
+        ):
+            return [("catalogue queries could be checked", False, "probe products could not be seeded")]
+
+    status, body = request("GET", f"{base}/catalog/products?ordering=-price&per_page=5")
+    prices = [
+        float(item["inventory"]["sale_price"] or item["inventory"]["base_price"])
+        for item in body.get("products", []) if item.get("inventory")
+    ] if isinstance(body, dict) else []
+    results.append((
+        "sorting by price returns descending prices",
+        status == 200 and prices == sorted(prices, reverse=True) and len(set(prices)) > 1,
+        f"status {status}, prices {prices[:5]}"
+    ))
+
+    status, body = request("GET", f"{base}/catalog/products?gender=Unisex&per_page=5")
+    genders = {item["gender"] for item in body.get("products", [])} if isinstance(body, dict) else set()
+    results.append((
+        "filtering by gender returns only that gender",
+        status == 200 and genders <= {"Unisex"},
+        f"status {status}, genders {sorted(genders)}"
+    ))
+
+    status, body = request("GET", f"{base}/catalog/products?ordering=---id&per_page=5")
+    results.append((
+        "an ordering value of only dashes is refused rather than crashing",
+        status == 200,
+        f"status {status}"
+    ))
+
+    status, filters = request("GET", f"{base}/catalog/products/filters")
+    availability = filters.get("is_available") if isinstance(filters, dict) else None
+    _, listing = request("GET", f"{base}/catalog/products?per_page=1")
+    total = listing.get("total_items") if isinstance(listing, dict) else None
+
+    counted = (
+        availability["available_count"] + availability["unavailable_count"]
+        if isinstance(availability, dict) else None
+    )
+    results.append((
+        "the availability counts add up to the catalogue size",
+        status == 200 and counted == total,
+        f"available plus unavailable {counted}, catalogue {total}"
+    ))
+
+    status, body = request("GET", f"{base}/catalog/products?q=probe&ordering=-price&per_page=5")
+    searched_prices = [
+        float(item["inventory"]["sale_price"] or item["inventory"]["base_price"])
+        for item in body.get("products", []) if item.get("inventory")
+    ] if isinstance(body, dict) else []
+    results.append((
+        "a search keeps the sort the client asked for",
+        status == 200 and searched_prices == sorted(searched_prices, reverse=True)
+        and len(set(searched_prices)) > 1,
+        f"status {status}, prices {searched_prices[:5]}"
+    ))
+
+    return results
 
 
 def run_parallel_registrations(base: str, emails: List[str]) -> List[int]:
