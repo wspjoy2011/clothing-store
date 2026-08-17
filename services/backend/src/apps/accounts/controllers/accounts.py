@@ -12,6 +12,7 @@ from apps.accounts.dto.password_reset import (
 from apps.accounts.dto.users import CreateUserDTO, UserLoginDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.interfaces.services import AccountServiceInterface
+from apps.accounts.validators.token import mask_token_for_logging
 from apps.accounts.schemas.jwt_token import RefreshTokenResponse, RefreshTokenRequest
 from apps.accounts.schemas.password_reset import (
     PasswordResetRequestSchema,
@@ -425,7 +426,7 @@ async def confirm_password_reset_controller(
             detail=str(e)
         )
     except PasswordResetRollbackError as e:
-        logger.error(f"Password reset rolled back for token {confirm_data.token}: {e}")
+        logger.error(f"Password reset rolled back for token {mask_token_for_logging(confirm_data.token)}: {e}")
         raise HTTPException(
             status_code=503,
             detail="Password reset could not be completed. Please request it again."
@@ -436,7 +437,10 @@ async def confirm_password_reset_controller(
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Unexpected error during password reset confirmation with token {confirm_data.token}: {e}")
+        logger.error(
+            f"Unexpected error during password reset confirmation with token "
+            f"{mask_token_for_logging(confirm_data.token)}: {e}"
+        )
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during password reset confirmation"

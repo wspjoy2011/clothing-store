@@ -6,47 +6,78 @@ from apps.catalog.interfaces.specifications import OrderingSpecificationInterfac
 class OrderingSpecification(OrderingSpecificationInterface):
     """Specification for ordering results"""
 
+    FIELD_EXPRESSIONS = {
+        "id": "id",
+        "year": "year",
+        "product_id": "product_id",
+        "price": "COALESCE(i.sale_price, i.base_price)"
+    }
+
+    DEFAULT_ORDERING = "-id"
+    TIEBREAKER = "product_id"
+
     def __init__(self, ordering: Optional[str] = None):
-        self._allowed_fields = ["id", "year", "product_id", "price"]
+        self._allowed_fields = list(self.FIELD_EXPRESSIONS)
 
         self._ordering_fields = self._parse_ordering(ordering)
 
     def _parse_ordering(self, ordering_param: Optional[str]) -> list[str]:
-        """Parse and validate ordering parameter"""
+        """
+        Keep the requested fields that are on the allowlist, in the order asked for
+
+        A field is recognised only as an exact allowlisted name with at most one
+        leading minus. Anything else is dropped: stripping every leading minus
+        would let "---id" pass as "id" and reach the SQL as "--id", where the two
+        dashes comment out the rest of the statement.
+
+        Args:
+            ordering_param: Comma-separated fields as received from the client
+
+        Returns:
+            Recognised fields, always ending with the tiebreaker
+        """
         if not ordering_param:
-            return ["-id"]
+            return [self.DEFAULT_ORDERING]
 
-        ordering_fields = ordering_param.split(',')
-
-        all_allowed_fields = set(self._allowed_fields + [f"-{field}" for field in self._allowed_fields])
-
-        processed_fields = [field for field in ordering_fields if field.lstrip('-') in all_allowed_fields]
+        processed_fields = [
+            field for field in ordering_param.split(',')
+            if self._field_name_of(field) in self.FIELD_EXPRESSIONS
+        ]
 
         if not processed_fields:
-            return ["-id"]
+            return [self.DEFAULT_ORDERING]
 
-        has_product_id = any(field.lstrip('-') == 'product_id' for field in processed_fields)
-        if not has_product_id:
-            processed_fields.append("product_id")
+        if not any(self._field_name_of(field) == self.TIEBREAKER for field in processed_fields):
+            processed_fields.append(self.TIEBREAKER)
 
         return processed_fields
 
+    @staticmethod
+    def _field_name_of(field: str) -> str:
+        """
+        Read the field name of a possibly descending field
+
+        Args:
+            field: Field as written by the client, optionally prefixed with one minus
+
+        Returns:
+            The name without its direction prefix
+        """
+        return field[1:] if field.startswith('-') else field
+
     def to_sql(self) -> tuple[str, list[Any]]:
-        """Convert ordering fields to SQL ORDER BY clause"""
+        """
+        Build the ORDER BY clause from allowlisted expressions only
+
+        Returns:
+            The clause and an empty parameter list
+        """
         sql_parts = []
 
         for field in self._ordering_fields:
-            if field.startswith('-'):
-                field_name = field[1:]
-                if field_name == 'price':
-                    sql_parts.append("COALESCE(i.sale_price, i.base_price) DESC")
-                else:
-                    sql_parts.append(f"{field_name} DESC")
-            else:
-                if field == 'price':
-                    sql_parts.append("COALESCE(i.sale_price, i.base_price) ASC")
-                else:
-                    sql_parts.append(f"{field} ASC")
+            expression = self.FIELD_EXPRESSIONS[self._field_name_of(field)]
+            direction = "DESC" if field.startswith('-') else "ASC"
+            sql_parts.append(f"{expression} {direction}")
 
         sql = f"ORDER BY {', '.join(sql_parts)}"
         return sql, []

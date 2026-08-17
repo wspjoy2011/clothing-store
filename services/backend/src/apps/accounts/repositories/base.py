@@ -30,7 +30,6 @@ class BaseRepository(AccountsRepositoryMixin):
         """Execute query and return single result"""
         query, params = self._query_builder.build()
         logger.info(f"{log_prefix} query: {query}")
-        logger.info(f"{log_prefix} params: {params}")
 
         try:
             return await self._dao.execute(query, params, fetch_one=True)
@@ -45,7 +44,6 @@ class BaseRepository(AccountsRepositoryMixin):
         """Execute query and return multiple results"""
         query, params = self._query_builder.build()
         logger.info(f"{log_prefix} query: {query}")
-        logger.info(f"{log_prefix} params: {params}")
 
         try:
             result = await self._dao.execute(query, params)
@@ -62,7 +60,6 @@ class BaseRepository(AccountsRepositoryMixin):
         """Execute count query"""
         query, params = self._query_builder.build_count()
         logger.info(f"{log_prefix} query: {query}")
-        logger.info(f"{log_prefix} params: {params}")
 
         try:
             result = await self._dao.execute(query, params, fetch_one=True)
@@ -78,7 +75,6 @@ class BaseRepository(AccountsRepositoryMixin):
     async def _execute_custom_query_single(self, query: str, params: List, log_prefix: str) -> Optional[tuple]:
         """Execute custom query and return single result"""
         logger.info(f"{log_prefix} query: {query}")
-        logger.info(f"{log_prefix} params: {params}")
 
         try:
             return await self._dao.execute(query, params, fetch_one=True)
@@ -92,7 +88,6 @@ class BaseRepository(AccountsRepositoryMixin):
     async def _execute_custom_query_multiple(self, query: str, params: List, log_prefix: str) -> List[tuple]:
         """Execute custom query and return multiple results"""
         logger.info(f"{log_prefix} query: {query}")
-        logger.info(f"{log_prefix} params: {params}")
 
         try:
             result = await self._dao.execute(query, params)
@@ -108,7 +103,6 @@ class BaseRepository(AccountsRepositoryMixin):
     async def _execute_custom_update_query(self, query: str, params: List, log_prefix: str) -> bool:
         """Execute custom UPDATE/DELETE query and return number of affected rows"""
         logger.info(f"{log_prefix} query: {query}")
-        logger.info(f"{log_prefix} params: {params}")
 
         try:
             cursor = await self._dao.execute(query, params)

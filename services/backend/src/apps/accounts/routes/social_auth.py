@@ -2,7 +2,7 @@
 Routes for social authentication API.
 """
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, Request, status, HTTPException
 
 from apps.accounts.controllers.social_auth import (
     social_auth_controller,
@@ -33,6 +33,7 @@ from apps.accounts.schemas.examples.social_auth import (
     EMAIL_INVALID_FORMAT_ERROR
 )
 from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
+from security.rate_limit import limiter, CREDENTIAL_GUESS_LIMIT
 from oauth.factories import OAuthProviderRegistry
 
 API_PATHS = {
@@ -219,7 +220,9 @@ router = APIRouter(prefix="/auth", tags=["Social Authentication"])
         }
     }
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def social_auth_route(
+        request: Request,
         request_data: SocialAuthRequestSchema,
         google_service: SocialAuthServiceInterface = Depends(get_google_social_auth_service),
         facebook_service: SocialAuthServiceInterface = Depends(get_facebook_social_auth_service)
