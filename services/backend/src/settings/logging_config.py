@@ -49,6 +49,6 @@ def get_logger(name: str, log_filename: str) -> logging.Logger:
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
 
-        logger.setLevel(logging.INFO)
+        logger.setLevel(getattr(logging, config.LOG_LEVEL.upper(), logging.INFO))
 
     return logger

@@ -203,63 +203,6 @@ class UserGroupRepositoryInterface(ABC):
         pass
 
 
-class UserProfileRepositoryInterface(ABC):
-    """Interface for user profile repository operations"""
-
-    @abstractmethod
-    async def get_profile_by_user_id(self, user_id: int) -> Optional[UserProfileDTO]:
-        """
-        Get user profile by user ID
-
-        Args:
-            user_id: ID of the user
-
-        Returns:
-            UserProfileDTO if found, None otherwise
-        """
-        pass
-
-    @abstractmethod
-    async def create_profile(self, user_id: int, profile_data: dict) -> UserProfileDTO:
-        """
-        Create user profile
-
-        Args:
-            user_id: ID of the user
-            profile_data: Profile data
-
-        Returns:
-            Created UserProfileDTO
-        """
-        pass
-
-    @abstractmethod
-    async def update_profile(self, user_id: int, profile_data: dict) -> Optional[UserProfileDTO]:
-        """
-        Update user profile
-
-        Args:
-            user_id: ID of the user
-            profile_data: Updated profile data
-
-        Returns:
-            Updated UserProfileDTO if successful, None otherwise
-        """
-        pass
-
-    @abstractmethod
-    async def delete_profile(self, user_id: int) -> bool:
-        """
-        Delete user profile
-
-        Args:
-            user_id: ID of the user
-
-        Returns:
-            True if deleted successfully, False otherwise
-        """
-        pass
-
 
 class TokenRepositoryInterface(ABC):
     """Interface for token repository operations"""

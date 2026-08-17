@@ -148,7 +148,6 @@ class JWTManagerInterface(ABC):
             EmptyTokenError: If token is empty or None
             ExpiredTokenError: If token is expired
             InvalidTokenError: If token is invalid or malformed
-            TokenSignatureError: If token signature is invalid
             InvalidTokenTypeError: If token type is not 'access'
             TokenVerificationError: If verification fails for other reasons
         """
@@ -169,7 +168,6 @@ class JWTManagerInterface(ABC):
             EmptyTokenError: If token is empty or None
             ExpiredTokenError: If token is expired
             InvalidTokenError: If token is invalid or malformed
-            TokenSignatureError: If token signature is invalid
             InvalidTokenTypeError: If token type is not 'refresh'
             TokenVerificationError: If verification fails for other reasons
         """

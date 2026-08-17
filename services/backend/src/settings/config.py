@@ -53,6 +53,9 @@ class AppConfig(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
     JWT_REFRESH_TOKEN_EXPIRE_MINUTES: int
 
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
     # Rate limits
     RATE_LIMIT_CREDENTIAL_GUESS: str = "10/minute"
     RATE_LIMIT_REGISTRATION: str = "5/minute"

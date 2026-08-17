@@ -1,11 +1,7 @@
-"""
-Facebook OAuth provider implementation using Authlib.
-"""
+"""Facebook OAuth provider implementation."""
 
 from typing import Dict, Any
 
-from authlib.integrations.httpx_client import AsyncOAuth2Client
-from authlib.common.errors import AuthlibBaseError
 import httpx
 
 from oauth.interfaces import OAuthProviderInterface
@@ -14,8 +10,10 @@ from oauth.exceptions import TokenVerificationError, UserInfoError, Configuratio
 
 
 class FacebookOAuthProvider(OAuthProviderInterface):
-    """
-    Facebook OAuth2 provider implementation using Authlib.
+    """Facebook OAuth2 provider implementation
+
+    Every verification uses its own HTTP client: a client shared by the process
+    would carry one request's credentials into another.
     """
 
     _FACEBOOK_USERINFO_URL = "https://graph.facebook.com/me"
@@ -35,11 +33,6 @@ class FacebookOAuthProvider(OAuthProviderInterface):
         self._client_id = client_id
         self._client_secret = client_secret
         self.validate_config()
-
-        self._oauth_client = AsyncOAuth2Client(
-            client_id=self._client_id,
-            client_secret=self._client_secret
-        )
 
     @property
     def provider_name(self) -> str:
@@ -77,11 +70,6 @@ class FacebookOAuthProvider(OAuthProviderInterface):
                 self._require_own_app(token_debug)
                 return await self._read_user_info(client, access_token)
 
-        except AuthlibBaseError as e:
-            raise TokenVerificationError(
-                self.provider_name,
-                f"Authlib error during token verification: {str(e)}"
-            )
         except httpx.HTTPError as e:
             raise TokenVerificationError(
                 self.provider_name,
@@ -311,56 +299,4 @@ class FacebookOAuthProvider(OAuthProviderInterface):
 
         return True
 
-    def get_authorization_url(self, redirect_uri: str, state: str = None) -> str:
-        """
-        Generate Facebook OAuth2 authorization URL using Authlib.
 
-        Args:
-            redirect_uri: Redirect URI after authorization
-            state: Optional state parameter for security
-
-        Returns:
-            Authorization URL
-        """
-        authorization_url, _ = self._oauth_client.create_authorization_url(
-            self._FACEBOOK_AUTH_URL,
-            redirect_uri=redirect_uri,
-            scope=" ".join(self.get_required_scopes()),
-            state=state,
-            response_type="code"
-        )
-
-        return authorization_url
-
-    async def exchange_code_for_token(self, code: str, redirect_uri: str) -> Dict[str, Any]:
-        """
-        Exchange authorization code for access token using Authlib.
-
-        Args:
-            code: Authorization code from Facebook
-            redirect_uri: Redirect URI used in authorization
-
-        Returns:
-            Token response from Facebook
-
-        Raises:
-            TokenVerificationError: If code exchange fails
-        """
-        try:
-            token = await self._oauth_client.fetch_token(
-                self._FACEBOOK_TOKEN_URL,
-                code=code,
-                redirect_uri=redirect_uri
-            )
-            return token
-
-        except AuthlibBaseError as e:
-            raise TokenVerificationError(
-                self.provider_name,
-                f"Failed to exchange code for token: {str(e)}"
-            )
-        except Exception as e:
-            raise TokenVerificationError(
-                self.provider_name,
-                f"Unexpected error during code exchange: {str(e)}"
-            )

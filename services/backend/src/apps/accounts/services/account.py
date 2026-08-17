@@ -61,7 +61,7 @@ from security.exceptions import (
     VerificationError,
     TokenCreationError as SecurityTokenCreationError,
     InvalidTokenError,
-    ExpiredTokenError, TokenSignatureError, InvalidTokenTypeError, EmptyTokenError
+    ExpiredTokenError, InvalidTokenTypeError, EmptyTokenError
 )
 from notifications.email.interfaces import EmailSenderInterface
 from notifications.exceptions.email import BaseEmailError
@@ -683,7 +683,7 @@ class AccountService(AccountServiceInterface):
                 raise InvalidRefreshTokenError("Invalid refresh token payload")
 
             logger.debug(f"Refresh token payload verified for user_id: {user_id}")
-        except (ExpiredTokenError, InvalidTokenError, TokenSignatureError,
+        except (ExpiredTokenError, InvalidTokenError,
                 InvalidTokenTypeError, EmptyTokenError) as e:
             logger.warning(f"Refresh token verification failed: {e}")
             raise InvalidRefreshTokenError(f"Invalid refresh token: {str(e)}", e)

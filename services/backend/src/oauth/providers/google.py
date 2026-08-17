@@ -1,10 +1,6 @@
-"""
-Google OAuth provider implementation using Authlib.
-"""
+"""Google OAuth provider implementation."""
 
 from typing import Dict, Any
-from authlib.integrations.httpx_client import AsyncOAuth2Client
-from authlib.common.errors import AuthlibBaseError
 import httpx
 
 from oauth.interfaces import OAuthProviderInterface
@@ -13,8 +9,10 @@ from oauth.exceptions import TokenVerificationError, UserInfoError, Configuratio
 
 
 class GoogleOAuthProvider(OAuthProviderInterface):
-    """
-    Google OAuth2 provider implementation using Authlib.
+    """Google OAuth2 provider implementation
+
+    Every verification uses its own HTTP client: a client shared by the process
+    would carry one request's credentials into another.
     """
 
     _GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
@@ -34,11 +32,6 @@ class GoogleOAuthProvider(OAuthProviderInterface):
         self._client_id = client_id
         self._client_secret = client_secret
         self.validate_config()
-
-        self._oauth_client = AsyncOAuth2Client(
-            client_id=self._client_id,
-            client_secret=self._client_secret
-        )
 
     @property
     def provider_name(self) -> str:
@@ -76,11 +69,6 @@ class GoogleOAuthProvider(OAuthProviderInterface):
                 self._require_own_audience(token_info)
                 return await self._read_user_info(client, access_token)
 
-        except AuthlibBaseError as e:
-            raise TokenVerificationError(
-                self.provider_name,
-                f"Authlib error during token verification: {str(e)}"
-            )
         except httpx.HTTPError as e:
             raise TokenVerificationError(
                 self.provider_name,
@@ -294,57 +282,4 @@ class GoogleOAuthProvider(OAuthProviderInterface):
 
         return True
 
-    def get_authorization_url(self, redirect_uri: str, state: str = None) -> str:
-        """
-        Generate Google OAuth2 authorization URL using Authlib.
 
-        Args:
-            redirect_uri: Redirect URI after authorization
-            state: Optional state parameter for security
-
-        Returns:
-            Authorization URL
-        """
-        authorization_url, _ = self._oauth_client.create_authorization_url(
-            self._GOOGLE_AUTH_URL,
-            redirect_uri=redirect_uri,
-            scope=" ".join(self.get_required_scopes()),
-            state=state,
-            access_type="offline",
-            include_granted_scopes="true"
-        )
-
-        return authorization_url
-
-    async def exchange_code_for_token(self, code: str, redirect_uri: str) -> Dict[str, Any]:
-        """
-        Exchange authorization code for access token using Authlib.
-
-        Args:
-            code: Authorization code from Google
-            redirect_uri: Redirect URI used in authorization
-
-        Returns:
-            Token response from Google
-
-        Raises:
-            TokenVerificationError: If code exchange fails
-        """
-        try:
-            token = await self._oauth_client.fetch_token(
-                self._GOOGLE_TOKEN_URL,
-                code=code,
-                redirect_uri=redirect_uri
-            )
-            return token
-
-        except AuthlibBaseError as e:
-            raise TokenVerificationError(
-                self.provider_name,
-                f"Failed to exchange code for token: {str(e)}"
-            )
-        except Exception as e:
-            raise TokenVerificationError(
-                self.provider_name,
-                f"Unexpected error during code exchange: {str(e)}"
-            )

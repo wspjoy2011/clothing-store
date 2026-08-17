@@ -3,13 +3,11 @@ from fastapi import Depends
 from apps.accounts.interfaces.repositories import (
     UserRepositoryInterface,
     UserGroupRepositoryInterface,
-    UserProfileRepositoryInterface,
     TokenRepositoryInterface
 )
 from apps.accounts.interfaces.services import AccountServiceInterface
 from apps.accounts.repositories.user import UserRepository
 from apps.accounts.repositories.user_group import UserGroupRepository
-from apps.accounts.repositories.user_profile import UserProfileRepository
 from apps.accounts.repositories.token import TokenRepository
 from apps.accounts.services.account import AccountService
 from db.dependencies import get_database_dao, get_query_builder, get_transaction_manager
@@ -53,22 +51,6 @@ async def get_user_group_repository(
     """
     return UserGroupRepository(dao, query_builder)
 
-
-async def get_user_profile_repository(
-        dao: DAOInterface = Depends(get_database_dao),
-        query_builder: SQLQueryBuilderInterface = Depends(lambda: get_query_builder("accounts_user_profiles"))
-) -> UserProfileRepositoryInterface:
-    """
-    Dependency for getting user profile repository.
-
-    Args:
-        dao: Data Access Object for database operations
-        query_builder: SQL query builder for user profiles table
-
-    Returns:
-        Initialized user profile repository
-    """
-    return UserProfileRepository(dao, query_builder)
 
 
 async def get_token_repository(

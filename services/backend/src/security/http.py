@@ -9,7 +9,6 @@ from security.exceptions import (
     EmptyTokenError,
     ExpiredTokenError,
     InvalidTokenError,
-    TokenSignatureError,
     InvalidTokenTypeError,
     TokenVerificationError
 )
@@ -71,11 +70,7 @@ def get_verified_access_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token format"
         )
-    except TokenSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token signature"
-        )
+
     except InvalidTokenTypeError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
