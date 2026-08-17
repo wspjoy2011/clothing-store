@@ -120,6 +120,13 @@ class AccountService(AccountServiceInterface):
                 or the activation token could not be created
             UserPasswordError: Password processing errors
         """
+        try:
+            hashed_password = await self._password_manager.hash_password(user_data.password)
+            logger.debug(f"Password hashed successfully for user: {user_data.email}")
+        except (EmptyPasswordError, PasswordTooLongError, HashingError) as e:
+            logger.error(f"Password hashing failed for user {user_data.email}: {e}")
+            raise UserPasswordError(f"Password processing failed: {e}", e)
+
         async with self._transaction_manager.atomic():
             existing_user = await self._user_repository.get_user_by_email(user_data.email)
             if existing_user:
@@ -133,13 +140,6 @@ class AccountService(AccountServiceInterface):
                 raise UserCreationError("Default user group 'user' not found. Please contact administrator.")
 
             logger.debug(f"Default group found: ID={default_group.id}, name='{default_group.name}'")
-
-            try:
-                hashed_password = await self._password_manager.hash_password(user_data.password)
-                logger.debug(f"Password hashed successfully for user: {user_data.email}")
-            except (EmptyPasswordError, PasswordTooLongError, HashingError) as e:
-                logger.error(f"Password hashing failed for user {user_data.email}: {e}")
-                raise UserPasswordError(f"Password processing failed: {e}", e)
 
             user_data_with_hash = CreateUserDTO(
                 email=user_data.email,

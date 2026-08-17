@@ -129,11 +129,21 @@ class FakeTokenRepository:
 
 
 class FakePasswordManager:
-    """Password manager performing a reversible transformation"""
+    """Password manager performing a reversible transformation
 
-    @staticmethod
-    async def hash_password(password: str) -> str:
-        """Return a recognisable stand-in for a hash"""
+    Every hashing call records whether a transaction was open at the time. The
+    real one costs tens of milliseconds of CPU, so hashing while holding a pooled
+    connection is what exhausts the pool under a burst of registrations.
+    """
+
+    def __init__(self):
+        self.hashed_inside_transaction: List[bool] = []
+
+    async def hash_password(self, password: str) -> str:
+        """Record the transaction state and return a recognisable stand-in"""
+        from db.transaction import get_current_transaction
+
+        self.hashed_inside_transaction.append(get_current_transaction() is not None)
         return f"hashed:{password}"
 
     @staticmethod
