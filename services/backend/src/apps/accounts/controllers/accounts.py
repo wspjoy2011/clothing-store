@@ -12,6 +12,7 @@ from apps.accounts.dto.password_reset import (
 from apps.accounts.dto.users import CreateUserDTO, UserLoginDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
 from apps.accounts.interfaces.services import AccountServiceInterface
+from apps.accounts.controllers.errors import client_message
 from apps.accounts.validators.token import mask_token_for_logging
 from apps.accounts.schemas.jwt_token import RefreshTokenResponse, RefreshTokenRequest
 from apps.accounts.schemas.password_reset import (
@@ -96,12 +97,12 @@ async def create_user_controller(
     except EmailAlreadyExistsError as e:
         raise HTTPException(
             status_code=409,
-            detail=str(e)
+            detail=client_message(e)
         )
     except (UserCreationError, UserPasswordError) as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during user creation for email {user_data.email}: {e}")
@@ -144,22 +145,22 @@ async def activate_account_controller(
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserAlreadyActivatedError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except InvalidActivationTokenError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except ExpiredActivationTokenError as e:
         raise HTTPException(
             status_code=410,
-            detail=str(e)
+            detail=client_message(e)
         )
     except (UserCreationError, Exception) as e:
         logger.error(f"Unexpected error during account activation for email {activation_data.email}: {e}")
@@ -197,12 +198,12 @@ async def resend_activation_controller(
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserAlreadyActivatedError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during activation email resend for email {resend_data.email}: {e}")
@@ -241,30 +242,26 @@ async def login_user_controller(
 
     try:
         login_response = await account_service.login_user(user_login_dto)
-    except UserNotFoundError as e:
+    except (UserNotFoundError, UserInactiveError) as e:
+        logger.warning(f"Sign-in refused for {login_data.email}: {e}")
         raise HTTPException(
-            status_code=404,
-            detail=str(e)
-        )
-    except UserInactiveError as e:
-        raise HTTPException(
-            status_code=403,
-            detail=str(e)
+            status_code=401,
+            detail=client_message(e)
         )
     except InvalidCredentialsError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except TokenGenerationError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except LoginError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during user login for email {login_data.email}: {e}")
@@ -319,17 +316,17 @@ async def get_user_by_refresh_token_controller(
     except InvalidRefreshTokenError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except TokenValidationError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during user retrieval by refresh token: {e}")
@@ -420,17 +417,17 @@ async def confirm_password_reset_controller(
     except InvalidPasswordResetTokenError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except ExpiredPasswordResetTokenError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except PasswordResetTokenNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except PasswordResetRollbackError as e:
         logger.error(f"Password reset rolled back for token {mask_token_for_logging(confirm_data.token)}: {e}")
@@ -441,7 +438,7 @@ async def confirm_password_reset_controller(
     except PasswordResetError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(
@@ -487,27 +484,27 @@ async def change_password_controller(
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except IncorrectCurrentPasswordError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except SamePasswordError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserPasswordError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except PasswordChangeError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during password change for user {jwt_payload.email}: {e}")
@@ -543,22 +540,22 @@ async def refresh_access_token_controller(
     except InvalidRefreshTokenError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except TokenValidationError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except TokenGenerationError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during token refresh: {e}")
