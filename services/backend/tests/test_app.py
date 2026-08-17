@@ -1,6 +1,6 @@
 import inspect
 
-from apps.accounts.dependencies import get_account_service
+from apps.accounts.dependencies import get_registration_service
 from db.dependencies import get_database_dao, get_transaction_manager
 from db.interfaces import DAOInterface, TransactionManagerInterface
 from tests.fakes import FakeConnectionPool
@@ -31,8 +31,8 @@ async def test_transaction_manager_dependency_returns_the_declared_interface():
     assert isinstance(manager, TransactionManagerInterface)
 
 
-def test_account_service_dependency_requires_a_transaction_manager():
+def test_registration_service_dependency_requires_a_transaction_manager():
     """The account service is wired with a transaction manager"""
-    parameters = inspect.signature(get_account_service).parameters
+    parameters = inspect.signature(get_registration_service).parameters
 
     assert "transaction_manager" in parameters

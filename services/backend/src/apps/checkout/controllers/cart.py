@@ -1,11 +1,24 @@
-from fastapi import HTTPException, status, Response
+from fastapi import HTTPException, Response, status
 
-from apps.checkout.dto import CartItemResponseDTO, CartResponseDTO, AddToCartRequestDTO, UpdateCartItemRequestDTO
+from apps.checkout.controllers.errors import client_message
+from apps.checkout.dto import AddToCartRequestDTO, CartItemResponseDTO, CartResponseDTO, UpdateCartItemRequestDTO
+from apps.checkout.exceptions import (
+    CartNotFoundError,
+    CartStorageError,
+    CartTokenCreationError,
+    CartValidationError,
+    InsufficientStockError,
+    ProductNotFoundError,
+)
 from apps.checkout.interfaces import CartServiceInterface
-from apps.checkout.schemas import CartTokenResponse, CartResponse, CartItemResponse, GetCartByTokenRequest, \
-    AddToCartRequest, UpdateCartItemRequest
-from apps.checkout.exceptions import CartTokenCreationError, CartNotFoundError, CartValidationError, \
-    ProductNotFoundError, InsufficientStockError
+from apps.checkout.schemas import (
+    AddToCartRequest,
+    CartItemResponse,
+    CartResponse,
+    CartTokenResponse,
+    GetCartByTokenRequest,
+    UpdateCartItemRequest,
+)
 from security.dto import JWTPayloadDTO
 from settings.logging_config import get_logger
 
@@ -84,7 +97,7 @@ async def create_cart_token_controller(
         logger.error(f"Cart token creation failed: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create cart token: {e.message}"
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error creating cart token: {e}")
@@ -124,13 +137,13 @@ async def get_cart_by_token_controller(
         logger.warning(f"Cart not found for token {request_data.token[:10]}...: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Cart not found: {e.message}"
+            detail=client_message(e)
         )
     except CartValidationError as e:
         logger.error(f"Cart validation error for token {request_data.token[:10]}...: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cart validation error: {e.message}"
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error getting cart for token {request_data.token[:10]}...: {e}")
@@ -167,7 +180,7 @@ async def get_cart_for_user_controller(
         logger.error(f"Cart validation error for user {jwt_payload.user_id}: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cart validation error: {e.message}"
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error getting cart for user {jwt_payload.user_id}: {e}")
@@ -207,19 +220,19 @@ async def add_item_to_cart_by_token_controller(
         logger.warning(f"Cart not found for token {token[:10]}...: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Cart not found: {e.message}"
+            detail=client_message(e)
         )
     except ProductNotFoundError as e:
         logger.warning(f"Product not found: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Product not found: {e.message}"
+            detail=client_message(e)
         )
     except InsufficientStockError as e:
         logger.warning(f"Insufficient stock: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient stock: {e.message}"
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error adding item to cart by token {token[:10]}...: {e}")
@@ -259,19 +272,19 @@ async def add_item_to_cart_for_user_controller(
         logger.warning(f"Product not found: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Product not found: {e.message}"
+            detail=client_message(e)
         )
     except InsufficientStockError as e:
         logger.warning(f"Insufficient stock: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient stock: {e.message}"
+            detail=client_message(e)
         )
     except CartValidationError as e:
         logger.error(f"Cart validation error for user {jwt_payload.user_id}: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cart validation error: {e.message}"
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error adding item to cart for user {jwt_payload.user_id}: {e}")
@@ -310,7 +323,13 @@ async def remove_cart_item_by_token_controller(
     except CartNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=client_message(e)
+        )
+    except CartStorageError as e:
+        logger.error(f"Cart item {item_id} could not be removed: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The item could not be removed right now. Please try again."
         )
     except Exception as e:
         logger.error(f"Unexpected error removing cart item {item_id} by token: {e}")
@@ -324,7 +343,7 @@ async def remove_cart_item_by_token_controller(
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Cart item with ID {item_id} not found in cart"
+                detail="This item is not in your cart."
             )
 
 
@@ -355,7 +374,13 @@ async def remove_cart_item_for_user_controller(
     except CartNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=client_message(e)
+        )
+    except CartStorageError as e:
+        logger.error(f"Cart item {item_id} could not be removed: {e.message}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The item could not be removed right now. Please try again."
         )
     except Exception as e:
         logger.error(f"Unexpected error removing cart item {item_id} for user: {e}")
@@ -369,7 +394,7 @@ async def remove_cart_item_for_user_controller(
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Cart item with ID {item_id} not found in cart"
+                detail="This item is not in your cart."
             )
 
 
@@ -391,18 +416,18 @@ async def update_cart_item_by_token_controller(
     except CartNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=client_message(e)
         )
     except ProductNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=client_message(e)
         )
     except InsufficientStockError as e:
         logger.warning(f"Insufficient stock: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient stock: {e.message}"
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error updating cart item {item_id} by token {token[:10]}...: {e}")
@@ -433,18 +458,18 @@ async def update_cart_item_for_user_controller(
     except CartNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=client_message(e)
         )
     except ProductNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            detail=client_message(e)
         )
     except InsufficientStockError as e:
         logger.warning(f"Insufficient stock: {e.message}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient stock: {e.message}"
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error updating cart item {item_id} for user {jwt_payload.user_id}: {e}")

@@ -1,14 +1,25 @@
 """Test doubles for the account services."""
 
-from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from typing import Any, AsyncIterator, List, Optional
+from typing import Any, List, Optional
 
 from apps.accounts.dto.users import UserDTO
-from db.transaction import get_current_transaction, TransactionState
+from db.transaction import get_current_transaction
 from notifications.exceptions.email import BaseEmailError
-from tests.fakes import FakeConnection
+from tests.fakes import FakeTransactionManager
+
+# Re-exported for the account tests
+__all__ = [
+    "FakeEmailSender",
+    "FakeJWTManager",
+    "FakePasswordManager",
+    "FakeTokenRepository",
+    "FakeTransactionManager",
+    "FakeUserGroupRepository",
+    "FakeUserRepository",
+    "SentEmail",
+]
 
 
 @dataclass
@@ -66,50 +77,30 @@ class FakeEmailSender:
         await self._record(email, "password_change")
 
 
-class FakeTransactionManager:
-    """Transaction manager exposing an active transaction without a database"""
-
-    def __init__(self):
-        self.entered = 0
-        self.committed = 0
-        self.rolled_back = 0
-
-    @asynccontextmanager
-    async def atomic(self, isolation_level: Optional[Any] = None) -> AsyncIterator[None]:
-        """
-        Mark a transaction as active for the duration of the block
-
-        Args:
-            isolation_level: Accepted for interface compatibility
-
-        Yields:
-            Control to the wrapped block
-        """
-        from db.transaction import _current_transaction
-
-        self.entered += 1
-        token = _current_transaction.set(TransactionState(connection=FakeConnection("tx")))
-        try:
-            yield
-        except Exception:
-            self.rolled_back += 1
-            raise
-        else:
-            self.committed += 1
-        finally:
-            _current_transaction.reset(token)
-
-
 class FakeUserRepository:
-    """User repository backed by an in-memory list"""
+    """User repository backed by an in-memory list
+
+    Writes answer the way the real ones do, from the number of rows they matched:
+    updating somebody who is not there reports False rather than success.
+    """
 
     def __init__(self):
         self.users: List[UserDTO] = []
         self.next_id = 1
+        self.password_updates: List[tuple] = []
 
     async def get_user_by_email(self, email: str) -> Optional[UserDTO]:
         """Find a user by address"""
         return next((user for user in self.users if user.email == email), None)
+
+    async def get_user_password_hash(self, user_id: int) -> Optional[str]:
+        """Report the stored hash of a user"""
+        return next(("hashed:stored" for user in self.users if user.id == user_id), None)
+
+    async def update_user_password(self, user_id: int, hashed_password: str) -> bool:
+        """Record the update and report whether any stored user matched"""
+        self.password_updates.append((user_id, hashed_password))
+        return any(user.id == user_id for user in self.users)
 
     async def update_user_status(self, user_id: int, is_active: bool) -> bool:
         """Mark a stored user as active or inactive"""
@@ -163,11 +154,21 @@ class FakeTokenRepository:
 
 
 class FakePasswordManager:
-    """Password manager performing a reversible transformation"""
+    """Password manager performing a reversible transformation
 
-    @staticmethod
-    async def hash_password(password: str) -> str:
-        """Return a recognisable stand-in for a hash"""
+    Every hashing call records whether a transaction was open at the time. The
+    real one costs tens of milliseconds of CPU, so hashing while holding a pooled
+    connection is what exhausts the pool under a burst of registrations.
+    """
+
+    def __init__(self):
+        self.hashed_inside_transaction: List[bool] = []
+
+    async def hash_password(self, password: str) -> str:
+        """Record the transaction state and return a recognisable stand-in"""
+        from db.transaction import get_current_transaction
+
+        self.hashed_inside_transaction.append(get_current_transaction() is not None)
         return f"hashed:{password}"
 
     @staticmethod
@@ -193,3 +194,8 @@ class FakeJWTManager:
     def get_token_expiration(token: str) -> datetime:
         """Return a fixed expiration far enough in the future"""
         return datetime(2027, 1, 1, tzinfo=timezone.utc)
+
+    @staticmethod
+    def verify_refresh_token(token: str) -> dict:
+        """Report the payload a valid refresh token would carry"""
+        return {"user_id": 1, "email": "user@example.com", "group_id": 1, "group_name": "user", "type": "refresh"}

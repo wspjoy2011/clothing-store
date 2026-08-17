@@ -99,11 +99,3 @@ CREATE TRIGGER trigger_checkout_cart_items_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_checkout_cart_items_updated_at();
 
--- Grant privileges
-GRANT ALL PRIVILEGES ON TABLE checkout_cart_tokens TO admin;
-GRANT ALL PRIVILEGES ON TABLE checkout_cart TO admin;
-GRANT ALL PRIVILEGES ON TABLE checkout_cart_items TO admin;
-
-GRANT ALL PRIVILEGES ON SEQUENCE checkout_cart_tokens_id_seq TO admin;
-GRANT ALL PRIVILEGES ON SEQUENCE checkout_cart_id_seq TO admin;
-GRANT ALL PRIVILEGES ON SEQUENCE checkout_cart_items_id_seq TO admin;

@@ -1,29 +1,13 @@
-from typing import Optional, Callable
+from typing import Optional
 
 from apps.catalog.dto.catalog import CatalogDTO, PaginationDTO
 from apps.catalog.dto.category import CategoryMenuDTO
 from apps.catalog.dto.filters import FiltersDTO
 from apps.catalog.dto.products import ProductDTO
-from apps.catalog.interfaces.repositories import (
-    ProductRepositoryInterface,
-    CategoryRepositoryInterface
-)
+from apps.catalog.interfaces.factories import SpecificationFactoryInterface
+from apps.catalog.interfaces.repositories import CategoryRepositoryInterface, ProductRepositoryInterface
 from apps.catalog.interfaces.services import CatalogServiceInterface
-from apps.catalog.interfaces.specifications import (
-    PaginationSpecificationInterface,
-    OrderingSpecificationInterface,
-    FilterSpecificationInterface,
-    SearchSpecificationInterface,
-    CategorySpecificationInterface
-)
 from search.interfaces import AutocompleteClientInterface
-
-PaginationSpecificationFactory = Callable[[int, int], PaginationSpecificationInterface]
-OrderingSpecificationFactory = Callable[[Optional[str]], OrderingSpecificationInterface]
-FilterSpecificationFactory = Callable[
-    [Optional[int], Optional[int], Optional[float], Optional[float], Optional[str], Optional[bool]], FilterSpecificationInterface]
-SearchSpecificationFactory = Callable[[Optional[str]], SearchSpecificationInterface]
-CategorySpecificationFactory = Callable[[int, Optional[int], Optional[int]], CategorySpecificationInterface]
 
 
 class CatalogService(CatalogServiceInterface):
@@ -33,11 +17,7 @@ class CatalogService(CatalogServiceInterface):
             self,
             product_repository: ProductRepositoryInterface,
             category_repository: CategoryRepositoryInterface,
-            pagination_specification_factory: PaginationSpecificationFactory,
-            ordering_specification_factory: OrderingSpecificationFactory,
-            filter_specification_factory: FilterSpecificationFactory,
-            search_specification_factory: SearchSpecificationFactory,
-            category_specification_factory: CategorySpecificationFactory,
+            specifications: SpecificationFactoryInterface,
             autocomplete_client: AutocompleteClientInterface
     ):
         """
@@ -46,20 +26,12 @@ class CatalogService(CatalogServiceInterface):
         Args:
             product_repository: Repository for product data access
             category_repository: Repository for category data access
-            pagination_specification_factory: Factory for creating pagination specifications
-            ordering_specification_factory: Factory for creating ordering specifications
-            filter_specification_factory: Factory for creating filter specifications
-            search_specification_factory: Factory for creating search specifications
-            category_specification_factory: Factory for creating category specifications
+            specifications: Factory building the specifications of a query
             autocomplete_client: Client for autocomplete operations
         """
         self._product_repository = product_repository
         self._category_repository = category_repository
-        self._pagination_specification_factory = pagination_specification_factory
-        self._ordering_specification_factory = ordering_specification_factory
-        self._filter_specification_factory = filter_specification_factory
-        self._search_specification_factory = search_specification_factory
-        self._category_specification_factory = category_specification_factory
+        self._specifications = specifications
         self._autocomplete_client = autocomplete_client
 
     async def get_products(
@@ -93,21 +65,21 @@ class CatalogService(CatalogServiceInterface):
         Returns:
             CatalogDTO with products and pagination info
         """
-        pagination_spec = self._pagination_specification_factory(page, per_page)
+        pagination_spec = self._specifications.pagination(page, per_page)
 
-        ordering_spec = self._ordering_specification_factory(ordering)
+        ordering_spec = self._specifications.ordering(ordering)
 
         filter_spec = None
         if (min_year is not None or max_year is not None or
             min_price is not None or max_price is not None or
             gender or is_available is not None):
-            filter_spec = self._filter_specification_factory(
+            filter_spec = self._specifications.filters(
                 min_year, max_year, min_price, max_price, gender, is_available
             )
 
         search_spec = None
         if q:
-            search_spec = self._search_specification_factory(q)
+            search_spec = self._specifications.search(q)
 
         products = await self._product_repository.get_products_with_specifications(
             pagination_spec,
@@ -167,25 +139,25 @@ class CatalogService(CatalogServiceInterface):
         Returns:
             CatalogDTO with products and pagination info
         """
-        category_spec = self._category_specification_factory(
+        category_spec = self._specifications.category(
             master_category_id, sub_category_id, article_type_id
         )
 
-        pagination_spec = self._pagination_specification_factory(page, per_page)
+        pagination_spec = self._specifications.pagination(page, per_page)
 
-        ordering_spec = self._ordering_specification_factory(ordering)
+        ordering_spec = self._specifications.ordering(ordering)
 
         filter_spec = None
         if (min_year is not None or max_year is not None or
             min_price is not None or max_price is not None or
             gender or is_available is not None):
-            filter_spec = self._filter_specification_factory(
+            filter_spec = self._specifications.filters(
                 min_year, max_year, min_price, max_price, gender, is_available
             )
 
         search_spec = None
         if q:
-            search_spec = self._search_specification_factory(q)
+            search_spec = self._specifications.search(q)
 
         products = await self._product_repository.get_products_with_specifications_by_categories(
             category_spec,
@@ -249,7 +221,7 @@ class CatalogService(CatalogServiceInterface):
         """
         search_spec = None
         if q:
-            search_spec = self._search_specification_factory(q)
+            search_spec = self._specifications.search(q)
 
         return await self._product_repository.get_available_filters(search_spec)
 
@@ -270,7 +242,7 @@ class CatalogService(CatalogServiceInterface):
         Returns:
             FiltersDTO object containing all available filters for the specified categories or None if no products found
         """
-        category_spec = self._category_specification_factory(
+        category_spec = self._specifications.category(
             master_category_id, sub_category_id, article_type_id
         )
 
@@ -299,26 +271,26 @@ class CatalogService(CatalogServiceInterface):
         """
         return await self._autocomplete_client.get_suggestions(query, limit)
 
-    async def check_product_availability(self, product_id: int, quantity: int) -> bool:
+    async def hold_available_quantity(self, product_id: int) -> Optional[int]:
         """
-        Check if product is available and has sufficient stock for requested quantity
+        Report sellable stock while holding the inventory row against concurrent changes
+
+        Business logic: Lock the inventory row for the rest of the caller's transaction
+        and report how many units may be sold, so the caller can read its own state and
+        decide while the stock cannot move
 
         Args:
-            product_id: ID of the product to check
-            quantity: Requested quantity
+            product_id: ID of the product to hold
 
         Returns:
-            True if product is available and has sufficient stock, False otherwise
+            Units available for sale, or None when the product cannot be sold
         """
-        product = await self._product_repository.get_product_by_id(product_id)
+        inventory = await self._product_repository.lock_inventory(product_id)
 
-        if not product:
-            return False
+        if not inventory:
+            return None
 
-        if not product.inventory:
-            return False
+        if not inventory.is_active or not inventory.is_in_stock:
+            return None
 
-        if not product.inventory.is_active or not product.inventory.is_in_stock:
-            return False
-
-        return product.inventory.available_quantity >= quantity
+        return inventory.available_quantity

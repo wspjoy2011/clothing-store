@@ -2,38 +2,37 @@
 Routes for social authentication API.
 """
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from typing import Callable
 
-from apps.accounts.controllers.social_auth import (
-    social_auth_controller,
-    get_supported_providers_controller
-)
-from apps.accounts.services.social_auth.dependencies import get_google_social_auth_service, \
-    get_facebook_social_auth_service
-from oauth.dependencies import get_oauth_registry
-from apps.accounts.schemas.social_auth import (
-    SocialAuthRequestSchema,
-    SocialAuthResponseSchema,
-    SupportedProvidersSchema
-)
+from fastapi import APIRouter, Depends, Request, status
+
+from apps.accounts.controllers.social_auth import get_supported_providers_controller, social_auth_controller
 from apps.accounts.schemas.examples.social_auth import (
-    SOCIAL_AUTH_REQUEST_GOOGLE,
-    SOCIAL_AUTH_REQUEST_FACEBOOK,
-    SOCIAL_AUTH_SUCCESS_EXISTING_USER,
-    SOCIAL_AUTH_SUCCESS_NEW_USER,
-    SUPPORTED_PROVIDERS_RESPONSE,
-    SOCIAL_TOKEN_ERROR,
-    SOCIAL_PROVIDER_ERROR,
-    SOCIAL_USER_INFO_ERROR,
-    SOCIAL_USER_VALIDATION_ERROR,
+    ACCESS_TOKEN_EMPTY_ERROR,
+    EMAIL_INVALID_FORMAT_ERROR,
     GOOGLE_EMAIL_NOT_VERIFIED_ERROR,
     PROVIDER_EMPTY_ERROR,
     PROVIDER_UNSUPPORTED_ERROR,
-    ACCESS_TOKEN_EMPTY_ERROR,
-    EMAIL_INVALID_FORMAT_ERROR
+    SOCIAL_AUTH_REQUEST_FACEBOOK,
+    SOCIAL_AUTH_REQUEST_GOOGLE,
+    SOCIAL_AUTH_SUCCESS_EXISTING_USER,
+    SOCIAL_AUTH_SUCCESS_NEW_USER,
+    SOCIAL_PROVIDER_ERROR,
+    SOCIAL_TOKEN_ERROR,
+    SOCIAL_USER_INFO_ERROR,
+    SOCIAL_USER_VALIDATION_ERROR,
+    SUPPORTED_PROVIDERS_RESPONSE,
 )
+from apps.accounts.schemas.social_auth import (
+    SocialAuthRequestSchema,
+    SocialAuthResponseSchema,
+    SupportedProvidersSchema,
+)
+from apps.accounts.services.social_auth.dependencies import get_social_auth_service_resolver
 from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
+from oauth.dependencies import get_oauth_registry
 from oauth.factories import OAuthProviderRegistry
+from security.rate_limit import CREDENTIAL_GUESS_LIMIT, limiter
 
 API_PATHS = {
     "social_auth": "/social-auth",
@@ -219,18 +218,20 @@ router = APIRouter(prefix="/auth", tags=["Social Authentication"])
         }
     }
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def social_auth_route(
+        request: Request,
         request_data: SocialAuthRequestSchema,
-        google_service: SocialAuthServiceInterface = Depends(get_google_social_auth_service),
-        facebook_service: SocialAuthServiceInterface = Depends(get_facebook_social_auth_service)
+        resolve_service: Callable[[str], SocialAuthServiceInterface] = Depends(get_social_auth_service_resolver)
 ) -> SocialAuthResponseSchema:
     """
     Authenticate user via social OAuth provider
 
     Args:
+        request: Incoming request, used by the rate limiter
         request_data: Social authentication request data (provider and access token)
-        google_service: Google social authentication service for business logic
-        facebook_service: Facebook social authentication service for business logic
+        resolve_service: Resolver building the service of the requested provider
+
     Returns:
         SocialAuthResponseSchema: Authentication result with JWT tokens and user profile
 
@@ -242,27 +243,9 @@ async def social_auth_route(
             - 503 for OAuth provider service unavailability
             - 500 for internal server errors (configuration, database, token generation)
     """
-    if request_data.provider == "google":
-        social_auth_service = google_service
-    elif request_data.provider == "facebook":
-        social_auth_service = facebook_service
-    else:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "success": False,
-                "error_type": "ProviderNotSupportedError",
-                "error_message": f"Provider '{request_data.provider}' is not supported",
-                "provider": request_data.provider,
-                "details": {
-                    "supported_providers": ["google", "facebook"]
-                }
-            }
-        )
-
     return await social_auth_controller(
         request_data=request_data,
-        social_auth_service=social_auth_service
+        resolve_service=resolve_service
     )
 
 

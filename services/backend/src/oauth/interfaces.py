@@ -3,7 +3,7 @@ OAuth provider interfaces.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any, Dict
 
 from oauth.dto import OAuthUserInfo
 

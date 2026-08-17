@@ -1,18 +1,21 @@
 """Exceptions module for checkout application"""
 
+from apps.checkout.exceptions.repositories import CartStorageError, CheckoutRepositoryError
 from apps.checkout.exceptions.services import (
-    CheckoutServiceError,
-    CartTokenCreationError,
-    CartNotFoundError,
     CartItemNotFoundError,
-    ProductNotFoundError,
-    InsufficientStockError,
+    CartItemValidationError,
+    CartNotFoundError,
     CartOwnershipError,
+    CartTokenCreationError,
     CartValidationError,
-    CartItemValidationError
+    CheckoutServiceError,
+    InsufficientStockError,
+    ProductNotFoundError,
 )
 
 __all__ = [
+    'CheckoutRepositoryError',
+    'CartStorageError',
     'CheckoutServiceError',
     'CartTokenCreationError',
     'CartNotFoundError',

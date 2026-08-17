@@ -29,6 +29,11 @@ class RefreshTokenResponse(BaseModel):
         description="New access token",
     )
 
+    refresh_token: str = Field(
+        ...,
+        description="New refresh token, replacing the one presented",
+    )
+
     token_type: str = Field(
         default="bearer",
         description="Token type",
@@ -43,6 +48,7 @@ class RefreshTokenResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJncm91cF9pZCI6MSwiZ3JvdXBfbmFtZSI6InVzZXIiLCJleHAiOjE3MzY4NzUyMDAsImlhdCI6MTczNjg3MTYwMCwidHlwZSI6ImFjY2VzcyJ9.abc123...",
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJ0eXBlIjoicmVmcmVzaCJ9.def456...",
                 "token_type": "bearer",
                 "expires_in": 3600
             }

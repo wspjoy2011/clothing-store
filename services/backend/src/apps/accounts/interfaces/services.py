@@ -2,13 +2,13 @@
 
 from abc import ABC, abstractmethod
 
-from apps.accounts.dto.password_reset import PasswordResetRequestDTO, PasswordResetConfirmDTO, PasswordChangeDTO
-from apps.accounts.dto.users import UserDTO, CreateUserDTO, UserLoginDTO, LoginResponseDTO
 from apps.accounts.dto.activation import ActivateAccountDTO
+from apps.accounts.dto.password_reset import PasswordChangeDTO, PasswordResetConfirmDTO, PasswordResetRequestDTO
+from apps.accounts.dto.users import CreateUserDTO, LoginResponseDTO, UserDTO, UserLoginDTO
 
 
-class AccountServiceInterface(ABC):
-    """Interface for account service operations"""
+class RegistrationServiceInterface(ABC):
+    """Contract for creating accounts and getting them activated"""
 
     @abstractmethod
     async def register_user(self, user_data: CreateUserDTO) -> UserDTO:
@@ -68,6 +68,10 @@ class AccountServiceInterface(ABC):
         """
         pass
 
+
+class AuthenticationServiceInterface(ABC):
+    """Contract for signing users in and out and refreshing their session"""
+
     @abstractmethod
     async def login_user(self, login_data: UserLoginDTO) -> LoginResponseDTO:
         """
@@ -118,6 +122,32 @@ class AccountServiceInterface(ABC):
             TokenValidationError: If token validation fails
         """
         pass
+
+    @abstractmethod
+    async def refresh_access_token(self, refresh_token: str) -> LoginResponseDTO:
+        """
+        Exchange a refresh token for a new pair, invalidating the one presented
+
+        The presented token stops working once it is exchanged, so a leaked one is
+        useful only until its owner refreshes.
+
+        Args:
+            refresh_token: Valid refresh token
+
+        Returns:
+            New access and refresh tokens
+
+        Raises:
+            InvalidRefreshTokenError: If refresh token is invalid, expired, or not found in database
+            UserNotFoundError: If user associated with token is not found
+            TokenValidationError: If token validation fails
+            TokenGenerationError: If new access token generation fails
+        """
+        pass
+
+
+class PasswordServiceInterface(ABC):
+    """Contract for resetting and changing passwords"""
 
     @abstractmethod
     async def request_password_reset(self, request_data: PasswordResetRequestDTO) -> bool:
@@ -174,24 +204,5 @@ class AccountServiceInterface(ABC):
             SamePasswordError: If new password is the same as current password
             UserPasswordError: If password processing fails
             PasswordChangeError: If password change fails
-        """
-        pass
-
-    @abstractmethod
-    async def refresh_access_token(self, refresh_token: str) -> str:
-        """
-        Refresh access token using refresh token
-
-        Args:
-            refresh_token: Valid refresh token
-
-        Returns:
-            New access token string
-
-        Raises:
-            InvalidRefreshTokenError: If refresh token is invalid, expired, or not found in database
-            UserNotFoundError: If user associated with token is not found
-            TokenValidationError: If token validation fails
-            TokenGenerationError: If new access token generation fails
         """
         pass

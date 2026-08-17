@@ -12,6 +12,10 @@ from settings.logging_config import get_logger
 logger = get_logger(__name__, "db")
 
 
+class NoActiveTransactionError(RuntimeError):
+    """Raised when work requiring a transaction is attempted outside one"""
+
+
 @dataclass(frozen=True)
 class TransactionState:
     """Connection bound to the transaction currently active in this task"""

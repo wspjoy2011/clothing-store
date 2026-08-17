@@ -1,22 +1,43 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, List, Optional, Tuple
+
+from apps.catalog.specifications.clauses import SqlClause
 
 
 class SpecificationInterface(ABC):
-    """Base interface for specifications"""
+    """Base interface for specifications
+
+    A specification describes what to select, not how the statement is written: it
+    returns predicates with their parameters and never SQL keywords, so nothing has
+    to parse or rewrite its output.
+    """
 
     @abstractmethod
-    def to_sql(self) -> tuple[str, list[Any]]:
+    def is_empty(self) -> bool:
         """
-        Convert specification to SQL clause and parameters
+        Check whether the specification narrows anything
 
         Returns:
-            tuple[str, list[Any]]: SQL part, list of parameters
+            True when the specification contributes no criteria
         """
         pass
 
 
-class PaginationSpecificationInterface(SpecificationInterface):
+class ClauseSpecificationInterface(SpecificationInterface):
+    """Interface for specifications contributing conditions to a statement"""
+
+    @abstractmethod
+    def to_clause(self) -> SqlClause:
+        """
+        Build the conditions this specification contributes
+
+        Returns:
+            Conditions, joins and the parameters they bind
+        """
+        pass
+
+
+class PaginationSpecificationInterface(ABC):
     """Interface for pagination specifications"""
 
     @abstractmethod
@@ -30,16 +51,37 @@ class PaginationSpecificationInterface(SpecificationInterface):
         pass
 
 
-class OrderingSpecificationInterface(SpecificationInterface):
+class OrderingSpecificationInterface(ABC):
     """Interface for ordering specifications"""
 
     @abstractmethod
-    def get_ordering_fields(self) -> list[str]:
-        """Get list of ordering fields"""
+    def to_order_by(self) -> List[str]:
+        """
+        Build the ordering expressions, in the order they apply
+
+        Returns:
+            Expressions already qualified and safe to place after ORDER BY
+        """
+        pass
+
+    @abstractmethod
+    def get_ordering_fields(self) -> List[str]:
+        """Get list of ordering fields as the client asked for them"""
+        pass
+
+    @property
+    @abstractmethod
+    def is_default(self) -> bool:
+        """
+        Report whether the client asked for no particular order
+
+        Search uses this to decide whether relevance leads the ordering or merely
+        breaks ties behind the order the client chose.
+        """
         pass
 
 
-class FilterSpecificationInterface(SpecificationInterface):
+class FilterSpecificationInterface(ClauseSpecificationInterface):
     """Interface for filtering specifications"""
 
     @abstractmethod
@@ -53,18 +95,8 @@ class FilterSpecificationInterface(SpecificationInterface):
         """
         pass
 
-    @abstractmethod
-    def is_empty(self) -> bool:
-        """
-        Check if filter specification has any filters
 
-        Returns:
-            True if no filters are defined, False otherwise
-        """
-        pass
-
-
-class SearchSpecificationInterface(SpecificationInterface):
+class SearchSpecificationInterface(ClauseSpecificationInterface):
     """Interface for search specifications."""
 
     @property
@@ -74,20 +106,15 @@ class SearchSpecificationInterface(SpecificationInterface):
         pass
 
     @abstractmethod
-    def is_empty(self) -> bool:
-        """Check if the search specification is empty."""
-        pass
-
-
-class CategorySpecificationInterface(SpecificationInterface):
-    """Interface for category specifications"""
-
-    @abstractmethod
-    def is_empty(self) -> bool:
+    def relevance_order(self) -> Tuple[str, List[Any]]:
         """
-        Check if category specification is empty
+        Build the ordering expression ranking matches by relevance
 
         Returns:
-            True if no category criteria are defined, False otherwise
+            Expression and the parameter it binds, empty when nothing is searched
         """
         pass
+
+
+class CategorySpecificationInterface(ClauseSpecificationInterface):
+    """Interface for category specifications"""

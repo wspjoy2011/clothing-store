@@ -4,9 +4,9 @@ OAuth dependencies for dependency injection.
 
 from functools import lru_cache
 
+from oauth.exceptions import ProviderNotSupportedError
 from oauth.factories import OAuthProviderFactory, OAuthProviderRegistry
 from oauth.interfaces import OAuthProviderInterface
-from oauth.exceptions import ProviderNotSupportedError
 from settings.config import config
 
 
@@ -14,7 +14,7 @@ from settings.config import config
 def get_oauth_registry() -> OAuthProviderRegistry:
     """
     Get OAuth provider registry instance (singleton).
-    
+
     Returns:
         OAuth provider registry
     """
@@ -25,7 +25,7 @@ def get_oauth_registry() -> OAuthProviderRegistry:
 def get_oauth_provider(provider_name: str) -> OAuthProviderInterface:
     """
     Get OAuth provider by name with default configuration.
-    
+
     Args:
         provider_name: Name of the OAuth provider ('google', 'facebook', etc.)
 

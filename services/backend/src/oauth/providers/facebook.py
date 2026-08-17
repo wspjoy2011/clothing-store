@@ -1,24 +1,24 @@
-"""
-Facebook OAuth provider implementation using Authlib.
-"""
+"""Facebook OAuth provider implementation."""
 
-from typing import Dict, Any
+from typing import Any, Dict
 
-from authlib.integrations.httpx_client import AsyncOAuth2Client
-from authlib.common.errors import AuthlibBaseError
 import httpx
 
-from oauth.interfaces import OAuthProviderInterface
 from oauth.dto import OAuthUserInfo
-from oauth.exceptions import TokenVerificationError, UserInfoError, ConfigurationError, OAuthError
+from oauth.exceptions import ConfigurationError, OAuthError, TokenVerificationError, UserInfoError
+from oauth.interfaces import OAuthProviderInterface
 
 
 class FacebookOAuthProvider(OAuthProviderInterface):
-    """
-    Facebook OAuth2 provider implementation using Authlib.
+    """Facebook OAuth2 provider implementation
+
+    Every verification uses its own HTTP client: a client shared by the process
+    would carry one request's credentials into another.
     """
 
     _FACEBOOK_USERINFO_URL = "https://graph.facebook.com/me"
+    _FACEBOOK_DEBUG_TOKEN_URL = "https://graph.facebook.com/debug_token"
+    _REQUEST_TIMEOUT = 10.0
     _FACEBOOK_AUTH_URL = "https://www.facebook.com/v23.0/dialog/oauth"
     _FACEBOOK_TOKEN_URL = "https://graph.facebook.com/v23.0/oauth/access_token"
 
@@ -34,11 +34,6 @@ class FacebookOAuthProvider(OAuthProviderInterface):
         self._client_secret = client_secret
         self.validate_config()
 
-        self._oauth_client = AsyncOAuth2Client(
-            client_id=self._client_id,
-            client_secret=self._client_secret
-        )
-
     @property
     def provider_name(self) -> str:
         """Return provider name."""
@@ -46,7 +41,12 @@ class FacebookOAuthProvider(OAuthProviderInterface):
 
     async def verify_token(self, access_token: str) -> Dict[str, Any]:
         """
-        Verify Facebook access token and get user info.
+        Verify that the token belongs to this app, then read the profile
+
+        The app check is what makes the token ours: the graph API answers for any
+        valid token, including one issued to somebody else's app, so a token
+        accepted without checking its app lets the holder of any Facebook token
+        sign in as its owner.
 
         Args:
             access_token: Facebook access token
@@ -55,7 +55,8 @@ class FacebookOAuthProvider(OAuthProviderInterface):
             User data from Facebook
 
         Raises:
-            TokenVerificationError: If token verification fails
+            TokenVerificationError: If the token is rejected, belongs to another
+                app, or the profile cannot be read
         """
         if not access_token:
             raise TokenVerificationError(
@@ -64,40 +65,11 @@ class FacebookOAuthProvider(OAuthProviderInterface):
             )
 
         try:
-            self._oauth_client.token = {"access_token": access_token}
+            async with httpx.AsyncClient(timeout=self._REQUEST_TIMEOUT) as client:
+                token_debug = await self._read_token_debug(client, access_token)
+                self._require_own_app(token_debug)
+                return await self._read_user_info(client, access_token)
 
-            params = {
-                "fields": "id,name,email,first_name,last_name,picture,locale,verified"
-            }
-
-            response = await self._oauth_client.get(
-                self._FACEBOOK_USERINFO_URL,
-                params=params
-            )
-
-            if response.status_code != 200:
-                raise TokenVerificationError(
-                    self.provider_name,
-                    f"Failed to get user info: {response.text}",
-                    response.status_code
-                )
-
-            user_data = response.json()
-
-            if "error" in user_data:
-                error_msg = user_data["error"].get("message", "Unknown Facebook API error")
-                raise TokenVerificationError(
-                    self.provider_name,
-                    f"Facebook API error: {error_msg}"
-                )
-
-            return user_data
-
-        except AuthlibBaseError as e:
-            raise TokenVerificationError(
-                self.provider_name,
-                f"Authlib error during token verification: {str(e)}"
-            )
         except httpx.HTTPError as e:
             raise TokenVerificationError(
                 self.provider_name,
@@ -110,6 +82,87 @@ class FacebookOAuthProvider(OAuthProviderInterface):
                 self.provider_name,
                 f"Unexpected error during token verification: {str(e)}"
             )
+
+    async def _read_token_debug(self, client: httpx.AsyncClient, access_token: str) -> Dict[str, Any]:
+        """
+        Ask Facebook what the token is and which app it was issued to
+
+        Args:
+            client: HTTP client used for this verification
+            access_token: Token presented by the caller
+
+        Returns:
+            Token metadata as reported by Facebook
+
+        Raises:
+            TokenVerificationError: If Facebook does not recognise the token
+        """
+        response = await client.get(
+            self._FACEBOOK_DEBUG_TOKEN_URL,
+            params={
+                "input_token": access_token,
+                "access_token": f"{self._client_id}|{self._client_secret}"
+            }
+        )
+
+        if response.status_code != 200:
+            raise TokenVerificationError(
+                self.provider_name,
+                "Token was rejected by Facebook"
+            )
+
+        return response.json().get("data", {})
+
+    def _require_own_app(self, token_debug: Dict[str, Any]) -> None:
+        """
+        Refuse a token that is invalid or was issued to a different app
+
+        Args:
+            token_debug: Token metadata as reported by Facebook
+
+        Raises:
+            TokenVerificationError: If the token is not valid for this app
+        """
+        if not token_debug.get("is_valid"):
+            raise TokenVerificationError(
+                self.provider_name,
+                "Token is not valid"
+            )
+
+        if str(token_debug.get("app_id")) != str(self._client_id):
+            raise TokenVerificationError(
+                self.provider_name,
+                "Token was issued to another application"
+            )
+
+    async def _read_user_info(self, client: httpx.AsyncClient, access_token: str) -> Dict[str, Any]:
+        """
+        Read the profile of the token owner
+
+        Args:
+            client: HTTP client used for this verification
+            access_token: Token already confirmed to belong to this app
+
+        Returns:
+            Raw profile data from Facebook
+
+        Raises:
+            TokenVerificationError: If the profile cannot be read
+        """
+        response = await client.get(
+            self._FACEBOOK_USERINFO_URL,
+            params={"fields": "id,name,email,first_name,last_name,picture,locale,verified"},
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+
+        if response.status_code != 200:
+            raise TokenVerificationError(
+                self.provider_name,
+                "Profile could not be read from Facebook",
+                response.status_code
+            )
+
+        return response.json()
 
     def extract_user_info(self, raw_data: Dict[str, Any]) -> OAuthUserInfo:
         """
@@ -155,7 +208,7 @@ class FacebookOAuthProvider(OAuthProviderInterface):
                     avatar_url = data.get("url")
 
             locale = raw_data.get("locale")
-            verified_email = raw_data.get("verified", True)
+            verified_email = raw_data.get("verified", False)
 
             if isinstance(verified_email, str):
                 verified_email = verified_email.lower() in ("true", "1", "yes")
@@ -246,56 +299,4 @@ class FacebookOAuthProvider(OAuthProviderInterface):
 
         return True
 
-    def get_authorization_url(self, redirect_uri: str, state: str = None) -> str:
-        """
-        Generate Facebook OAuth2 authorization URL using Authlib.
 
-        Args:
-            redirect_uri: Redirect URI after authorization
-            state: Optional state parameter for security
-
-        Returns:
-            Authorization URL
-        """
-        authorization_url, _ = self._oauth_client.create_authorization_url(
-            self._FACEBOOK_AUTH_URL,
-            redirect_uri=redirect_uri,
-            scope=" ".join(self.get_required_scopes()),
-            state=state,
-            response_type="code"
-        )
-
-        return authorization_url
-
-    async def exchange_code_for_token(self, code: str, redirect_uri: str) -> Dict[str, Any]:
-        """
-        Exchange authorization code for access token using Authlib.
-
-        Args:
-            code: Authorization code from Facebook
-            redirect_uri: Redirect URI used in authorization
-
-        Returns:
-            Token response from Facebook
-
-        Raises:
-            TokenVerificationError: If code exchange fails
-        """
-        try:
-            token = await self._oauth_client.fetch_token(
-                self._FACEBOOK_TOKEN_URL,
-                code=code,
-                redirect_uri=redirect_uri
-            )
-            return token
-
-        except AuthlibBaseError as e:
-            raise TokenVerificationError(
-                self.provider_name,
-                f"Failed to exchange code for token: {str(e)}"
-            )
-        except Exception as e:
-            raise TokenVerificationError(
-                self.provider_name,
-                f"Unexpected error during code exchange: {str(e)}"
-            )

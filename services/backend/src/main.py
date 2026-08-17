@@ -1,17 +1,20 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 
-from settings.config import config
-from settings.logging_config import get_logger
-from apps.catalog.routes import router as catalog_router
 from apps.accounts.routes.accounts import router as accounts_router
 from apps.accounts.routes.social_auth import router as auth_router
+from apps.catalog.routes import router as catalog_router
 from apps.checkout.routes import router as checkout_router
 from search.dependencies import cleanup_autocomplete_client
+from security.rate_limit import limiter, rate_limit_exceeded_handler
+from settings.api import API_VERSION_PREFIX
+from settings.config import config
+from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "main")
 
@@ -38,6 +41,10 @@ app = FastAPI(
 )
 
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
@@ -58,8 +65,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         },
     )
 
-
-API_VERSION_PREFIX = "/api/v1"
 
 app.include_router(catalog_router, prefix=f"{API_VERSION_PREFIX}")
 app.include_router(accounts_router, prefix=f"{API_VERSION_PREFIX}")

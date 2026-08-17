@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
-from typing import Any, List, Optional, TypeVar, Type, Union, Dict, Self, Tuple
+from typing import Any, Dict, List, Optional, Self, Tuple, Type, TypeVar, Union
 
 from psycopg import IsolationLevel
 
@@ -36,6 +36,23 @@ class DAOInterface(ABC):
 
         Returns:
             Query results based on the options specified
+        """
+        pass
+
+    @abstractmethod
+    async def execute_write(self, query: str, params: Optional[List[Any]] = None) -> int:
+        """
+        Execute a statement that changes rows and report how many it changed
+
+        Runs inside the caller's active transaction when there is one, otherwise
+        acquires its own connection from the pool.
+
+        Args:
+            query: SQL statement to execute
+            params: Statement parameters
+
+        Returns:
+            Number of rows the statement affected
         """
         pass
 

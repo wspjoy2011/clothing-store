@@ -1,6 +1,9 @@
-from typing import Optional, Tuple, List, Any
+from typing import Any, List, Optional, Tuple
 
 from apps.catalog.interfaces.specifications import SearchSpecificationInterface
+from apps.catalog.specifications.clauses import PRODUCT_ALIAS, SqlClause
+
+SEARCH_CONFIGURATION = "public.english_unaccent"
 
 
 class ProductSearchSpecification(SearchSpecificationInterface):
@@ -24,19 +27,36 @@ class ProductSearchSpecification(SearchSpecificationInterface):
         """Check if the search specification is empty."""
         return self._query is None or self._query == ""
 
-    def to_sql(self) -> Tuple[str, List[Any]]:
+    def to_clause(self) -> SqlClause:
         """
-        Convert search specification to SQL WHERE clause and params
+        Build the full-text predicate for the query
 
         Returns:
-            Tuple of (SQL WHERE clause, parameters list)
+            Condition matching the searched products, with its parameter
+        """
+        if self.is_empty():
+            return SqlClause()
+
+        return SqlClause(
+            conditions=[
+                f"to_tsvector('{SEARCH_CONFIGURATION}', {PRODUCT_ALIAS}.product_display_name) "
+                f"@@ plainto_tsquery('{SEARCH_CONFIGURATION}', %s)"
+            ],
+            params=[self._query]
+        )
+
+    def relevance_order(self) -> Tuple[str, List[Any]]:
+        """
+        Build the ordering expression ranking matches by relevance
+
+        Returns:
+            Expression and the parameter it binds, empty when nothing is searched
         """
         if self.is_empty():
             return "", []
 
-        sql = """
-            WHERE to_tsvector('public.english_unaccent', p.product_display_name) @@ plainto_tsquery('public.english_unaccent', %s)
-            ORDER BY ts_rank(to_tsvector('public.english_unaccent', p.product_display_name), 
-                            plainto_tsquery('public.english_unaccent', %s)) DESC
-            """
-        return sql, [self._query, self._query]
+        expression = (
+            f"ts_rank(to_tsvector('{SEARCH_CONFIGURATION}', {PRODUCT_ALIAS}.product_display_name), "
+            f"plainto_tsquery('{SEARCH_CONFIGURATION}', %s)) DESC"
+        )
+        return expression, [self._query]

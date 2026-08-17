@@ -1,10 +1,11 @@
 """Data loaders for various destinations."""
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from elasticsearch import AsyncElasticsearch, NotFoundError
 
-from etl.sync.interfaces import DataLoaderInterface
 from etl.sync.exceptions import DataLoadingError, IndexOperationError
+from etl.sync.interfaces import DataLoaderInterface
 from settings.logging_config import get_logger
 
 logger = get_logger(__name__, "sync_loaders")

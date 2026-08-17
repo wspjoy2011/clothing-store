@@ -1,55 +1,92 @@
-from typing import Any, Optional
+from typing import Optional
 
 from apps.catalog.interfaces.specifications import OrderingSpecificationInterface
+from apps.catalog.specifications.clauses import EFFECTIVE_PRICE, PRODUCT_ALIAS
 
 
 class OrderingSpecification(OrderingSpecificationInterface):
     """Specification for ordering results"""
 
+    FIELD_EXPRESSIONS = {
+        "id": f"{PRODUCT_ALIAS}.product_id",
+        "year": f"{PRODUCT_ALIAS}.year",
+        "product_id": f"{PRODUCT_ALIAS}.product_id",
+        "price": EFFECTIVE_PRICE
+    }
+
+    DEFAULT_ORDERING = "-id"
+    TIEBREAKER = "product_id"
+
     def __init__(self, ordering: Optional[str] = None):
-        self._allowed_fields = ["id", "year", "product_id", "price"]
+        self._allowed_fields = list(self.FIELD_EXPRESSIONS)
 
         self._ordering_fields = self._parse_ordering(ordering)
 
     def _parse_ordering(self, ordering_param: Optional[str]) -> list[str]:
-        """Parse and validate ordering parameter"""
+        """
+        Keep the requested fields that are on the allowlist, in the order asked for
+
+        A field is recognised only as an exact allowlisted name with at most one
+        leading minus. Anything else is dropped: stripping every leading minus
+        would let "---id" pass as "id" and reach the SQL as "--id", where the two
+        dashes comment out the rest of the statement.
+
+        Args:
+            ordering_param: Comma-separated fields as received from the client
+
+        Returns:
+            Recognised fields, always ending with the tiebreaker
+        """
         if not ordering_param:
-            return ["-id"]
+            return [self.DEFAULT_ORDERING]
 
-        ordering_fields = ordering_param.split(',')
-
-        all_allowed_fields = set(self._allowed_fields + [f"-{field}" for field in self._allowed_fields])
-
-        processed_fields = [field for field in ordering_fields if field.lstrip('-') in all_allowed_fields]
+        processed_fields = [
+            field for field in ordering_param.split(',')
+            if self._field_name_of(field) in self.FIELD_EXPRESSIONS
+        ]
 
         if not processed_fields:
-            return ["-id"]
+            return [self.DEFAULT_ORDERING]
 
-        has_product_id = any(field.lstrip('-') == 'product_id' for field in processed_fields)
-        if not has_product_id:
-            processed_fields.append("product_id")
+        if not any(self._field_name_of(field) == self.TIEBREAKER for field in processed_fields):
+            processed_fields.append(self.TIEBREAKER)
 
         return processed_fields
 
-    def to_sql(self) -> tuple[str, list[Any]]:
-        """Convert ordering fields to SQL ORDER BY clause"""
-        sql_parts = []
+    @staticmethod
+    def _field_name_of(field: str) -> str:
+        """
+        Read the field name of a possibly descending field
 
-        for field in self._ordering_fields:
-            if field.startswith('-'):
-                field_name = field[1:]
-                if field_name == 'price':
-                    sql_parts.append("COALESCE(i.sale_price, i.base_price) DESC")
-                else:
-                    sql_parts.append(f"{field_name} DESC")
-            else:
-                if field == 'price':
-                    sql_parts.append("COALESCE(i.sale_price, i.base_price) ASC")
-                else:
-                    sql_parts.append(f"{field} ASC")
+        Args:
+            field: Field as written by the client, optionally prefixed with one minus
 
-        sql = f"ORDER BY {', '.join(sql_parts)}"
-        return sql, []
+        Returns:
+            The name without its direction prefix
+        """
+        return field[1:] if field.startswith('-') else field
+
+    def to_order_by(self) -> list[str]:
+        """
+        Build the ordering expressions from allowlisted columns only
+
+        Returns:
+            Expressions in the order they apply
+        """
+        return [
+            f"{self.FIELD_EXPRESSIONS[self._field_name_of(field)]} "
+            f"{'DESC' if field.startswith('-') else 'ASC'}"
+            for field in self._ordering_fields
+        ]
+
+    @property
+    def is_default(self) -> bool:
+        """Report whether the client asked for no particular order"""
+        return self._ordering_fields == [self.DEFAULT_ORDERING]
+
+    def is_empty(self) -> bool:
+        """Ordering always contributes an order, if only the default one"""
+        return False
 
     def get_ordering_fields(self) -> list[str]:
         """Get the list of ordering fields"""

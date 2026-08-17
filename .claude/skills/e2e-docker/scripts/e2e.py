@@ -22,12 +22,22 @@ from ledger import Ledger, latest_run_id, new_run_id, run_directory
 
 PROJECT_MARKER = "docker-compose.yml"
 TEST_EMAIL_PREFIX = "e2e-"
+PARALLEL_REGISTRATION_BUDGET_SECONDS = 5.0
+SCENARIO_RATE_LIMIT = "200/minute"
+EMAIL_DISPATCH_RATE_LIMIT = "3/second"
+EMAIL_DISPATCH_BURST = 8
 DEFAULT_API = "http://localhost:8000/api/v1"
 ANCHOR_PROCESS = "wsl.exe"
 STACK_SERVICES = ("db", "mailhog", "web")
 REQUEST_TIMEOUT = 120
 STOCK_PROBE_PRODUCT_ID = 999_000_001
 STOCK_PROBE_UNITS = 3
+PAGINATION_PROBE_PRODUCT_ID = 999_000_100
+PAGINATION_PROBE_PRODUCTS = 2
+CATALOG_PROBE_PRODUCT_ID = 999_000_200
+CATALOG_PROBE_PRODUCTS = 3
+CATALOG_PROBE_BASE_PRICE = 17.50
+API_ORIGIN = "http://localhost:8000"
 
 
 def find_project_root() -> str:
@@ -293,6 +303,12 @@ def ensure_override(project_root: str, ledger: Ledger) -> str:
     restarts the server every couple of minutes, which drops in-flight requests
     and makes every scenario flaky. End-to-end runs use a plain server instead.
 
+    The override also raises the limits the scenarios spend themselves. Left at
+    production values, a suite that registers a dozen accounts exhausts its own
+    quota and a rerun inside the same minute fails on 429 rather than on code.
+    The email dispatch limit stays low on purpose: one scenario proves the
+    limiter still refuses a burst.
+
     Args:
         project_root: Repository root
         ledger: Journal recording the change
@@ -305,6 +321,10 @@ def ensure_override(project_root: str, ledger: Ledger) -> str:
         "services:\n"
         "  web:\n"
         "    command: [\"uvicorn\", \"main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n"
+        "    environment:\n"
+        f"      RATE_LIMIT_REGISTRATION: {SCENARIO_RATE_LIMIT}\n"
+        f"      RATE_LIMIT_CREDENTIAL_GUESS: {SCENARIO_RATE_LIMIT}\n"
+        f"      RATE_LIMIT_EMAIL_DISPATCH: {EMAIL_DISPATCH_RATE_LIMIT}\n"
     )
 
     with open(override_path, "w", encoding="utf-8") as handle:
@@ -421,7 +441,7 @@ def command_up(arguments, ledger: Ledger) -> int:
     ensure_override(project_root, ledger)
 
     ledger.record("started", "compose_stack", ",".join(STACK_SERVICES), project_root=project_root)
-    code, output = compose(docker, project_root, env_file, ["up", "-d", *STACK_SERVICES])
+    code, output = compose(docker, project_root, env_file, ["up", "-d", "--build", *STACK_SERVICES])
     if code != 0:
         print(output[-3000:])
         return code
@@ -476,12 +496,24 @@ def command_scenarios(arguments, ledger: Ledger) -> int:
     for address in concurrent_emails:
         ledger.record("created", "db_row", address, table="accounts_users", note="concurrency scenario")
 
+    started = time.time()
     codes = run_parallel_registrations(base, concurrent_emails)
-    all_created = all(code == 201 for code in codes)
+    elapsed = time.time() - started
+
+    accepted = sum(1 for code in codes if code == 201)
+    throttled = sum(1 for code in codes if code == 429)
+    unexpected = sorted({code for code in codes if code not in (201, 429)})
+    within_budget = elapsed < PARALLEL_REGISTRATION_BUDGET_SECONDS
+
     results.append((
-        f"{arguments.parallel} parallel registrations all succeed",
-        all_created,
-        f"status codes {sorted(set(codes))}"
+        f"{arguments.parallel} parallel registrations are served or throttled, never broken",
+        accepted + throttled == len(codes) and not unexpected and accepted > 0,
+        f"{accepted} created, {throttled} throttled, unexpected {unexpected}"
+    ))
+    results.append((
+        "hashing does not block the event loop",
+        within_budget,
+        f"{len(codes)} concurrent registrations answered in {elapsed:.2f}s"
     ))
 
     status, body = request("POST", f"{base}/checkout/cart/token")
@@ -496,13 +528,19 @@ def command_scenarios(arguments, ledger: Ledger) -> int:
 
         if seed_test_product(arguments, ledger, STOCK_PROBE_PRODUCT_ID, STOCK_PROBE_UNITS):
             results.extend(check_stock_limit(base, cart_token, STOCK_PROBE_PRODUCT_ID))
+            results.extend(check_concurrent_stock_limit(base, STOCK_PROBE_PRODUCT_ID, STOCK_PROBE_UNITS))
+
+    results.extend(check_pagination_links(arguments, base, ledger))
+    results.extend(check_catalog_queries(arguments, base, ledger))
+    results.extend(check_refresh_rotation(arguments, base, ledger))
+    results.extend(check_rate_limit(base))
 
     print_results(results)
     write_report(ledger, results)
     return 0 if all(passed for _, passed, _ in results) else 1
 
 
-def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) -> bool:
+def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int, price: float = 10.00) -> bool:
     """
     Insert one product with a known stock level
 
@@ -514,6 +552,7 @@ def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) ->
         ledger: Journal recording the rows
         product_id: Identifier to insert
         stock: Units to make available
+        price: Base price to give the product
 
     Returns:
         True when the product is in place
@@ -525,6 +564,9 @@ def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) ->
     if not isinstance(product_id, int) or not isinstance(stock, int):
         raise TypeError("product_id and stock must be integers: they are interpolated into SQL")
 
+    if not isinstance(price, (int, float)):
+        raise TypeError("price must be numeric: it is interpolated into SQL")
+
     ledger.record("created", "db_row", str(product_id), table="catalog_products", note="stock scenario")
     ledger.record("created", "db_row", str(product_id), table="catalog_product_inventory", note="stock scenario")
 
@@ -535,8 +577,8 @@ def seed_test_product(arguments, ledger: Ledger, product_id: int, stock: int) ->
         f"'http://example.com/e2e.jpg', 'e2e-stock-probe-{product_id}') "
         f"ON CONFLICT (product_id) DO NOTHING; "
         f"INSERT INTO catalog_product_inventory (product_id, base_price, stock_quantity, is_active) "
-        f"VALUES ({product_id}, 10.00, {stock}, TRUE) "
-        f"ON CONFLICT (product_id) DO UPDATE SET stock_quantity = {stock};"
+        f"VALUES ({product_id}, {price:.2f}, {stock}, TRUE) "
+        f"ON CONFLICT (product_id) DO UPDATE SET stock_quantity = {stock}, base_price = {price:.2f};"
     )
 
     user = read_env_value(env_file, "POSTGRES_USER") or "admin"
@@ -588,6 +630,305 @@ def check_stock_limit(base: str, cart_token: str, product_id: int) -> List[Tuple
         "stock limit enforced by the database",
         status == 400,
         f"status {status} {str(body)[:80]}"
+    ))
+
+    return results
+
+
+def check_concurrent_stock_limit(base: str, product_id: int, stock: int) -> List[Tuple[str, bool, str]]:
+    """
+    Check that concurrent additions to one cart cannot exceed the stock
+
+    Only a real database proves this: the guard is a row lock held for the length of
+    a transaction, and a repository double cannot reproduce it.
+
+    Args:
+        base: API base URL
+        product_id: Product to compete for
+        stock: Units the warehouse holds
+
+    Returns:
+        Scenario results
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    status, body = request("POST", f"{base}/checkout/cart/token")
+    token = body.get("token")
+    if status != 201 or not token:
+        return [("concurrent additions respect the stock", False, f"no cart token, status {status}")]
+
+    def add_one(_: int) -> int:
+        code, _body = request(
+            "POST",
+            f"{base}/checkout/cart/token/{token}/items",
+            {"product_id": product_id, "quantity": 1}
+        )
+        return code
+
+    attempts = stock + 2
+    with ThreadPoolExecutor(max_workers=attempts) as pool:
+        codes = list(pool.map(add_one, range(attempts)))
+
+    status, cart = request("POST", f"{base}/checkout/cart/token/get", {"token": token})
+    stored = sum(item.get("quantity", 0) for item in cart.get("items", []))
+
+    accepted = codes.count(201)
+    refused = codes.count(400)
+    broken = [code for code in codes if code not in (201, 400)]
+
+    passed = (
+        stored == stock
+        and accepted == stock
+        and refused == attempts - stock
+        and not broken
+    )
+
+    return [(
+        "concurrent additions respect the stock",
+        passed,
+        f"{attempts} at once -> {accepted} accepted, {refused} refused, "
+        f"{len(broken)} neither ({sorted(set(broken))}), cart holds {stored} of {stock}"
+    )]
+
+
+def check_rate_limit(base: str) -> List[Tuple[str, bool, str]]:
+    """
+    Prove the limiter still refuses a burst on the real stack
+
+    Password reset is used because no other scenario spends its quota, and an
+    address nobody registered writes no row and sends no mail: the limiter counts
+    the request either way.
+
+    The stand configures a per-second window, so the burst proves the mechanism
+    without leaving a spent quota behind: a rerun a second later starts clean.
+    The assertion is therefore that a burst is partly served and partly refused,
+    which fails both when the limiter is absent and when it refuses everything.
+
+    Args:
+        base: API base URL
+
+    Returns:
+        One scenario result
+    """
+    unknown_address = f"{TEST_EMAIL_PREFIX}{uuid.uuid4().hex[:12]}@example.com"
+
+    codes = []
+    for _ in range(EMAIL_DISPATCH_BURST):
+        status, _ = request("POST", f"{base}/accounts/password-reset/request", {"email": unknown_address})
+        codes.append(status)
+
+    served = sum(1 for code in codes if code == 200)
+    refused = sum(1 for code in codes if code == 429)
+
+    return [(
+        "a burst beyond the limit is partly refused",
+        served > 0 and refused > 0 and served + refused == len(codes),
+        f"{EMAIL_DISPATCH_BURST} in a row -> {served} served, {refused} refused, "
+        f"other {sorted({code for code in codes if code not in (200, 429)})}"
+    )]
+
+
+def activate_user(arguments, address: str) -> bool:
+    """
+    Activate a registered account straight in the database
+
+    The activation link is delivered by mail, which a scenario cannot read, so the
+    row is flipped directly. Nothing else about the account is touched.
+
+    Args:
+        arguments: Parsed command line arguments
+        address: Address of the account to activate
+
+    Returns:
+        True when the account is active
+    """
+    project_root = find_project_root()
+    docker = detect_docker(arguments.distro)
+    env_file = os.path.join(project_root, "services", "backend", ".env")
+
+    if not address.startswith(TEST_EMAIL_PREFIX):
+        raise ValueError(f"refusing to activate an account outside the {TEST_EMAIL_PREFIX} prefix")
+
+    statement = f"UPDATE accounts_users SET is_active = TRUE WHERE email = '{address}';"
+
+    user = read_env_value(env_file, "POSTGRES_USER") or "admin"
+    database = read_env_value(env_file, "POSTGRES_DB") or "clothing_store"
+    code, output = compose(
+        docker, project_root, env_file,
+        ["exec", "-T", "db", "psql", "-U", user, "-d", database, "-c", statement],
+        timeout=120
+    )
+
+    if code != 0:
+        print(f"could not activate {address}: {output.strip()[:200]}")
+
+    return code == 0
+
+
+def check_refresh_rotation(arguments, base: str, ledger: Ledger) -> List[Tuple[str, bool, str]]:
+    """
+    Check that refreshing replaces the token it was given
+
+    Rotation spans the token store and two requests, so only a live stack shows
+    whether the presented token really stopped working.
+
+    Args:
+        arguments: Parsed command line arguments
+        base: API base URL
+        ledger: Journal recording the account
+
+    Returns:
+        Scenario results
+    """
+    address = f"{TEST_EMAIL_PREFIX}{uuid.uuid4().hex[:12]}@example.com"
+    password = "E2ePassword123!"
+    ledger.record("created", "db_row", address, table="accounts_users", note="refresh rotation scenario")
+
+    status, _ = request("POST", f"{base}/accounts/register", {"email": address, "password": password})
+    if status != 201 or not activate_user(arguments, address):
+        return [("refresh rotation could be checked", False, f"account could not be prepared (register {status})")]
+
+    status, body = request("POST", f"{base}/accounts/login", {"email": address, "password": password})
+    first_refresh = body.get("refresh_token")
+    if status != 200 or not first_refresh:
+        return [("refresh rotation could be checked", False, f"login answered {status}")]
+
+    status, body = request("POST", f"{base}/accounts/refresh", {"refresh_token": first_refresh})
+    second_refresh = body.get("refresh_token")
+
+    results = [(
+        "refreshing returns a new refresh token",
+        status == 200 and bool(second_refresh) and second_refresh != first_refresh,
+        f"status {status}, token changed: {bool(second_refresh) and second_refresh != first_refresh}"
+    )]
+
+    replayed, _ = request("POST", f"{base}/accounts/refresh", {"refresh_token": first_refresh})
+    results.append((
+        "the replaced refresh token stops working",
+        replayed == 401,
+        f"replaying the old token answered {replayed}"
+    ))
+
+    if second_refresh:
+        status, body = request("POST", f"{base}/accounts/refresh", {"refresh_token": second_refresh})
+        results.append((
+            "the new refresh token works",
+            status == 200 and bool(body.get("access_token")),
+            f"status {status}"
+        ))
+
+    return results
+
+
+def check_pagination_links(arguments, base: str, ledger: Ledger) -> List[Tuple[str, bool, str]]:
+    """
+    Check that the link the catalogue hands the client can be followed
+
+    Two products are seeded so the listing spans more than one page: the dataset is
+    not loaded on the stand, and an empty catalogue returns no links to follow.
+
+    Args:
+        arguments: Parsed command line arguments
+        base: API base URL
+        ledger: Journal recording the rows
+
+    Returns:
+        Scenario results
+    """
+    for offset in range(PAGINATION_PROBE_PRODUCTS):
+        if not seed_test_product(arguments, ledger, PAGINATION_PROBE_PRODUCT_ID + offset, 1):
+            return [("pagination links could be checked", False, "probe products could not be seeded")]
+
+    status, body = request("GET", f"{base}/catalog/products?page=1&per_page=1")
+    next_page = body.get("next_page") if isinstance(body, dict) else None
+
+    if status != 200 or not next_page:
+        return [("the catalogue offers a next page link", False, f"status {status}, link {next_page}")]
+
+    followed, _ = request("GET", f"{API_ORIGIN}{next_page}")
+
+    return [(
+        "the next page link the catalogue returns can be followed",
+        followed == 200,
+        f"following {next_page} answered {followed}"
+    )]
+
+
+def check_catalog_queries(arguments, base: str, ledger: Ledger) -> List[Tuple[str, bool, str]]:
+    """
+    Check the catalogue answers filters, sorting and counts consistently
+
+    These read paths are assembled from specifications, so only a real database
+    shows whether the statement they produce is valid and means what it says.
+
+    Args:
+        arguments: Parsed command line arguments
+        base: API base URL
+        ledger: Journal recording the rows
+
+    Returns:
+        Scenario results
+    """
+    results: List[Tuple[str, bool, str]] = []
+
+    for offset in range(CATALOG_PROBE_PRODUCTS):
+        probe_price = CATALOG_PROBE_BASE_PRICE * (offset + 1)
+        if not seed_test_product(
+                arguments, ledger, CATALOG_PROBE_PRODUCT_ID + offset, offset + 1, probe_price
+        ):
+            return [("catalogue queries could be checked", False, "probe products could not be seeded")]
+
+    status, body = request("GET", f"{base}/catalog/products?ordering=-price&per_page=5")
+    prices = [
+        float(item["inventory"]["sale_price"] or item["inventory"]["base_price"])
+        for item in body.get("products", []) if item.get("inventory")
+    ] if isinstance(body, dict) else []
+    results.append((
+        "sorting by price returns descending prices",
+        status == 200 and prices == sorted(prices, reverse=True) and len(set(prices)) > 1,
+        f"status {status}, prices {prices[:5]}"
+    ))
+
+    status, body = request("GET", f"{base}/catalog/products?gender=Unisex&per_page=5")
+    genders = {item["gender"] for item in body.get("products", [])} if isinstance(body, dict) else set()
+    results.append((
+        "filtering by gender returns only that gender",
+        status == 200 and genders <= {"Unisex"},
+        f"status {status}, genders {sorted(genders)}"
+    ))
+
+    status, body = request("GET", f"{base}/catalog/products?ordering=---id&per_page=5")
+    results.append((
+        "an ordering value of only dashes is refused rather than crashing",
+        status == 200,
+        f"status {status}"
+    ))
+
+    status, filters = request("GET", f"{base}/catalog/products/filters")
+    availability = filters.get("is_available") if isinstance(filters, dict) else None
+    _, listing = request("GET", f"{base}/catalog/products?per_page=1")
+    total = listing.get("total_items") if isinstance(listing, dict) else None
+
+    counted = (
+        availability["available_count"] + availability["unavailable_count"]
+        if isinstance(availability, dict) else None
+    )
+    results.append((
+        "the availability counts add up to the catalogue size",
+        status == 200 and counted == total,
+        f"available plus unavailable {counted}, catalogue {total}"
+    ))
+
+    status, body = request("GET", f"{base}/catalog/products?q=probe&ordering=-price&per_page=5")
+    searched_prices = [
+        float(item["inventory"]["sale_price"] or item["inventory"]["base_price"])
+        for item in body.get("products", []) if item.get("inventory")
+    ] if isinstance(body, dict) else []
+    results.append((
+        "a search keeps the sort the client asked for",
+        status == 200 and searched_prices == sorted(searched_prices, reverse=True)
+        and len(set(searched_prices)) > 1,
+        f"status {status}, prices {searched_prices[:5]}"
     ))
 
     return results
@@ -815,6 +1156,11 @@ def command_monitor(arguments, ledger: Ledger) -> int:
     Polling is used rather than event subscription: a dropped event is silent,
     while a missed poll is corrected by the next one.
 
+    The destination of the log is resolved at every sample unless a run was named
+    explicitly. A monitor started before the stack, as the skill asks, would
+    otherwise keep writing into the previous run's directory for its whole life,
+    and the run it was meant to document would end up with an empty log.
+
     Args:
         arguments: Parsed command line arguments
         ledger: Journal of the run
@@ -823,6 +1169,7 @@ def command_monitor(arguments, ledger: Ledger) -> int:
         Process exit code, non-zero when a failure was observed
     """
     docker = detect_docker(arguments.distro)
+    pinned_run = bool(getattr(arguments, "run_id", None))
     log_path = os.path.join(ledger.directory, "monitor.log")
     deadline = time.time() + arguments.duration if arguments.duration else None
 
@@ -832,6 +1179,9 @@ def command_monitor(arguments, ledger: Ledger) -> int:
     print(f"monitoring every {arguments.interval}s, log: {log_path}")
 
     while deadline is None or time.time() < deadline:
+        if not pinned_run:
+            log_path = os.path.join(run_directory(latest_run_id()), "monitor.log")
+
         sample = probe_stack(docker, arguments.api)
         stamp = time.strftime("%H:%M:%S")
 

@@ -100,17 +100,3 @@ INSERT INTO accounts_user_groups (name) VALUES
     ('moderator'),
     ('admin');
 
--- Grant privileges
-GRANT ALL PRIVILEGES ON TABLE accounts_user_groups TO admin;
-GRANT ALL PRIVILEGES ON TABLE accounts_users TO admin;
-GRANT ALL PRIVILEGES ON TABLE accounts_user_profiles TO admin;
-GRANT ALL PRIVILEGES ON TABLE accounts_activation_tokens TO admin;
-GRANT ALL PRIVILEGES ON TABLE accounts_password_reset_tokens TO admin;
-GRANT ALL PRIVILEGES ON TABLE accounts_refresh_tokens TO admin;
-
-GRANT ALL PRIVILEGES ON SEQUENCE accounts_user_groups_id_seq TO admin;
-GRANT ALL PRIVILEGES ON SEQUENCE accounts_users_id_seq TO admin;
-GRANT ALL PRIVILEGES ON SEQUENCE accounts_user_profiles_id_seq TO admin;
-GRANT ALL PRIVILEGES ON SEQUENCE accounts_activation_tokens_id_seq TO admin;
-GRANT ALL PRIVILEGES ON SEQUENCE accounts_password_reset_tokens_id_seq TO admin;
-GRANT ALL PRIVILEGES ON SEQUENCE accounts_refresh_tokens_id_seq TO admin;

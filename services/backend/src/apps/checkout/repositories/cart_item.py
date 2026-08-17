@@ -1,8 +1,9 @@
-from typing import Optional, List
+from typing import List, Optional
 
 import psycopg
 
-from apps.checkout.dto import CartItemDTO, AddToCartRequestDTO, UpdateCartItemRequestDTO
+from apps.checkout.dto import AddToCartRequestDTO, CartItemDTO, UpdateCartItemRequestDTO
+from apps.checkout.exceptions.repositories import CartStorageError
 from apps.checkout.interfaces.repositories import CartItemRepositoryInterface
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface
 from settings.logging_config import get_logger
@@ -30,17 +31,15 @@ class CartItemRepository(CartItemRepositoryInterface):
         """
         Add item to cart or update quantity if item already exists
 
-        The resulting quantity is re-checked against stock inside the statement,
-        the same way update_cart_item does: on conflict the quantities are summed,
-        and a separate check could not see that sum.
+        On conflict the quantities are summed, so the caller must validate the
+        resulting total rather than the increment, while holding the inventory row.
 
         Args:
             request_data: Data for adding item to cart
             cart_id: ID of the cart
 
         Returns:
-            Created or updated CartItemDTO, or None when stock no longer covers
-            the resulting quantity
+            Created or updated CartItemDTO
         """
         query = f"""
             INSERT INTO {self.APP_NAME}_cart_items (cart_id, product_id, quantity)
@@ -49,13 +48,6 @@ class CartItemRepository(CartItemRepositoryInterface):
             DO UPDATE SET
                 quantity = {self.APP_NAME}_cart_items.quantity + EXCLUDED.quantity,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE EXISTS (
-                SELECT 1 FROM catalog_product_inventory AS inventory
-                WHERE inventory.product_id = {self.APP_NAME}_cart_items.product_id
-                  AND inventory.is_active
-                  AND inventory.is_in_stock
-                  AND inventory.available_quantity >= {self.APP_NAME}_cart_items.quantity + EXCLUDED.quantity
-            )
             RETURNING id, cart_id, product_id, quantity, added_at, updated_at
         """
 
@@ -68,7 +60,9 @@ class CartItemRepository(CartItemRepositoryInterface):
         )
 
         logger.info(
-            f"Added/updated item in cart {cart_id}: product {request_data.product_id}, quantity {request_data.quantity}")
+            f"Added/updated item in cart {cart_id}: product {request_data.product_id}, "
+            f"quantity {request_data.quantity}"
+        )
         return result
 
     async def get_cart_item_by_id(self, item_id: int) -> Optional[CartItemDTO]:
@@ -155,34 +149,27 @@ class CartItemRepository(CartItemRepositoryInterface):
         """
         Update cart item quantity with cart ownership and stock validation
 
-        Stock is re-checked inside the statement itself: a separate check would
-        leave a window in which a concurrent request could take the last units
-        between the check and the update.
+        Stock is validated by the caller while it holds the inventory row, so this
+        statement only enforces ownership.
 
         Args:
             request_data: Data for updating cart item
             cart_id: ID of the cart to which the item must belong
 
         Returns:
-            Updated CartItemDTO, or None when the item is absent, owned by another
-            cart, or no longer covered by the available stock
+            Updated CartItemDTO, or None when the item is absent or owned by
+            another cart
         """
         query = f"""
-            UPDATE {self.APP_NAME}_cart_items AS item
+            UPDATE {self.APP_NAME}_cart_items
             SET quantity = %s, updated_at = CURRENT_TIMESTAMP
-            FROM catalog_product_inventory AS inventory
-            WHERE item.id = %s
-              AND item.cart_id = %s
-              AND inventory.product_id = item.product_id
-              AND inventory.is_active
-              AND inventory.is_in_stock
-              AND inventory.available_quantity >= %s
-            RETURNING item.id, item.cart_id, item.product_id, item.quantity, item.added_at, item.updated_at
+            WHERE id = %s AND cart_id = %s
+            RETURNING id, cart_id, product_id, quantity, added_at, updated_at
         """
 
         result = await self._dao.execute(
             query=query,
-            params=[request_data.quantity, request_data.cart_item_id, cart_id, request_data.quantity],
+            params=[request_data.quantity, request_data.cart_item_id, cart_id],
             fetch=True,
             fetch_one=True,
             model_class=CartItemDTO
@@ -195,7 +182,7 @@ class CartItemRepository(CartItemRepositoryInterface):
         else:
             logger.warning(
                 f"Cart item {request_data.cart_item_id} not updated in cart {cart_id}: "
-                f"missing, owned by another cart, or stock no longer covers {request_data.quantity}"
+                f"it is missing or belongs to another cart"
             )
 
         return result
@@ -209,10 +196,14 @@ class CartItemRepository(CartItemRepositoryInterface):
             cart_id: ID of the cart (for ownership validation)
 
         Returns:
-            True if removed successfully, False if item not found or doesn't belong to cart
+            True if removed, False if no such item belongs to that cart
+
+        Raises:
+            CartStorageError: If the statement could not be carried out, which is
+                not the same answer as "no such item"
         """
         query = f"""
-            DELETE FROM {self.APP_NAME}_cart_items 
+            DELETE FROM {self.APP_NAME}_cart_items
             WHERE id = %s AND cart_id = %s
             RETURNING id
         """
@@ -227,10 +218,10 @@ class CartItemRepository(CartItemRepositoryInterface):
             )
         except psycopg.Error as e:
             logger.error(f"Database error removing cart item {item_id} from cart {cart_id}: {e}")
-            return False
+            raise CartStorageError(f"Cart item {item_id} could not be removed from cart {cart_id}", e)
         except Exception as e:
             logger.error(f"Failed to remove cart item {item_id} from cart {cart_id}: {e}")
-            return False
+            raise CartStorageError(f"Cart item {item_id} could not be removed from cart {cart_id}", e)
         else:
             if result:
                 logger.info(f"Removed cart item {item_id} from cart {cart_id}")
@@ -239,82 +230,5 @@ class CartItemRepository(CartItemRepositoryInterface):
                 logger.warning(f"Cart item {item_id} not found in cart {cart_id} or doesn't belong to this cart")
                 return False
 
-    async def clear_cart_items(self, cart_id: int) -> bool:
-        """
-        Remove all items from cart
 
-        Args:
-            cart_id: ID of the cart to clear
 
-        Returns:
-            True if cleared successfully, False otherwise
-        """
-        query = f"DELETE FROM {self.APP_NAME}_cart_items WHERE cart_id = %s"
-
-        try:
-            await self._dao.execute(
-                query=query,
-                params=[cart_id],
-                fetch=False
-            )
-        except psycopg.Error as e:
-            logger.error(f"Database error clearing cart {cart_id}: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"Failed to clear cart {cart_id}: {e}")
-            return False
-
-        logger.info(f"Cleared all items from cart {cart_id}")
-        return True
-
-    async def get_cart_items_count(self, cart_id: int) -> int:
-        """
-        Get total count of items in cart
-
-        Args:
-            cart_id: ID of the cart
-
-        Returns:
-            Number of items in the cart
-        """
-        query = f"""
-            SELECT COUNT(*) as count
-            FROM {self.APP_NAME}_cart_items
-            WHERE cart_id = %s
-        """
-
-        result = await self._dao.execute(
-            query=query,
-            params=[cart_id],
-            fetch=True,
-            fetch_one=True,
-            as_dict=True
-        )
-
-        return result['count'] if result else 0
-
-    async def get_cart_total_quantity(self, cart_id: int) -> int:
-        """
-        Get total quantity of all items in cart
-
-        Args:
-            cart_id: ID of the cart
-
-        Returns:
-            Total quantity of all items
-        """
-        query = f"""
-            SELECT COALESCE(SUM(quantity), 0) as total_quantity
-            FROM {self.APP_NAME}_cart_items
-            WHERE cart_id = %s
-        """
-
-        result = await self._dao.execute(
-            query=query,
-            params=[cart_id],
-            fetch=True,
-            fetch_one=True,
-            as_dict=True
-        )
-
-        return result['total_quantity'] if result else 0

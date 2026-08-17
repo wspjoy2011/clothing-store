@@ -3,17 +3,30 @@ from typing import Optional
 
 from apps.catalog.dto.category import CategoryMenuDTO, MasterCategoryInfoDTO
 from apps.catalog.dto.filters import FiltersDTO
-from apps.catalog.dto.products import ProductDTO
+from apps.catalog.dto.products import InventoryHoldDTO, ProductDTO
 from apps.catalog.interfaces.specifications import (
-    PaginationSpecificationInterface,
-    OrderingSpecificationInterface,
+    CategorySpecificationInterface,
     FilterSpecificationInterface,
+    OrderingSpecificationInterface,
+    PaginationSpecificationInterface,
     SearchSpecificationInterface,
-    CategorySpecificationInterface
 )
 
 
 class ProductRepositoryInterface(ABC):
+    @abstractmethod
+    async def lock_inventory(self, product_id: int) -> Optional[InventoryHoldDTO]:
+        """
+        Read the inventory row of a product and hold it for the current transaction
+
+        Args:
+            product_id: The ID of the product whose inventory is needed
+
+        Returns:
+            State of the held row, or None when the product has no inventory row
+        """
+        pass
+
     @abstractmethod
     async def get_product_by_id(self, product_id: int) -> Optional[ProductDTO]:
         """

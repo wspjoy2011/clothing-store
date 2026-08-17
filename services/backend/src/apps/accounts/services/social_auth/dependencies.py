@@ -2,30 +2,89 @@
 Dependencies for social authentication service.
 """
 
+from typing import Callable
+
 from fastapi import Depends
 
-from oauth.dependencies import get_oauth_registry
-from oauth.factories import OAuthProviderRegistry
-from oauth.exceptions import ProviderNotSupportedError
-from settings.config import config
-from apps.accounts.services.social_auth.service import SocialAuthService
-from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
+from apps.accounts.dependencies import get_token_repository, get_user_group_repository, get_user_repository
 from apps.accounts.interfaces.repositories import (
-    UserRepositoryInterface,
+    TokenRepositoryInterface,
     UserGroupRepositoryInterface,
-    TokenRepositoryInterface
+    UserRepositoryInterface,
 )
-from apps.accounts.dependencies import (
-    get_user_repository,
-    get_user_group_repository,
-    get_token_repository
-)
-from security.dependencies import get_password_manager, get_jwt_manager
-from security.interfaces import PasswordManagerInterface, JWTManagerInterface
-from notifications.dependencies import get_email_sender_dependency
-from notifications.email.interfaces import EmailSenderInterface
+from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
+from apps.accounts.services.social_auth.service import SocialAuthService
 from db.dependencies import get_transaction_manager
 from db.interfaces import TransactionManagerInterface
+from notifications.dependencies import get_email_sender_dependency
+from notifications.email.interfaces import EmailSenderInterface
+from oauth.dependencies import get_oauth_registry
+from oauth.exceptions import ProviderNotSupportedError
+from oauth.factories import OAuthProviderRegistry
+from security.dependencies import get_jwt_manager, get_password_manager
+from security.interfaces import JWTManagerInterface, PasswordManagerInterface
+from settings.config import config
+
+
+def get_social_auth_service_resolver(
+        registry: OAuthProviderRegistry = Depends(get_oauth_registry),
+        user_repository: UserRepositoryInterface = Depends(get_user_repository),
+        user_group_repository: UserGroupRepositoryInterface = Depends(get_user_group_repository),
+        token_repository: TokenRepositoryInterface = Depends(get_token_repository),
+        password_manager: PasswordManagerInterface = Depends(get_password_manager),
+        jwt_manager: JWTManagerInterface = Depends(get_jwt_manager),
+        email_sender: EmailSenderInterface = Depends(get_email_sender_dependency),
+        transaction_manager: TransactionManagerInterface = Depends(get_transaction_manager)
+) -> Callable[[str], SocialAuthServiceInterface]:
+    """
+    Get a resolver building the social auth service of one named provider
+
+    The service is built when the provider is known, not while the request is being
+    wired: resolving every provider up front means a credential missing for one of
+    them breaks sign-in through all the others.
+
+    Args:
+        registry: OAuth provider registry
+        user_repository: Repository for user data operations
+        user_group_repository: Repository for user group operations
+        token_repository: Repository for token operations
+        password_manager: Manager for password hashing and verification
+        jwt_manager: Manager for JWT token operations
+        email_sender: Email sender for notifications
+        transaction_manager: Manager owning transaction boundaries
+
+    Returns:
+        Callable taking a provider name and returning its service
+
+    Raises:
+        ProviderNotSupportedError: Raised by the resolver for an unknown provider
+    """
+    def resolve(provider_name: str) -> SocialAuthServiceInterface:
+        """
+        Build the service of one provider
+
+        Args:
+            provider_name: Provider the caller asked for
+
+        Returns:
+            Social auth service bound to that provider
+
+        Raises:
+            ProviderNotSupportedError: If the provider is unknown
+        """
+        return get_social_auth_service(
+            provider_name=provider_name,
+            registry=registry,
+            user_repository=user_repository,
+            user_group_repository=user_group_repository,
+            token_repository=token_repository,
+            password_manager=password_manager,
+            jwt_manager=jwt_manager,
+            email_sender=email_sender,
+            transaction_manager=transaction_manager
+        )
+
+    return resolve
 
 
 def get_google_social_auth_service(

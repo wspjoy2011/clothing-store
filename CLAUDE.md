@@ -2,6 +2,30 @@
 
 Working guidelines for the clothing-store codebase.
 
+## Backend architecture
+
+Request path: **route → controller → service → repository → DAO**. Each layer calls the next one only. No layer is skipped and none is called backwards.
+
+- **Route** — HTTP surface: path, status codes, `Depends`. No logic.
+- **Controller** — converts Schema ↔ DTO through `_convert_<src>_to_<dst>` helpers and maps domain exceptions to `HTTPException`.
+- **Service** — business logic, and the only layer that opens a transaction boundary.
+- **Repository** — SQL for one aggregate, returns DTOs.
+- **DAO** — executes statements and reuses the connection of the active transaction.
+
+**DTO inside, Schema at the edge.** DTOs are `@dataclass`, schemas are pydantic. A schema never travels deeper than the controller, a DTO never reaches the client, and the conversion lives nowhere else.
+
+**Every dependency sits behind an `ABC`** in the module's `interfaces/` and is wired in its `dependencies.py`. Implementations are injected, never imported directly by their consumer.
+
+**A module is a package** under `apps/<name>/`: `dto`, `exceptions`, `interfaces`, `repositories`, `schemas`, `services`, plus `controllers.py`, `routes.py`, `dependencies.py`. Reference: `apps/checkout`.
+
+**Modules talk through service interfaces.** Reach another module by its `…ServiceInterface`, never by its repositories or tables.
+
+**Transactions.** The service owns the boundary via `transaction_manager.atomic()`. A locking read (`SELECT … FOR UPDATE`) is valid only inside one — outside, the lock dies with the statement. Take the lock before reading anything the decision depends on.
+
+**No ORM.** SQL is written by hand; schema changes ship as a migration.
+
+**Errors.** Domain exceptions live in the module's `exceptions/`. Outward they describe the failed action, inward each layer logs what it alone knows.
+
 ## Comments and documentation
 
 - **Zero comments in code by default.** All documentation lives in docstrings.
@@ -34,6 +58,14 @@ Prove every new test by mutation before considering it done: break the code it c
 Backend tests live in `services/backend/tests`, mirror the package they cover and run with `pytest`. External boundaries — database, SMTP, HTTP — are replaced by fakes, so no test needs a running Postgres or `.env`. One behaviour per test, named as the statement it proves.
 
 Coverage is measured with `pytest --cov`. The target is **90%**; `fail_under` in `pyproject.toml` holds the floor at the level already reached, so a change that drops coverage fails the run rather than relying on anyone noticing. Raise the floor when you raise the coverage. Chase uncovered branches, not uncovered lines: a file at 100% whose error paths were never executed is not covered.
+
+## Linting
+
+Backend code is checked with **ruff**, configured in `pyproject.toml`: `ruff check src tests`. It runs before every push, alongside the tests — it catches a class of defect they do not, having already found a `return` on a name that did not exist.
+
+A fake mirrors the contract it stands in for, or the tests above it prove nothing. When the real thing refuses something — an isolation level changed inside a transaction, a row factory that maps a row, a commit on leaving a pooled connection — the fake refuses it too.
+
+`--fix` is safe to apply but never to trust blindly: it deletes re-exports that look like unused imports. Declare them in `__all__` and re-run the tests after any automatic fix.
 
 ## Dependencies
 

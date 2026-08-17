@@ -4,63 +4,65 @@ from dataclasses import asdict
 
 from fastapi import HTTPException
 
-from apps.accounts.dto.password_reset import (
-    PasswordResetRequestDTO,
-    PasswordResetConfirmDTO,
-    PasswordChangeDTO
-)
-from apps.accounts.dto.users import CreateUserDTO, UserLoginDTO
+from apps.accounts.controllers.errors import client_message
 from apps.accounts.dto.activation import ActivateAccountDTO
-from apps.accounts.interfaces.services import AccountServiceInterface
-from apps.accounts.schemas.jwt_token import RefreshTokenResponse, RefreshTokenRequest
-from apps.accounts.schemas.password_reset import (
-    PasswordResetRequestSchema,
-    PasswordResetRequestResponseSchema,
-    PasswordResetConfirmSchema,
-    PasswordResetConfirmResponseSchema,
-    PasswordChangeResponseSchema,
-    PasswordChangeSchema
-)
-from apps.accounts.schemas.user import (
-    CreateUserSchema,
-    CreateUserResponseSchema,
-    UserResponseSchema,
-    UserLoginSchema,
-    LoginResponseSchema,
-    LogoutSchema,
-    LogoutResponseSchema,
-    RefreshTokenResponseSchema
+from apps.accounts.dto.password_reset import PasswordChangeDTO, PasswordResetConfirmDTO, PasswordResetRequestDTO
+from apps.accounts.dto.users import CreateUserDTO, UserLoginDTO
+from apps.accounts.interfaces.services import (
+    AuthenticationServiceInterface,
+    PasswordServiceInterface,
+    RegistrationServiceInterface,
 )
 from apps.accounts.schemas.activation import (
-    ActivateAccountSchema,
     ActivateAccountResponseSchema,
+    ActivateAccountSchema,
+    ResendActivationResponseSchema,
     ResendActivationSchema,
-    ResendActivationResponseSchema
+)
+from apps.accounts.schemas.jwt_token import RefreshTokenRequest, RefreshTokenResponse
+from apps.accounts.schemas.password_reset import (
+    PasswordChangeResponseSchema,
+    PasswordChangeSchema,
+    PasswordResetConfirmResponseSchema,
+    PasswordResetConfirmSchema,
+    PasswordResetRequestResponseSchema,
+    PasswordResetRequestSchema,
+)
+from apps.accounts.schemas.user import (
+    CreateUserResponseSchema,
+    CreateUserSchema,
+    LoginResponseSchema,
+    LogoutResponseSchema,
+    LogoutSchema,
+    RefreshTokenResponseSchema,
+    UserLoginSchema,
+    UserResponseSchema,
 )
 from apps.accounts.services.exceptions import (
     EmailAlreadyExistsError,
-    UserCreationError,
-    UserPasswordError,
-    UserNotFoundError,
-    UserAlreadyActivatedError,
-    InvalidActivationTokenError,
     ExpiredActivationTokenError,
-    UserInactiveError,
-    InvalidCredentialsError,
-    TokenGenerationError,
-    LoginError,
-    InvalidRefreshTokenError,
-    TokenValidationError,
-    PasswordResetEmailError,
-    InvalidPasswordResetTokenError,
     ExpiredPasswordResetTokenError,
-    PasswordResetTokenNotFoundError,
+    IncorrectCurrentPasswordError,
+    InvalidActivationTokenError,
+    InvalidCredentialsError,
+    InvalidPasswordResetTokenError,
+    InvalidRefreshTokenError,
+    LoginError,
+    PasswordChangeError,
+    PasswordResetEmailError,
     PasswordResetError,
     PasswordResetRollbackError,
-    IncorrectCurrentPasswordError,
+    PasswordResetTokenNotFoundError,
     SamePasswordError,
-    PasswordChangeError
+    TokenGenerationError,
+    TokenValidationError,
+    UserAlreadyActivatedError,
+    UserCreationError,
+    UserInactiveError,
+    UserNotFoundError,
+    UserPasswordError,
 )
+from apps.accounts.validators.token import mask_token_for_logging
 from security.dto import JWTPayloadDTO
 from settings.config import config
 from settings.logging_config import get_logger
@@ -70,14 +72,14 @@ logger = get_logger(__name__, "accounts_controller")
 
 async def create_user_controller(
         user_data: CreateUserSchema,
-        account_service: AccountServiceInterface,
+        registration_service: RegistrationServiceInterface,
 ) -> CreateUserResponseSchema:
     """
     Controller for user registration
 
     Args:
         user_data: User registration data from request
-        account_service: Account service for business logic
+        registration_service: Registration service for business logic
 
     Returns:
         CreateUserResponseSchema with created user data and success message
@@ -91,16 +93,16 @@ async def create_user_controller(
     )
 
     try:
-        created_user = await account_service.register_user(create_user_dto)
+        created_user = await registration_service.register_user(create_user_dto)
     except EmailAlreadyExistsError as e:
         raise HTTPException(
             status_code=409,
-            detail=str(e)
+            detail=client_message(e)
         )
     except (UserCreationError, UserPasswordError) as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during user creation for email {user_data.email}: {e}")
@@ -118,14 +120,14 @@ async def create_user_controller(
 
 async def activate_account_controller(
         activation_data: ActivateAccountSchema,
-        account_service: AccountServiceInterface,
+        registration_service: RegistrationServiceInterface,
 ) -> ActivateAccountResponseSchema:
     """
     Controller for account activation
 
     Args:
         activation_data: Account activation data from request
-        account_service: Account service for business logic
+        registration_service: Registration service for business logic
 
     Returns:
         ActivateAccountResponseSchema with activated user data and success message
@@ -139,26 +141,26 @@ async def activate_account_controller(
     )
 
     try:
-        activated_user = await account_service.activate_account(activate_account_dto)
+        activated_user = await registration_service.activate_account(activate_account_dto)
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserAlreadyActivatedError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except InvalidActivationTokenError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except ExpiredActivationTokenError as e:
         raise HTTPException(
             status_code=410,
-            detail=str(e)
+            detail=client_message(e)
         )
     except (UserCreationError, Exception) as e:
         logger.error(f"Unexpected error during account activation for email {activation_data.email}: {e}")
@@ -176,14 +178,14 @@ async def activate_account_controller(
 
 async def resend_activation_controller(
         resend_data: ResendActivationSchema,
-        account_service: AccountServiceInterface,
+        registration_service: RegistrationServiceInterface,
 ) -> ResendActivationResponseSchema:
     """
     Controller for resending activation email
 
     Args:
         resend_data: Resend activation data from request
-        account_service: Account service for business logic
+        registration_service: Registration service for business logic
 
     Returns:
         ResendActivationResponseSchema with success message and email
@@ -192,16 +194,16 @@ async def resend_activation_controller(
         HTTPException: 404 if user not found, 400 if user already activated, 500 for server errors
     """
     try:
-        await account_service.resend_activation_email(str(resend_data.email))
+        await registration_service.resend_activation_email(str(resend_data.email))
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserAlreadyActivatedError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during activation email resend for email {resend_data.email}: {e}")
@@ -218,14 +220,14 @@ async def resend_activation_controller(
 
 async def login_user_controller(
         login_data: UserLoginSchema,
-        account_service: AccountServiceInterface,
+        authentication_service: AuthenticationServiceInterface,
 ) -> LoginResponseSchema:
     """
     Controller for user login
 
     Args:
         login_data: User login data from request
-        account_service: Account service for business logic
+        authentication_service: Authentication service for business logic
 
     Returns:
         LoginResponseSchema with JWT tokens
@@ -239,31 +241,27 @@ async def login_user_controller(
     )
 
     try:
-        login_response = await account_service.login_user(user_login_dto)
-    except UserNotFoundError as e:
+        login_response = await authentication_service.login_user(user_login_dto)
+    except (UserNotFoundError, UserInactiveError) as e:
+        logger.warning(f"Sign-in refused for {login_data.email}: {e}")
         raise HTTPException(
-            status_code=404,
-            detail=str(e)
-        )
-    except UserInactiveError as e:
-        raise HTTPException(
-            status_code=403,
-            detail=str(e)
+            status_code=401,
+            detail=client_message(e)
         )
     except InvalidCredentialsError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except TokenGenerationError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except LoginError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during user login for email {login_data.email}: {e}")
@@ -277,14 +275,14 @@ async def login_user_controller(
 
 async def logout_user_controller(
         logout_data: LogoutSchema,
-        account_service: AccountServiceInterface,
+        authentication_service: AuthenticationServiceInterface,
 ) -> LogoutResponseSchema:
     """
     Controller for user logout
 
     Args:
         logout_data: User logout data from request
-        account_service: Account service for business logic
+        authentication_service: Authentication service for business logic
 
     Returns:
         LogoutResponseSchema with success message
@@ -292,20 +290,20 @@ async def logout_user_controller(
     Note:
         This controller never raises exceptions - logout always succeeds
     """
-    await account_service.logout_user(logout_data.refresh_token)
+    await authentication_service.logout_user(logout_data.refresh_token)
     return LogoutResponseSchema()
 
 
 async def get_user_by_refresh_token_controller(
         refresh_token: str,
-        account_service: AccountServiceInterface,
+        authentication_service: AuthenticationServiceInterface,
 ) -> RefreshTokenResponseSchema:
     """
     Controller for getting user by refresh token
 
     Args:
         refresh_token: JWT refresh token from Authorization header
-        account_service: Account service for business logic
+        authentication_service: Authentication service for business logic
 
     Returns:
         RefreshTokenResponseSchema with user data and success message
@@ -314,21 +312,21 @@ async def get_user_by_refresh_token_controller(
         HTTPException: 401 for invalid/expired tokens, 404 if user not found, 500 for server errors
     """
     try:
-        user = await account_service.get_user_by_refresh_token(refresh_token)
+        user = await authentication_service.get_user_by_refresh_token(refresh_token)
     except InvalidRefreshTokenError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except TokenValidationError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during user retrieval by refresh token: {e}")
@@ -346,14 +344,14 @@ async def get_user_by_refresh_token_controller(
 
 async def request_password_reset_controller(
         request_data: PasswordResetRequestSchema,
-        account_service: AccountServiceInterface,
+        password_service: PasswordServiceInterface,
 ) -> PasswordResetRequestResponseSchema:
     """
     Controller for password reset request
 
     Args:
         request_data: Password reset request data from request
-        account_service: Account service for business logic
+        password_service: Password service for business logic
 
     Returns:
         PasswordResetRequestResponseSchema with success message and email
@@ -366,11 +364,18 @@ async def request_password_reset_controller(
     )
 
     try:
-        await account_service.request_password_reset(reset_request_dto)
+        await password_service.request_password_reset(reset_request_dto)
     except PasswordResetEmailError as e:
+        logger.error(f"Password reset email could not be sent for {request_data.email}: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=str(e)
+            status_code=503,
+            detail="Password reset email could not be sent. Please try again."
+        )
+    except PasswordResetError as e:
+        logger.error(f"Password reset could not be started for {request_data.email}: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Password reset could not be started. Please try again."
         )
     except Exception as e:
         logger.error(f"Unexpected error during password reset request for email {request_data.email}: {e}")
@@ -387,14 +392,14 @@ async def request_password_reset_controller(
 
 async def confirm_password_reset_controller(
         confirm_data: PasswordResetConfirmSchema,
-        account_service: AccountServiceInterface,
+        password_service: PasswordServiceInterface,
 ) -> PasswordResetConfirmResponseSchema:
     """
     Controller for password reset confirmation
 
     Args:
         confirm_data: Password reset confirmation data from request
-        account_service: Account service for business logic
+        password_service: Password service for business logic
 
     Returns:
         PasswordResetConfirmResponseSchema with success message
@@ -408,24 +413,24 @@ async def confirm_password_reset_controller(
     )
 
     try:
-        await account_service.confirm_password_reset(reset_confirm_dto)
+        await password_service.confirm_password_reset(reset_confirm_dto)
     except InvalidPasswordResetTokenError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except ExpiredPasswordResetTokenError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except PasswordResetTokenNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except PasswordResetRollbackError as e:
-        logger.error(f"Password reset rolled back for token {confirm_data.token}: {e}")
+        logger.error(f"Password reset rolled back for token {mask_token_for_logging(confirm_data.token)}: {e}")
         raise HTTPException(
             status_code=503,
             detail="Password reset could not be completed. Please request it again."
@@ -433,10 +438,13 @@ async def confirm_password_reset_controller(
     except PasswordResetError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
-        logger.error(f"Unexpected error during password reset confirmation with token {confirm_data.token}: {e}")
+        logger.error(
+            f"Unexpected error during password reset confirmation with token "
+            f"{mask_token_for_logging(confirm_data.token)}: {e}"
+        )
         raise HTTPException(
             status_code=500,
             detail="Internal server error occurred during password reset confirmation"
@@ -450,7 +458,7 @@ async def confirm_password_reset_controller(
 async def change_password_controller(
         change_data: PasswordChangeSchema,
         jwt_payload: JWTPayloadDTO,
-        account_service: AccountServiceInterface,
+        password_service: PasswordServiceInterface,
 ) -> PasswordChangeResponseSchema:
     """
     Controller for password change by authenticated user
@@ -458,7 +466,7 @@ async def change_password_controller(
     Args:
         change_data: Password change data from request
         jwt_payload: JWT payload from verified access token
-        account_service: Account service for business logic
+        password_service: Password service for business logic
 
     Returns:
         PasswordChangeResponseSchema with success message
@@ -472,31 +480,31 @@ async def change_password_controller(
     )
 
     try:
-        await account_service.change_password(jwt_payload.email, change_dto)
+        await password_service.change_password(jwt_payload.email, change_dto)
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except IncorrectCurrentPasswordError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except SamePasswordError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserPasswordError as e:
         raise HTTPException(
             status_code=400,
-            detail=str(e)
+            detail=client_message(e)
         )
     except PasswordChangeError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during password change for user {jwt_payload.email}: {e}")
@@ -512,42 +520,42 @@ async def change_password_controller(
 
 async def refresh_access_token_controller(
         token_data: RefreshTokenRequest,
-        account_service: AccountServiceInterface,
+        authentication_service: AuthenticationServiceInterface,
 ) -> RefreshTokenResponse:
     """
     Controller for refreshing access token using refresh token
 
     Args:
         token_data: Refresh token data from request
-        account_service: Account service for business logic
+        authentication_service: Authentication service for business logic
 
     Returns:
-        RefreshTokenResponse with new access token
+        RefreshTokenResponse with the new token pair
 
     Raises:
         HTTPException: 401 for invalid/expired tokens, 404 if user not found, 500 for server errors
     """
     try:
-        new_access_token = await account_service.refresh_access_token(token_data.refresh_token)
+        tokens = await authentication_service.refresh_access_token(token_data.refresh_token)
     except InvalidRefreshTokenError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except UserNotFoundError as e:
         raise HTTPException(
             status_code=404,
-            detail=str(e)
+            detail=client_message(e)
         )
     except TokenValidationError as e:
         raise HTTPException(
             status_code=401,
-            detail=str(e)
+            detail=client_message(e)
         )
     except TokenGenerationError as e:
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=client_message(e)
         )
     except Exception as e:
         logger.error(f"Unexpected error during token refresh: {e}")
@@ -557,7 +565,8 @@ async def refresh_access_token_controller(
         )
     else:
         return RefreshTokenResponse(
-            access_token=new_access_token,
-            token_type="bearer",
-            expires_in=config.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            access_token=tokens.access_token,
+            refresh_token=tokens.refresh_token,
+            token_type=tokens.token_type,
+            expires_in=config.access_token_lifetime_seconds
         )

@@ -49,13 +49,18 @@ class RecordingTokenRepository(FakeTokenRepository):
         return True
 
 
-def build_service(email_sender: FakeEmailSender, transaction_manager: FakeTransactionManager) -> SocialAuthService:
+def build_service(
+        email_sender: FakeEmailSender,
+        transaction_manager: FakeTransactionManager,
+        password_manager: FakePasswordManager = None
+) -> SocialAuthService:
     """
     Assemble a social auth service from test doubles
 
     Args:
         email_sender: Sender recording deliveries
         transaction_manager: Manager exposing transaction state
+        password_manager: Manager recording where hashing happened
 
     Returns:
         Service wired for the test
@@ -65,7 +70,7 @@ def build_service(email_sender: FakeEmailSender, transaction_manager: FakeTransa
         user_repository=FakeUserRepository(),
         user_group_repository=FakeUserGroupRepository(),
         token_repository=RecordingTokenRepository(),
-        password_manager=FakePasswordManager(),
+        password_manager=password_manager or FakePasswordManager(),
         jwt_manager=FakeJWTManager(),
         email_sender=email_sender,
         transaction_manager=transaction_manager
@@ -113,4 +118,15 @@ async def test_welcome_email_failure_does_not_fail_authentication():
     response = await service.authenticate(SocialAuthRequest(provider="google", access_token="token"))
 
     assert response.success is True
+    assert transaction_manager.committed == 1
+
+async def test_the_generated_password_is_hashed_outside_the_transaction():
+    """A social registration hashes before opening the transaction that writes"""
+    password_manager = FakePasswordManager()
+    transaction_manager = FakeTransactionManager()
+    service = build_service(FakeEmailSender(), transaction_manager, password_manager)
+
+    await service.authenticate(SocialAuthRequest(provider="google", access_token="token"))
+
+    assert password_manager.hashed_inside_transaction == [False]
     assert transaction_manager.committed == 1

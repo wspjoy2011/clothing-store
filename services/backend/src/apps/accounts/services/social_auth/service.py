@@ -4,45 +4,42 @@ Universal social authentication service.
 
 import secrets
 
-from email_validator import validate_email, EmailNotValidError
+from email_validator import EmailNotValidError, validate_email
 
-from oauth.interfaces import OAuthProviderInterface
-from oauth.dto import OAuthUserInfo
-from oauth.exceptions import OAuthError, TokenVerificationError, UserInfoError
-
-from apps.accounts.dto.users import CreateUserDTO
 from apps.accounts.dto.tokens import CreateTokenDTO
+from apps.accounts.dto.users import CreateUserDTO
 from apps.accounts.enums.user_groups import UserGroupEnum
 from apps.accounts.interfaces.repositories import (
-    UserRepositoryInterface,
+    TokenRepositoryInterface,
     UserGroupRepositoryInterface,
-    TokenRepositoryInterface
+    UserRepositoryInterface,
 )
+from apps.accounts.repositories.exceptions import UserCreationError as RepoUserCreationError
 from apps.accounts.services.social_auth.dto import (
     SocialAuthRequest,
-    SocialUserProfile,
+    SocialAuthResponse,
     SocialAuthResult,
     SocialAuthTokens,
-    SocialAuthResponse
+    SocialUserProfile,
 )
 from apps.accounts.services.social_auth.exceptions import (
     SocialAuthError,
     SocialProviderError,
     SocialTokenError,
+    SocialTokenGenerationError,
     SocialUserInfoError,
-    SocialUserValidationError,
     SocialUserLookupError,
-    SocialTokenGenerationError
+    SocialUserValidationError,
 )
 from apps.accounts.services.social_auth.interfaces import SocialAuthServiceInterface
-from apps.accounts.repositories.exceptions import (
-    UserCreationError as RepoUserCreationError
-)
 from db.interfaces import TransactionManagerInterface
-from security.interfaces import PasswordManagerInterface, JWTManagerInterface
-from security.exceptions import TokenCreationError as SecurityTokenCreationError
 from notifications.email.interfaces import EmailSenderInterface
 from notifications.exceptions.email import BaseEmailError
+from oauth.dto import OAuthUserInfo
+from oauth.exceptions import OAuthError, TokenVerificationError, UserInfoError
+from oauth.interfaces import OAuthProviderInterface
+from security.exceptions import TokenCreationError as SecurityTokenCreationError
+from security.interfaces import JWTManagerInterface, PasswordManagerInterface
 from settings.config import config
 from settings.logging_config import get_logger
 
@@ -129,8 +126,7 @@ class SocialAuthService(SocialAuthServiceInterface):
         self._validate_profile(user_profile)
 
         try:
-            async with self._transaction_manager.atomic():
-                auth_result = await self._handle_user(user_profile)
+            auth_result = await self._handle_user(user_profile)
 
             if not auth_result.user_exists:
                 try:
@@ -234,6 +230,10 @@ class SocialAuthService(SocialAuthServiceInterface):
         """
         Handle user lookup/creation.
 
+        Hashing runs outside a transaction: it costs tens of milliseconds of CPU,
+        and holding a pooled connection with an open transaction meanwhile is what
+        exhausts the pool under a burst of logins.
+
         Args:
             profile: Social user profile
 
@@ -252,7 +252,8 @@ class SocialAuthService(SocialAuthServiceInterface):
 
             if not existing_user.is_active:
                 try:
-                    await self._user_repository.update_user_status(existing_user.id, True)
+                    async with self._transaction_manager.atomic():
+                        await self._user_repository.update_user_status(existing_user.id, True)
                     logger.info(f"User {existing_user.id} activated through {profile.provider} auth")
                 except Exception as e:
                     logger.error(f"Failed to activate user {existing_user.id}: {e}")
@@ -292,8 +293,9 @@ class SocialAuthService(SocialAuthServiceInterface):
         )
 
         try:
-            created_user = await self._user_repository.create_user(user_data)
-            await self._user_repository.update_user_status(created_user.id, True)
+            async with self._transaction_manager.atomic():
+                created_user = await self._user_repository.create_user(user_data)
+                await self._user_repository.update_user_status(created_user.id, True)
         except RepoUserCreationError as e:
             logger.error(f"User creation failed for {profile.email}: {e}")
             raise SocialUserLookupError(
@@ -374,7 +376,7 @@ class SocialAuthService(SocialAuthServiceInterface):
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            expires_in=3600
+            expires_in=config.access_token_lifetime_seconds
         )
 
     async def _store_refresh_token(self, user_id: int, refresh_token: str) -> None:

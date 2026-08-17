@@ -1,19 +1,19 @@
+import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any
+from typing import Any, Dict
 
 from jose import jwt
-from jose.exceptions import JWTError, JWTClaimsError, ExpiredSignatureError, JWSSignatureError
+from jose.exceptions import ExpiredSignatureError, JWTClaimsError, JWTError
 
-from security.interfaces import JWTManagerInterface
 from security.exceptions import (
+    EmptyTokenError,
+    ExpiredTokenError,
+    InvalidTokenError,
+    InvalidTokenTypeError,
     TokenCreationError,
     TokenVerificationError,
-    InvalidTokenError,
-    ExpiredTokenError,
-    TokenSignatureError,
-    InvalidTokenTypeError,
-    EmptyTokenError
 )
+from security.interfaces import JWTManagerInterface
 
 
 class JWTManager(JWTManagerInterface):
@@ -73,6 +73,10 @@ class JWTManager(JWTManagerInterface):
         """
         Create a new refresh token.
 
+        Every token carries a unique identifier: the rest of the payload is the same
+        for the same user within a second, so two issues would otherwise be the same
+        string, and neither rotation nor a per-session logout could tell them apart.
+
         Args:
             data: Dictionary containing the payload data
 
@@ -88,6 +92,7 @@ class JWTManager(JWTManagerInterface):
             to_encode.update({
                 "exp": expire,
                 "iat": datetime.now(timezone.utc),
+                "jti": str(uuid.uuid4()),
                 "type": "refresh"
             })
         except Exception as e:
@@ -109,7 +114,6 @@ class JWTManager(JWTManagerInterface):
             EmptyTokenError: If token is empty or None
             ExpiredTokenError: If token is expired
             InvalidTokenError: If token is invalid or malformed
-            TokenSignatureError: If token signature is invalid
             InvalidTokenTypeError: If token type is not 'access'
             TokenVerificationError: If verification fails for other reasons
         """
@@ -118,21 +122,19 @@ class JWTManager(JWTManagerInterface):
 
         try:
             payload = jwt.decode(token, self._access_secret, algorithms=[self._algorithm])
-
-            if payload.get("type") != "access":
-                raise InvalidTokenTypeError("Token type must be 'access'")
         except ExpiredSignatureError as e:
             raise ExpiredTokenError("Access token has expired", e)
-        except JWSSignatureError as e:
-            raise TokenSignatureError("Invalid token signature", e)
         except JWTClaimsError as e:
             raise InvalidTokenError("Invalid token claims", e)
         except JWTError as e:
             raise InvalidTokenError("Invalid token format", e)
         except Exception as e:
             raise TokenVerificationError(f"Failed to verify access token: {str(e)}", e)
-        else:
-            return payload
+
+        if payload.get("type") != "access":
+            raise InvalidTokenTypeError("Token type must be 'access'")
+
+        return payload
 
     def verify_refresh_token(self, token: str) -> Dict[str, Any]:
         """
@@ -148,7 +150,6 @@ class JWTManager(JWTManagerInterface):
             EmptyTokenError: If token is empty or None
             ExpiredTokenError: If token is expired
             InvalidTokenError: If token is invalid or malformed
-            TokenSignatureError: If token signature is invalid
             InvalidTokenTypeError: If token type is not 'refresh'
             TokenVerificationError: If verification fails for other reasons
         """
@@ -157,21 +158,19 @@ class JWTManager(JWTManagerInterface):
 
         try:
             payload = jwt.decode(token, self._refresh_secret, algorithms=[self._algorithm])
-
-            if payload.get("type") != "refresh":
-                raise InvalidTokenTypeError("Token type must be 'refresh'")
         except ExpiredSignatureError as e:
             raise ExpiredTokenError("Refresh token has expired", e)
-        except JWSSignatureError as e:
-            raise TokenSignatureError("Invalid token signature", e)
         except JWTClaimsError as e:
             raise InvalidTokenError("Invalid token claims", e)
         except JWTError as e:
             raise InvalidTokenError("Invalid token format", e)
         except Exception as e:
             raise TokenVerificationError(f"Failed to verify refresh token: {str(e)}", e)
-        else:
-            return payload
+
+        if payload.get("type") != "refresh":
+            raise InvalidTokenTypeError("Token type must be 'refresh'")
+
+        return payload
 
     def get_token_expiration(self, token: str) -> datetime:
         """

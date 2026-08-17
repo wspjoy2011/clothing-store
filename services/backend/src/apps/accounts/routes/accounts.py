@@ -1,107 +1,113 @@
 """Routes for accounts module"""
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from apps.accounts.controllers.accounts import (
-    create_user_controller,
     activate_account_controller,
-    resend_activation_controller,
+    change_password_controller,
+    confirm_password_reset_controller,
+    create_user_controller,
+    get_user_by_refresh_token_controller,
     login_user_controller,
     logout_user_controller,
-    get_user_by_refresh_token_controller,
+    refresh_access_token_controller,
     request_password_reset_controller,
-    confirm_password_reset_controller,
-    change_password_controller, refresh_access_token_controller
+    resend_activation_controller,
 )
-from apps.accounts.dependencies import get_account_service
-from apps.accounts.interfaces.services import AccountServiceInterface
-from apps.accounts.schemas.examples.errors import (
-    EMAIL_ALREADY_EXISTS_ERROR,
-    USER_CREATION_ERROR,
-    PASSWORD_PROCESSING_ERROR,
-    EMAIL_VALIDATION_ERROR,
-    PASSWORD_EMPTY_ERROR,
-    PASSWORD_TOO_SHORT_ERROR,
-    PASSWORD_NO_UPPERCASE_ERROR,
-    PASSWORD_NO_LOWERCASE_ERROR,
-    PASSWORD_NO_DIGIT_ERROR,
-    PASSWORD_NO_SPECIAL_CHAR_ERROR,
-    PASSWORD_TOO_LONG_ERROR,
-    INTERNAL_SERVER_ERROR,
-    INVALID_CREDENTIALS_ERROR,
-    USER_INACTIVE_ERROR,
-    USER_NOT_FOUND_ERROR,
-    TOKEN_GENERATION_ERROR,
-    LOGIN_ERROR,
-    AUTHORIZATION_HEADER_MISSING_ERROR,
-    INVALID_AUTHORIZATION_HEADER_ERROR,
-    INVALID_REFRESH_TOKEN_ERROR,
-    REFRESH_TOKEN_NOT_FOUND_ERROR,
-    REFRESH_TOKEN_EXPIRED_ERROR,
-    TOKEN_VALIDATION_ERROR
+from apps.accounts.dependencies import get_authentication_service, get_password_service, get_registration_service
+from apps.accounts.interfaces.services import (
+    AuthenticationServiceInterface,
+    PasswordServiceInterface,
+    RegistrationServiceInterface,
 )
-from apps.accounts.schemas.examples.jwt_token import REFRESH_TOKEN_RESPONSE_EXAMPLES, TOKEN_ERROR_EXAMPLES
-from apps.accounts.schemas.examples.password_reset import (
-    PASSWORD_RESET_REQUEST_SUCCESS_RESPONSE,
-    PASSWORD_RESET_REQUEST_VALIDATION_ERROR,
-    PASSWORD_RESET_EMAIL_ERROR,
-    PASSWORD_RESET_REQUEST_EXAMPLE,
-    PASSWORD_RESET_CONFIRM_SUCCESS_RESPONSE,
-    PASSWORD_RESET_INVALID_TOKEN_ERROR,
-    PASSWORD_RESET_EXPIRED_TOKEN_ERROR,
-    PASSWORD_RESET_TOKEN_NOT_FOUND_ERROR,
-    PASSWORD_RESET_CONFIRM_VALIDATION_ERROR,
-    PASSWORD_RESET_CONFIRM_WEAK_PASSWORD_ERROR,
-    PASSWORD_RESET_SERVER_ERROR,
-    PASSWORD_RESET_CONFIRM_EXAMPLE,
-    PASSWORD_CHANGE_SUCCESS_RESPONSE,
-    PASSWORD_CHANGE_SAME_PASSWORD_ERROR
-)
-from apps.accounts.schemas.examples.user import (
-    CREATE_USER_SUCCESS_RESPONSE,
-    LOGIN_RESPONSE_EXAMPLE,
-    USER_LOGIN_REQUEST_EXAMPLE,
-    GET_USER_BY_TOKEN_SUCCESS_RESPONSE
+from apps.accounts.schemas.activation import (
+    ActivateAccountResponseSchema,
+    ActivateAccountSchema,
+    ResendActivationResponseSchema,
+    ResendActivationSchema,
 )
 from apps.accounts.schemas.examples.activation import (
     ACTIVATE_ACCOUNT_REQUEST_EXAMPLE,
     ACTIVATE_ACCOUNT_SUCCESS_RESPONSE,
+    ACTIVATION_ALREADY_ACTIVE_ERROR,
+    ACTIVATION_EXPIRED_TOKEN_ERROR,
+    ACTIVATION_INVALID_TOKEN_ERROR,
+    ACTIVATION_USER_NOT_FOUND_ERROR,
+    ACTIVATION_VALIDATION_ERROR,
     RESEND_ACTIVATION_REQUEST_EXAMPLE,
     RESEND_ACTIVATION_SUCCESS_RESPONSE,
-    ACTIVATION_USER_NOT_FOUND_ERROR,
-    ACTIVATION_ALREADY_ACTIVE_ERROR,
-    ACTIVATION_INVALID_TOKEN_ERROR,
-    ACTIVATION_EXPIRED_TOKEN_ERROR,
-    ACTIVATION_VALIDATION_ERROR,
     RESEND_ALREADY_ACTIVE_ERROR,
+    RESEND_RATE_LIMIT_ERROR,
     RESEND_USER_NOT_FOUND_ERROR,
-    RESEND_RATE_LIMIT_ERROR
 )
-from apps.accounts.schemas.jwt_token import RefreshTokenResponse, TokenErrorResponse, RefreshTokenRequest
+from apps.accounts.schemas.examples.errors import (
+    AUTHORIZATION_HEADER_MISSING_ERROR,
+    EMAIL_ALREADY_EXISTS_ERROR,
+    EMAIL_VALIDATION_ERROR,
+    INTERNAL_SERVER_ERROR,
+    INVALID_AUTHORIZATION_HEADER_ERROR,
+    INVALID_CREDENTIALS_ERROR,
+    INVALID_REFRESH_TOKEN_ERROR,
+    LOGIN_ERROR,
+    PASSWORD_EMPTY_ERROR,
+    PASSWORD_NO_DIGIT_ERROR,
+    PASSWORD_NO_LOWERCASE_ERROR,
+    PASSWORD_NO_SPECIAL_CHAR_ERROR,
+    PASSWORD_NO_UPPERCASE_ERROR,
+    PASSWORD_PROCESSING_ERROR,
+    PASSWORD_TOO_LONG_ERROR,
+    PASSWORD_TOO_SHORT_ERROR,
+    REFRESH_TOKEN_EXPIRED_ERROR,
+    REFRESH_TOKEN_NOT_FOUND_ERROR,
+    TOKEN_GENERATION_ERROR,
+    TOKEN_VALIDATION_ERROR,
+    USER_CREATION_ERROR,
+    USER_INACTIVE_ERROR,
+    USER_NOT_FOUND_ERROR,
+)
+from apps.accounts.schemas.examples.jwt_token import REFRESH_TOKEN_RESPONSE_EXAMPLES, TOKEN_ERROR_EXAMPLES
+from apps.accounts.schemas.examples.password_reset import (
+    PASSWORD_CHANGE_SAME_PASSWORD_ERROR,
+    PASSWORD_CHANGE_SUCCESS_RESPONSE,
+    PASSWORD_RESET_CONFIRM_EXAMPLE,
+    PASSWORD_RESET_CONFIRM_SUCCESS_RESPONSE,
+    PASSWORD_RESET_CONFIRM_VALIDATION_ERROR,
+    PASSWORD_RESET_CONFIRM_WEAK_PASSWORD_ERROR,
+    PASSWORD_RESET_EMAIL_ERROR,
+    PASSWORD_RESET_EXPIRED_TOKEN_ERROR,
+    PASSWORD_RESET_INVALID_TOKEN_ERROR,
+    PASSWORD_RESET_REQUEST_EXAMPLE,
+    PASSWORD_RESET_REQUEST_SUCCESS_RESPONSE,
+    PASSWORD_RESET_REQUEST_VALIDATION_ERROR,
+    PASSWORD_RESET_SERVER_ERROR,
+    PASSWORD_RESET_TOKEN_NOT_FOUND_ERROR,
+)
+from apps.accounts.schemas.examples.user import (
+    CREATE_USER_SUCCESS_RESPONSE,
+    GET_USER_BY_TOKEN_SUCCESS_RESPONSE,
+    LOGIN_RESPONSE_EXAMPLE,
+    USER_LOGIN_REQUEST_EXAMPLE,
+)
+from apps.accounts.schemas.jwt_token import RefreshTokenRequest, RefreshTokenResponse, TokenErrorResponse
 from apps.accounts.schemas.password_reset import (
-    PasswordResetRequestResponseSchema,
-    PasswordResetRequestSchema,
+    PasswordChangeResponseSchema,
+    PasswordChangeSchema,
     PasswordResetConfirmResponseSchema,
     PasswordResetConfirmSchema,
-    PasswordChangeResponseSchema,
-    PasswordChangeSchema
+    PasswordResetRequestResponseSchema,
+    PasswordResetRequestSchema,
 )
 from apps.accounts.schemas.user import (
-    CreateUserSchema,
     CreateUserResponseSchema,
+    CreateUserSchema,
     LoginResponseSchema,
-    UserLoginSchema,
     LogoutResponseSchema,
     LogoutSchema,
-    RefreshTokenResponseSchema
+    RefreshTokenResponseSchema,
+    UserLoginSchema,
 )
-from apps.accounts.schemas.activation import (
-    ActivateAccountSchema,
-    ActivateAccountResponseSchema,
-    ResendActivationSchema,
-    ResendActivationResponseSchema
-)
-from security.http import JWTTokenDependency, AccessTokenDependency
+from security.http import AccessTokenDependency, JWTTokenDependency
+from security.rate_limit import CREDENTIAL_GUESS_LIMIT, EMAIL_DISPATCH_LIMIT, REGISTRATION_LIMIT, limiter
 
 API_PATHS: dict[str, str] = {
     "register": "/register",
@@ -226,16 +232,18 @@ router = APIRouter(
         }
     }
 )
+@limiter.limit(REGISTRATION_LIMIT)
 async def register_user_route(
+        request: Request,
         user_data: CreateUserSchema,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        registration_service: RegistrationServiceInterface = Depends(get_registration_service)
 ) -> CreateUserResponseSchema:
     """
     Register a new user account
 
     Args:
         user_data: User registration data (email and password)
-        account_service: Account service for business logic
+        registration_service: Registration service for business logic
 
     Returns:
         CreateUserResponseSchema: Created user data with success message
@@ -248,7 +256,7 @@ async def register_user_route(
     """
     return await create_user_controller(
         user_data=user_data,
-        account_service=account_service
+        registration_service=registration_service
     )
 
 
@@ -363,16 +371,18 @@ async def register_user_route(
         }
     }
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def activate_account_route(
+        request: Request,
         activation_data: ActivateAccountSchema,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        registration_service: RegistrationServiceInterface = Depends(get_registration_service)
 ) -> ActivateAccountResponseSchema:
     """
     Activate user account with email and token
 
     Args:
         activation_data: Account activation data (email and token)
-        account_service: Account service for business logic
+        registration_service: Registration service for business logic
 
     Returns:
         ActivateAccountResponseSchema: Activated user data with success message
@@ -387,7 +397,7 @@ async def activate_account_route(
     """
     return await activate_account_controller(
         activation_data=activation_data,
-        account_service=account_service
+        registration_service=registration_service
     )
 
 
@@ -483,16 +493,18 @@ async def activate_account_route(
         }
     }
 )
+@limiter.limit(EMAIL_DISPATCH_LIMIT)
 async def resend_activation_route(
+        request: Request,
         resend_data: ResendActivationSchema,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        registration_service: RegistrationServiceInterface = Depends(get_registration_service)
 ) -> ResendActivationResponseSchema:
     """
     Resend activation email to user
 
     Args:
         resend_data: Resend activation data (email only)
-        account_service: Account service for business logic
+        registration_service: Registration service for business logic
 
     Returns:
         ResendActivationResponseSchema: Success message with email confirmation
@@ -506,7 +518,7 @@ async def resend_activation_route(
     """
     return await resend_activation_controller(
         resend_data=resend_data,
-        account_service=account_service
+        registration_service=registration_service
     )
 
 
@@ -632,16 +644,18 @@ async def resend_activation_route(
         }
     }
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def login_user_route(
+        request: Request,
         login_data: UserLoginSchema,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        authentication_service: AuthenticationServiceInterface = Depends(get_authentication_service)
 ) -> LoginResponseSchema:
     """
     Authenticate user and return JWT tokens
 
     Args:
         login_data: User login credentials (email and password)
-        account_service: Account service for business logic
+        authentication_service: Authentication service for business logic
 
     Returns:
         LoginResponseSchema: JWT access and refresh tokens
@@ -656,7 +670,7 @@ async def login_user_route(
     """
     return await login_user_controller(
         login_data=login_data,
-        account_service=account_service
+        authentication_service=authentication_service
     )
 
 
@@ -702,14 +716,14 @@ async def login_user_route(
 )
 async def logout_user_route(
         logout_data: LogoutSchema,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        authentication_service: AuthenticationServiceInterface = Depends(get_authentication_service)
 ) -> LogoutResponseSchema:
     """
     Logout user by invalidating refresh token
 
     Args:
         logout_data: User logout data (refresh token)
-        account_service: Account service for business logic
+        authentication_service: Authentication service for business logic
 
     Returns:
         LogoutResponseSchema: Success message
@@ -719,7 +733,7 @@ async def logout_user_route(
     """
     return await logout_user_controller(
         logout_data=logout_data,
-        account_service=account_service
+        authentication_service=authentication_service
     )
 
 
@@ -808,14 +822,14 @@ async def logout_user_route(
 )
 async def get_user_by_refresh_token_route(
         refresh_token: JWTTokenDependency,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        authentication_service: AuthenticationServiceInterface = Depends(get_authentication_service)
 ) -> RefreshTokenResponseSchema:
     """
     Get current user information by refresh token
 
     Args:
         refresh_token: JWT refresh token from Authorization header
-        account_service: Account service for business logic
+        authentication_service: Authentication service for business logic
 
     Returns:
         RefreshTokenResponseSchema: User data with success message
@@ -828,7 +842,7 @@ async def get_user_by_refresh_token_route(
     """
     return await get_user_by_refresh_token_controller(
         refresh_token=refresh_token,
-        account_service=account_service
+        authentication_service=authentication_service
     )
 
 
@@ -907,16 +921,18 @@ async def get_user_by_refresh_token_route(
         }
     }
 )
+@limiter.limit(EMAIL_DISPATCH_LIMIT)
 async def request_password_reset_route(
+        request: Request,
         request_data: PasswordResetRequestSchema,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        password_service: PasswordServiceInterface = Depends(get_password_service)
 ) -> PasswordResetRequestResponseSchema:
     """
     Request password reset by email
 
     Args:
         request_data: Password reset request data (email only)
-        account_service: Account service for business logic
+        password_service: Password service for business logic
 
     Returns:
         PasswordResetRequestResponseSchema: Success message with email confirmation
@@ -932,7 +948,7 @@ async def request_password_reset_route(
     """
     return await request_password_reset_controller(
         request_data=request_data,
-        account_service=account_service
+        password_service=password_service
     )
 
 
@@ -1044,16 +1060,18 @@ async def request_password_reset_route(
         }
     }
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def confirm_password_reset_route(
+        request: Request,
         confirm_data: PasswordResetConfirmSchema,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        password_service: PasswordServiceInterface = Depends(get_password_service)
 ) -> PasswordResetConfirmResponseSchema:
     """
     Confirm password reset with token and new password
 
     Args:
         confirm_data: Password reset confirmation data (token and new password)
-        account_service: Account service for business logic
+        password_service: Password service for business logic
 
     Returns:
         PasswordResetConfirmResponseSchema: Success message
@@ -1067,7 +1085,7 @@ async def confirm_password_reset_route(
     """
     return await confirm_password_reset_controller(
         confirm_data=confirm_data,
-        account_service=account_service
+        password_service=password_service
     )
 
 
@@ -1170,7 +1188,7 @@ async def confirm_password_reset_route(
 async def change_password_route(
         change_data: PasswordChangeSchema,
         jwt_payload: AccessTokenDependency,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        password_service: PasswordServiceInterface = Depends(get_password_service)
 ) -> PasswordChangeResponseSchema:
     """
     Change password for authenticated user.
@@ -1182,7 +1200,7 @@ async def change_password_route(
     Args:
         change_data: Password change data containing old and new passwords
         jwt_payload: JWT payload from verified access token
-        account_service: Account service for business logic
+        password_service: Password service for business logic
 
     Returns:
         PasswordChangeResponseSchema with success message
@@ -1199,7 +1217,7 @@ async def change_password_route(
         User will receive an email notification about the password change.
         Email failure won't prevent password change but will be logged.
     """
-    return await change_password_controller(change_data, jwt_payload, account_service)
+    return await change_password_controller(change_data, jwt_payload, password_service)
 
 
 @router.post(
@@ -1270,9 +1288,11 @@ async def change_password_route(
     },
     tags=["Authentication"]
 )
+@limiter.limit(CREDENTIAL_GUESS_LIMIT)
 async def refresh_access_token_route(
+        request: Request,
         token_data: RefreshTokenRequest,
-        account_service: AccountServiceInterface = Depends(get_account_service)
+        authentication_service: AuthenticationServiceInterface = Depends(get_authentication_service)
 ) -> RefreshTokenResponse:
     """
     Refresh access token using valid refresh token.
@@ -1282,7 +1302,7 @@ async def refresh_access_token_route(
 
     Args:
         token_data: Refresh token data from request body
-        account_service: Account service for business logic
+        authentication_service: Authentication service for business logic
 
     Returns:
         RefreshTokenResponse with new access token, token type, and expiration time
@@ -1298,4 +1318,4 @@ async def refresh_access_token_route(
         The refresh token must exist in the database and not be expired.
         The new access token contains current user data and permissions.
     """
-    return await refresh_access_token_controller(token_data, account_service)
+    return await refresh_access_token_controller(token_data, authentication_service)

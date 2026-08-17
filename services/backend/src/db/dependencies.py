@@ -1,6 +1,6 @@
 from fastapi import Depends
 
-from db.connection import get_connection_pool, AsyncConnectionPool
+from db.connection import AsyncConnectionPool, get_connection_pool
 from db.dao import PostgreSQLDAO
 from db.interfaces import DAOInterface, SQLQueryBuilderInterface, TransactionManagerInterface
 from db.query_builder import SQLQueryBuilder

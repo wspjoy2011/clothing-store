@@ -35,7 +35,7 @@ def build_repository() -> ProductRepository:
     Returns:
         Repository usable for row mapping only
     """
-    return ProductRepository(dao=None, query_builder=None)
+    return ProductRepository(dao=None)
 
 
 def test_row_with_every_field_is_mapped():

@@ -1,13 +1,7 @@
-from typing import Optional, ClassVar, Dict, Tuple
+import time
+from typing import ClassVar, Optional, Tuple
 
-from async_lru import alru_cache
-
-from apps.catalog.dto.category import (
-    CategoryMenuDTO,
-    MasterCategoryInfoDTO,
-    SubCategoryInfoDTO,
-    ArticleTypeInfoDTO
-)
+from apps.catalog.dto.category import ArticleTypeInfoDTO, CategoryMenuDTO, MasterCategoryInfoDTO, SubCategoryInfoDTO
 from apps.catalog.interfaces.repositories import CategoryRepositoryInterface
 from db.interfaces import DAOInterface
 from settings.logging_config import get_logger
@@ -16,33 +10,48 @@ logger = get_logger(__name__, "app")
 
 
 class CategoryRepository(CategoryRepositoryInterface):
+    """Repository implementation for category operations using SQL database
+
+    The category menu is the same for every caller and changes rarely, so it is
+    cached for the whole process rather than per instance: a repository built per
+    request would give every request its own empty cache.
+    """
+
     APP_NAME = "catalog"
-    _instances: ClassVar[Dict[str, 'CategoryRepository']] = {}
+    MENU_CACHE_TTL_SECONDS = 3600
+
+    _cached_menu: ClassVar[Optional[CategoryMenuDTO]] = None
+    _cached_menu_at: ClassVar[float] = 0.0
 
     def __init__(self, dao: DAOInterface):
         self._dao = dao
 
     @classmethod
-    def get_instance(cls, dao: DAOInterface) -> 'CategoryRepository':
-        """
-        Get or create a singleton instance of the repository
+    def reset_menu_cache(cls) -> None:
+        """Forget the cached menu, so the next read goes to the database"""
+        cls._cached_menu = None
+        cls._cached_menu_at = 0.0
 
-        Args:
-            dao: Data Access Object
-
-        Returns:
-            Repository instance
-        """
-        key = str(id(dao))
-        if key not in cls._instances:
-            cls._instances[key] = cls(dao)
-        return cls._instances[key]
-
-    @alru_cache(maxsize=1, ttl=3600)
     async def get_category_menu(self) -> CategoryMenuDTO:
         """
         Get the complete category menu structure with all master categories,
         subcategories and article types.
+
+        Returns:
+            CategoryMenuDTO: The complete category hierarchy
+        """
+        cached = type(self)._cached_menu
+        if cached is not None and time.monotonic() - type(self)._cached_menu_at < self.MENU_CACHE_TTL_SECONDS:
+            return cached
+
+        menu = await self._load_category_menu()
+        type(self)._cached_menu = menu
+        type(self)._cached_menu_at = time.monotonic()
+        return menu
+
+    async def _load_category_menu(self) -> CategoryMenuDTO:
+        """
+        Read the whole category hierarchy from the database
 
         Returns:
             CategoryMenuDTO: The complete category hierarchy
@@ -62,7 +71,7 @@ class CategoryRepository(CategoryRepositoryInterface):
 
             if master_id not in master_categories:
                 master_categories[master_id] = MasterCategoryInfoDTO(
-                    master_category_id=master_id,
+                    id=master_id,
                     name=master_name,
                     sub_categories=[]
                 )
@@ -103,7 +112,7 @@ class CategoryRepository(CategoryRepositoryInterface):
         master_id, master_name, _, _, _, _ = self._extract_row_data(category_result[0])
 
         master_category = MasterCategoryInfoDTO(
-            master_category_id=master_id,
+            id=master_id,
             name=master_name,
             sub_categories=[]
         )
@@ -134,23 +143,23 @@ class CategoryRepository(CategoryRepositoryInterface):
             SQL query string
         """
         query = f"""
-            SELECT 
+            SELECT
                 mc.master_category_id,
                 mc.name as master_name,
                 sc.sub_category_id,
                 sc.name as sub_name,
                 at.article_type_id,
                 at.name as article_name
-            FROM 
+            FROM
                 {self.APP_NAME}_master_category mc
-            LEFT JOIN 
+            LEFT JOIN
                 {self.APP_NAME}_sub_category sc ON mc.master_category_id = sc.master_category_id
-            LEFT JOIN 
+            LEFT JOIN
                 {self.APP_NAME}_article_type at ON sc.sub_category_id = at.sub_category_id
         """
 
         if master_category_id is not None:
-            query += f" WHERE mc.master_category_id = %s"
+            query += " WHERE mc.master_category_id = %s"
 
         query += " ORDER BY mc.name, sc.name, at.name"
 
@@ -191,7 +200,7 @@ class CategoryRepository(CategoryRepositoryInterface):
             article_name: Article type name
         """
         article_type = ArticleTypeInfoDTO(
-            article_type_id=article_id,
+            id=article_id,
             name=article_name
         )
 
@@ -236,7 +245,7 @@ class CategoryRepository(CategoryRepositoryInterface):
             Created subcategory
         """
         subcategory = SubCategoryInfoDTO(
-            sub_category_id=sub_id,
+            id=sub_id,
             name=sub_name,
             article_types=[]
         )
