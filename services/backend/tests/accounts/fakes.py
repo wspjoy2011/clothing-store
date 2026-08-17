@@ -67,15 +67,29 @@ class FakeEmailSender:
 
 
 class FakeUserRepository:
-    """User repository backed by an in-memory list"""
+    """User repository backed by an in-memory list
+
+    Writes answer the way the real ones do, from the number of rows they matched:
+    updating somebody who is not there reports False rather than success.
+    """
 
     def __init__(self):
         self.users: List[UserDTO] = []
         self.next_id = 1
+        self.password_updates: List[tuple] = []
 
     async def get_user_by_email(self, email: str) -> Optional[UserDTO]:
         """Find a user by address"""
         return next((user for user in self.users if user.email == email), None)
+
+    async def get_user_password_hash(self, user_id: int) -> Optional[str]:
+        """Report the stored hash of a user"""
+        return next((f"hashed:stored" for user in self.users if user.id == user_id), None)
+
+    async def update_user_password(self, user_id: int, hashed_password: str) -> bool:
+        """Record the update and report whether any stored user matched"""
+        self.password_updates.append((user_id, hashed_password))
+        return any(user.id == user_id for user in self.users)
 
     async def update_user_status(self, user_id: int, is_active: bool) -> bool:
         """Mark a stored user as active or inactive"""

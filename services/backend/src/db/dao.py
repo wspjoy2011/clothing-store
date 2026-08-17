@@ -65,6 +65,50 @@ class PostgreSQLDAO(DAOInterface):
         async with self._connection_pool.connection() as connection:
             return await self._run(connection, query, params, fetch, fetch_one, row_factory)
 
+    async def execute_write(self, query: str, params: Optional[List[Any]] = None) -> int:
+        """
+        Execute a statement that changes rows and report how many it changed
+
+        A caller deciding whether the change happened cannot use the absence of an
+        exception: a statement matching no row succeeds and changes nothing.
+
+        Args:
+            query: SQL statement to execute
+            params: Statement parameters
+
+        Returns:
+            Number of rows the statement affected
+        """
+        transaction = get_current_transaction()
+        if transaction is not None:
+            logger.debug("Executing write within transaction context")
+            return await self._run_write(transaction.connection, query, params)
+
+        logger.debug("Executing write without transaction context")
+        async with self._connection_pool.connection() as connection:
+            return await self._run_write(connection, query, params)
+
+    @staticmethod
+    async def _run_write(
+            connection: AsyncConnection,
+            query: str,
+            params: Optional[List[Any]]
+    ) -> int:
+        """
+        Execute a changing statement on the given connection
+
+        Args:
+            connection: Connection to run the statement on
+            query: SQL statement to execute
+            params: Statement parameters
+
+        Returns:
+            Number of rows the statement affected
+        """
+        async with connection.cursor() as cursor:
+            await cursor.execute(query, params or [])
+            return cursor.rowcount
+
     @staticmethod
     async def _run(
             connection: AsyncConnection,

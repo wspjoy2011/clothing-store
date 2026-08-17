@@ -91,13 +91,13 @@ class UserRepository(BaseRepository, UserRepositoryInterface):
         params = [is_active, user_id]
 
         try:
-            status = await self._execute_custom_update_query(query, params, "Update user status")
+            affected = await self._execute_custom_update_query(query, params, "Update user status")
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise UserUpdateError(f"Failed to update status for user with ID: {user_id}", e)
             raise UserUpdateError(f"Unexpected error updating status for user with ID: {user_id}", e)
         else:
-            return status
+            return affected > 0
 
     async def update_user_password(self, user_id: int, hashed_password: str) -> bool:
         """Update user password"""
@@ -105,13 +105,13 @@ class UserRepository(BaseRepository, UserRepositoryInterface):
         params = [hashed_password, user_id]
 
         try:
-            status = await self._execute_custom_update_query(query, params, "Update user password")
+            affected = await self._execute_custom_update_query(query, params, "Update user password")
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise UserUpdateError(f"Failed to update password for user with ID: {user_id}", e)
             raise UserUpdateError(f"Unexpected error updating password for user with ID: {user_id}", e)
         else:
-            return status
+            return affected > 0
 
     async def delete_user(self, user_id: int) -> bool:
         """Delete a user"""
@@ -119,13 +119,13 @@ class UserRepository(BaseRepository, UserRepositoryInterface):
         params = [user_id]
 
         try:
-            status = await self._execute_custom_update_query(query, params, "Delete user")
+            affected = await self._execute_custom_update_query(query, params, "Delete user")
         except Exception as e:
             if isinstance(e, (psycopg.Error, psycopg.DatabaseError)):
                 raise UserDeletionError(f"Failed to delete user with ID: {user_id}", e)
             raise UserDeletionError(f"Unexpected error deleting user with ID: {user_id}", e)
         else:
-            return status
+            return affected > 0
 
     async def get_users_list(self, limit: int = 50, offset: int = 0) -> List[UserWithProfileDTO]:
         """Get list of users with pagination"""
