@@ -59,6 +59,14 @@ Backend tests live in `services/backend/tests`, mirror the package they cover an
 
 Coverage is measured with `pytest --cov`. The target is **90%**; `fail_under` in `pyproject.toml` holds the floor at the level already reached, so a change that drops coverage fails the run rather than relying on anyone noticing. Raise the floor when you raise the coverage. Chase uncovered branches, not uncovered lines: a file at 100% whose error paths were never executed is not covered.
 
+## Linting
+
+Backend code is checked with **ruff**, configured in `pyproject.toml`: `ruff check src tests`. It runs before every push, alongside the tests — it catches a class of defect they do not, having already found a `return` on a name that did not exist.
+
+A fake mirrors the contract it stands in for, or the tests above it prove nothing. When the real thing refuses something — an isolation level changed inside a transaction, a row factory that maps a row, a commit on leaving a pooled connection — the fake refuses it too.
+
+`--fix` is safe to apply but never to trust blindly: it deletes re-exports that look like unused imports. Declare them in `__all__` and re-run the tests after any automatic fix.
+
 ## Dependencies
 
 Backend dependencies are managed by **uv**: `pyproject.toml` + `uv.lock`, both committed. Add packages with `uv add`, install with `uv sync`.
