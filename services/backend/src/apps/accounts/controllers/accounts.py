@@ -533,13 +533,13 @@ async def refresh_access_token_controller(
         account_service: Account service for business logic
 
     Returns:
-        RefreshTokenResponse with new access token
+        RefreshTokenResponse with the new token pair
 
     Raises:
         HTTPException: 401 for invalid/expired tokens, 404 if user not found, 500 for server errors
     """
     try:
-        new_access_token = await account_service.refresh_access_token(token_data.refresh_token)
+        tokens = await account_service.refresh_access_token(token_data.refresh_token)
     except InvalidRefreshTokenError as e:
         raise HTTPException(
             status_code=401,
@@ -568,7 +568,8 @@ async def refresh_access_token_controller(
         )
     else:
         return RefreshTokenResponse(
-            access_token=new_access_token,
-            token_type="bearer",
+            access_token=tokens.access_token,
+            refresh_token=tokens.refresh_token,
+            token_type=tokens.token_type,
             expires_in=config.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )

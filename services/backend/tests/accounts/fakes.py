@@ -183,3 +183,8 @@ class FakeJWTManager:
     def get_token_expiration(token: str) -> datetime:
         """Return a fixed expiration far enough in the future"""
         return datetime(2027, 1, 1, tzinfo=timezone.utc)
+
+    @staticmethod
+    def verify_refresh_token(token: str) -> dict:
+        """Report the payload a valid refresh token would carry"""
+        return {"user_id": 1, "email": "user@example.com", "group_id": 1, "group_name": "user", "type": "refresh"}
