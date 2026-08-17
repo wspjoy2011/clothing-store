@@ -54,7 +54,3 @@ CREATE TRIGGER trigger_catalog_product_inventory_updated_at
     BEFORE UPDATE ON catalog_product_inventory
     FOR EACH ROW
     EXECUTE FUNCTION update_catalog_product_inventory_updated_at();
-
--- Grant privileges
-GRANT ALL PRIVILEGES ON TABLE catalog_product_inventory TO admin;
-GRANT ALL PRIVILEGES ON SEQUENCE catalog_product_inventory_id_seq TO admin;
