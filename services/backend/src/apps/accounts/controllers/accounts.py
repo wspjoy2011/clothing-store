@@ -369,9 +369,16 @@ async def request_password_reset_controller(
     try:
         await account_service.request_password_reset(reset_request_dto)
     except PasswordResetEmailError as e:
+        logger.error(f"Password reset email could not be sent for {request_data.email}: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=str(e)
+            status_code=503,
+            detail="Password reset email could not be sent. Please try again."
+        )
+    except PasswordResetError as e:
+        logger.error(f"Password reset could not be started for {request_data.email}: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Password reset could not be started. Please try again."
         )
     except Exception as e:
         logger.error(f"Unexpected error during password reset request for email {request_data.email}: {e}")

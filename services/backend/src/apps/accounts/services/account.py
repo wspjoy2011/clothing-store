@@ -439,16 +439,20 @@ class AccountService(AccountServiceInterface):
         """
         Request password reset by email
 
-        Sends reset email if user exists (security - always returns True)
+        Business logic: Replace any previous token in one transaction, so a failure
+        cannot leave the user with neither the old link nor a new one, then send the
+        email outside it. An unknown or inactive address is answered as success, so
+        the endpoint does not reveal who is registered
 
         Args:
             request_data: Password reset request data containing email
 
         Returns:
-            True if process completed (always returns True for security)
+            True if process completed
 
         Raises:
-            BaseEmailError: If email sending fails (only for existing users)
+            PasswordResetError: If the reset token could not be replaced
+            PasswordResetEmailError: If the email could not be sent
         """
         logger.info(f"Starting password reset request for email: {request_data.email}")
 
@@ -464,20 +468,25 @@ class AccountService(AccountServiceInterface):
             return True
 
         try:
-            await self._token_repository.delete_password_reset_tokens_by_user_id(user.id)
-            logger.info(f"Deleted existing password reset tokens for user {user.id}")
+            async with self._transaction_manager.atomic():
+                await self._token_repository.delete_password_reset_tokens_by_user_id(user.id)
+                logger.info(f"Deleted existing password reset tokens for user {user.id}")
 
-            reset_token = await self._create_password_reset_token(user.id)
-            logger.info(f"Password reset token created for user: {request_data.email}, user_id: {user.id}")
+                reset_token = await self._create_password_reset_token(user.id)
+                logger.info(f"Password reset token created for user: {request_data.email}, user_id: {user.id}")
+        except TokenCreationError as e:
+            logger.error(
+                f"Password reset not started for user {user.id}: the replacement token could not be created, "
+                f"so the previous one was kept: {e}"
+            )
+            raise PasswordResetError("Password reset could not be started. Please try again.", e)
 
+        try:
             await self._send_password_reset_email(request_data.email, reset_token)
             logger.info(f"Password reset email sent successfully to {request_data.email}")
 
             return True
 
-        except TokenCreationError as e:
-            logger.error(f"Failed to create password reset token for user {user.id}: {e}")
-            return True
         except BaseEmailError as e:
             logger.error(f"Failed to send password reset email to {request_data.email}: {e}")
             raise PasswordResetEmailError(
